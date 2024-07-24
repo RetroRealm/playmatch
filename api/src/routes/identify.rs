@@ -4,7 +4,7 @@ use actix_web::web::Data;
 use log::debug;
 use sea_orm::DatabaseConnection;
 
-use service::query::find_game_release_and_id_mapping_by_md5;
+use service::db::query::find_game_release_and_id_mapping_by_md5;
 
 use crate::models::game_file::{GameFileRequest, GameMatchResponse, GameMatchType};
 

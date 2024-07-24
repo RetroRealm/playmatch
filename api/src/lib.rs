@@ -1,4 +1,5 @@
 use std::env;
+use std::path::Path;
 
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{App, HttpServer};
@@ -7,19 +8,18 @@ use actix_web::web::{Data, scope};
 use dotenvy::dotenv;
 use env_logger::Env;
 use log::LevelFilter;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm::{ConnectOptions, Database};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 use migration::{Migrator, MigratorTrait};
+use service::dat::no_intro::dat::read_no_intro_dat_files;
 
 use crate::models::game_file::GameFileRequest;
 use crate::models::game_file::GameMatchResponse;
 use crate::models::game_file::GameMatchType;
 use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
-use crate::routes::test::__path_hello_world;
-use crate::routes::test::hello_world;
 
 pub mod error;
 mod models;
@@ -61,8 +61,10 @@ async fn start() -> anyhow::Result<()> {
 
     opt.sqlx_logging_level(LevelFilter::Debug);
 
-    let conn: DatabaseConnection = Database::connect(opt).await?;
+    let conn = Database::connect(opt).await?;
     Migrator::up(&conn, None).await?;
+
+    read_no_intro_dat_files(Path::new(&env::var("DAT_PATH")?), &conn).await?;
 
     let conn_data = Data::new(conn);
 

@@ -5,6 +5,12 @@ edition = "2021"
 
 [dependencies]
 entity = { path = "../entity" }
+tokio = { version = "^1", features = ["macros", "rt"] }
+serde = { version = "^1", features = ["derive"] }
+serde-xml-rs = "^0.6"
+anyhow = "^1"
+log = "^0.4"
+chrono = "^0.4"
 
 [dependencies.sea-orm]
 version = "^0.12" # sea-orm version
@@ -13,6 +19,3 @@ features = [
 	"runtime-tokio-rustls",
 	"sqlx-postgres"
 ]
-
-[dev-dependencies]
-tokio = { version = "^1", features = ["macros", "rt"] }

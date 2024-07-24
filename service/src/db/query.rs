@@ -6,6 +6,23 @@ use ::entity::{
 	game_release_id_mapping, game_release_id_mapping::Entity as GameReleaseIdMapping,
 };
 
+pub async fn find_game_release_by_name_and_platform_and_platform_company(
+    name: &str,
+    platform: &str,
+    platform_company: &str,
+    conn: &DbConn,
+) -> Result<Option<game_release::Model>, DbErr> {
+    GameRelease::find()
+        .filter(
+            game_release::Column::Name
+                .eq(name)
+                .and(game_release::Column::Platform.eq(platform))
+                .and(game_release::Column::PlatformCompany.eq(platform_company)),
+        )
+        .one(conn)
+        .await
+}
+
 pub async fn find_game_release_and_id_mapping_by_md5(
     md5: &str,
     conn: &DbConn,
