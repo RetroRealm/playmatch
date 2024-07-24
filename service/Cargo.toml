@@ -1,0 +1,18 @@
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+entity = { path = "../entity" }
+
+[dependencies.sea-orm]
+version = "^0.12" # sea-orm version
+features = [
+	"debug-print",
+	"runtime-tokio-rustls",
+	"sqlx-postgres"
+]
+
+[dev-dependencies]
+tokio = { version = "^1", features = ["macros", "rt"] }

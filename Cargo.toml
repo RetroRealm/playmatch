@@ -1,0 +1,16 @@
+[package]
+name = "playmatch"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+authors = ["DevYukine <devyukine@gmx.de>"]
+description = "A simple matchmaking service"
+
+[workspace]
+members = [".", "api", "service", "entity", "migration"]
+
+[dependencies]
+api = { path = "api" }
+
+[build-dependencies]
+built = "^0.7"
