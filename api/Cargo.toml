@@ -26,6 +26,7 @@ actix-governor = "^0.5"
 utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono"] }
 utoipa-swagger-ui = { version = "^7.1", features = ["actix-web"] }
 uuid = "^1.10"
+derive_builder = "^0.20"
 
 [build-dependencies]
 built = "^0.7"
