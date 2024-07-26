@@ -38,10 +38,8 @@ pub async fn identify(
         }
     }
 
-    builder.insert_header(CacheControl(vec![
-        CacheDirective::Public,
-        CacheDirective::MaxAge(7200u32),
-    ]));
+
+	builder.set_public_cacheable(7200u32);
 
     Ok(
         builder.json(response_body.unwrap_or_else(|| GameMatchResponse {
