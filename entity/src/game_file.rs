@@ -32,7 +32,7 @@ pub enum Relation {
         from = "Column::GameReleaseId",
         to = "super::game_release::Column::Id",
         on_update = "NoAction",
-        on_delete = "NoAction"
+        on_delete = "Cascade"
     )]
     GameRelease,
 }
