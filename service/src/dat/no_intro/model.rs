@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Datafile {
     pub header: Header,
 
     pub game: Option<Vec<Game>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Game {
     pub description: String,
 
@@ -24,7 +24,7 @@ pub struct Game {
     pub category: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RomElement {
     pub name: String,
 
@@ -45,7 +45,7 @@ pub struct RomElement {
     pub mia: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Header {
     pub id: String,
 
@@ -64,13 +64,13 @@ pub struct Header {
     pub clrmamepro: Clrmamepro,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Clrmamepro {
     #[serde(rename = "forcenodump")]
     pub force_no_dump: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Status {
     #[serde(rename = "baddump")]
     Baddump,
