@@ -13,7 +13,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 use migration::{Migrator, MigratorTrait};
-use service::dat::no_intro::dat::read_no_intro_dat_files;
+use service::dat::no_intro::dat::read_and_import_no_intro_dat_files;
 
 use crate::models::game_file::GameFileRequest;
 use crate::models::game_file::GameMatchResponse;
@@ -64,7 +64,7 @@ async fn start() -> anyhow::Result<()> {
     let conn = Database::connect(opt).await?;
     Migrator::up(&conn, None).await?;
 
-    read_no_intro_dat_files(Path::new(&env::var("DAT_PATH")?), &conn).await?;
+	read_and_import_no_intro_dat_files(Path::new(&env::var("DAT_PATH")?), &conn).await?;
 
     let conn_data = Data::new(conn);
 

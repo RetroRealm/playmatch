@@ -10,7 +10,7 @@ use tokio::fs;
 use crate::dat::no_intro::model::Datafile;
 use crate::db::query::find_game_release_by_name_and_platform_and_platform_company;
 
-pub async fn read_no_intro_dat_files(path: &Path, conn: &DbConn) -> anyhow::Result<()> {
+pub async fn read_and_import_no_intro_dat_files(path: &Path, conn: &DbConn) -> anyhow::Result<()> {
     let mut entries = fs::read_dir(path).await?;
 
     while let Some(entry) = entries.next_entry().await? {
