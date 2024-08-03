@@ -20,87 +20,87 @@ use crate::models::game_file::GameMatchType;
 use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
 
+mod abstraction;
 pub mod error;
 mod models;
 pub mod routes;
-mod abstraction;
 
 pub mod built_info {
-	// The file has been placed there by the build script.
-	include!(concat!(env!("OUT_DIR"), "/built.rs"));
+    // The file has been placed there by the build script.
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 #[actix_web::main]
 async fn start() -> anyhow::Result<()> {
-	dotenv()?;
-	env_logger::Builder::from_env(Env::default().default_filter_or("info")).try_init()?;
+    dotenv()?;
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).try_init()?;
 
-	let port = env::var("PORT").unwrap_or("8080".to_string());
-	let worker_amount = match env::var("HTTP_WORKERS") {
-		Ok(workers) => workers.parse::<usize>()?,
-		Err(_) => num_cpus::get(),
-	};
+    let port = env::var("PORT").unwrap_or("8080".to_string());
+    let worker_amount = match env::var("HTTP_WORKERS") {
+        Ok(workers) => workers.parse::<usize>()?,
+        Err(_) => num_cpus::get(),
+    };
 
-	// Allow bursts with up to 20 requests per IP address
-	// and replenishes two element every seconds
-	let governor_conf = GovernorConfigBuilder::default()
-		.use_headers()
-		.per_millisecond(500)
-		.burst_size(20)
-		.finish()
-		.unwrap();
+    // Allow bursts with up to 20 requests per IP address
+    // and replenishes two element every seconds
+    let governor_conf = GovernorConfigBuilder::default()
+        .use_headers()
+        .per_millisecond(500)
+        .burst_size(20)
+        .finish()
+        .unwrap();
 
-	#[derive(OpenApi)]
-	#[openapi(
-		paths(identify),
-		components(schemas(GameFileRequest, GameMatchResponse, GameMatchType))
-	)]
-	struct ApiDoc;
+    #[derive(OpenApi)]
+    #[openapi(
+        paths(identify),
+        components(schemas(GameFileRequest, GameMatchResponse, GameMatchType))
+    )]
+    struct ApiDoc;
 
-	let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
+    let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
 
-	opt.sqlx_logging_level(LevelFilter::Debug);
+    opt.sqlx_logging_level(LevelFilter::Debug);
 
-	let conn = Database::connect(opt).await?;
-	Migrator::up(&conn, None).await?;
+    let conn = Database::connect(opt).await?;
+    Migrator::up(&conn, None).await?;
 
-	let client = reqwest::Client::builder().cookie_store(true).build()?;
+    let client = reqwest::Client::builder().cookie_store(true).build()?;
 
-	download_and_parse_dats(&client).await?;
+    download_and_parse_dats(&client).await?;
 
-	let conn_data = Data::new(conn);
-	let client_data = Data::new(client);
+    let conn_data = Data::new(conn);
+    let client_data = Data::new(client);
 
-	HttpServer::new(move || {
-		App::new()
-			.wrap(Compress::default())
-			.app_data(conn_data.clone())
-			.app_data(client_data.clone())
-			.service(
-				scope("/api")
-					.wrap(Governor::new(&governor_conf))
-					.wrap(Logger::default())
-					.wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
-					.service(identify),
-			)
-			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
-				Url::new("api", "/api-docs/openapi.json"),
-				ApiDoc::openapi(),
-			)]))
-	})
-		.bind(format!("0.0.0.0:{}", port))?
-		.shutdown_timeout(15)
-		.workers(worker_amount)
-		.run()
-		.await?;
+    HttpServer::new(move || {
+        App::new()
+            .wrap(Compress::default())
+            .app_data(conn_data.clone())
+            .app_data(client_data.clone())
+            .service(
+                scope("/api")
+                    .wrap(Governor::new(&governor_conf))
+                    .wrap(Logger::default())
+                    .wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
+                    .service(identify),
+            )
+            .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
+                Url::new("api", "/api-docs/openapi.json"),
+                ApiDoc::openapi(),
+            )]))
+    })
+    .bind(format!("0.0.0.0:{}", port))?
+    .shutdown_timeout(15)
+    .workers(worker_amount)
+    .run()
+    .await?;
 
-	Ok(())
+    Ok(())
 }
 
 pub fn main() {
-	let result = start();
+    let result = start();
 
-	if let Some(err) = result.err() {
-		println!("Error: {err}");
-	}
+    if let Some(err) = result.err() {
+        println!("Error: {err}");
+    }
 }
