@@ -11,6 +11,8 @@ use crate::zip::extract_zip_to_directory;
 const REDUMP_URL: &str = "http://redump.org";
 
 pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
+    // TODO: make download and unzip happen in tmp dir, only delete files when all new files are downloaded to prevent data loss when redump is down or not reachable
+
     let response = client
         .get(format!("{}/downloads", REDUMP_URL))
         .send()
