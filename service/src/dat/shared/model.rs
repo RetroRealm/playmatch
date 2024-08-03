@@ -47,7 +47,7 @@ pub struct RomElement {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Header {
-    pub id: String,
+    pub id: Option<String>,
 
     pub name: String,
 
@@ -60,14 +60,6 @@ pub struct Header {
     pub homepage: String,
 
     pub url: String,
-
-    pub clrmamepro: Clrmamepro,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Clrmamepro {
-    #[serde(rename = "forcenodump")]
-    pub force_no_dump: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
