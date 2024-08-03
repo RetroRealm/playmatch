@@ -1,5 +1,4 @@
 use std::env;
-use std::path::Path;
 
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{App, HttpServer};
@@ -13,7 +12,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 use migration::{Migrator, MigratorTrait};
-use service::dat::no_intro::dat::read_and_import_no_intro_dat_files;
+use service::dat::download_and_parse_dats;
 
 use crate::models::game_file::GameFileRequest;
 use crate::models::game_file::GameMatchResponse;
@@ -65,14 +64,18 @@ async fn start() -> anyhow::Result<()> {
 	let conn = Database::connect(opt).await?;
 	Migrator::up(&conn, None).await?;
 
-	read_and_import_no_intro_dat_files(Path::new(&env::var("DAT_PATH")?), &conn).await?;
+	let client = reqwest::Client::builder().cookie_store(true).build()?;
+
+	download_and_parse_dats(&client).await?;
 
 	let conn_data = Data::new(conn);
+	let client_data = Data::new(client);
 
 	HttpServer::new(move || {
 		App::new()
 			.wrap(Compress::default())
 			.app_data(conn_data.clone())
+			.app_data(client_data.clone())
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))

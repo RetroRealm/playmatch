@@ -6,11 +6,18 @@ edition = "2021"
 [dependencies]
 entity = { path = "../entity" }
 tokio = { version = "^1", features = ["macros", "rt"] }
+reqwest = { version = "^0.12", features = ["rustls-tls", "cookies", "stream"], default-features = false }
+scraper = "^0.19"
 serde = { version = "^1", features = ["derive"] }
 serde-xml-rs = "^0.6"
 anyhow = "^1"
 log = "^0.4"
 chrono = "^0.4"
+tempdir = "^0.3"
+rand = "^0.8"
+regex = "^1"
+lazy_static = "^1"
+futures-util = "^0.3"
 
 [dependencies.sea-orm]
 version = "^0.12" # sea-orm version
