@@ -1,22 +1,25 @@
-# Leveraging the pre-built Docker images with 
-# cargo-chef and the Rust toolchain
-FROM lukemathwalker/cargo-chef:latest-rust-alpine AS chef
-WORKDIR app
+# ---------------------------------------------------
+# 1 - Build Stage
+#
+# Use official rust image to for application docker-build.yml
+# ---------------------------------------------------
+FROM rust:1.80 AS build
 
-FROM chef AS planner
+# Setup working directory
+WORKDIR /usr/src/playmatch
 COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
 
-FROM chef AS builder 
-COPY --from=planner /app/recipe.json recipe.json
-# Build dependencies - this is the caching Docker layer!
-RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
-COPY . .
-RUN cargo build --release --bin app
+RUN cargo install --path .
 
-FROM alpine:3.19 AS runtime
-WORKDIR /app
-COPY --from=builder /app/app /usr/local/bin/
-EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/app"]
+# ---------------------------------------------------
+# 2 - Deploy Stage
+#
+# Use a distroless image for minimal container size
+# ---------------------------------------------------
+FROM gcr.io/distroless/cc-debian12
+
+# Application files
+COPY --from=build /usr/local/cargo/bin/playmatch /usr/local/bin/playmatch
+
+CMD ["playmatch"]
