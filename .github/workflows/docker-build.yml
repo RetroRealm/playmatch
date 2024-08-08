@@ -1,8 +1,9 @@
 name: Build Docker Image
 
 on:
+  pull_request:
   push:
-    branches: [ master ]
+    branches: [ "develop", "main" ]
     paths:
       - src/**
       - api/**
