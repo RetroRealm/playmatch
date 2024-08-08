@@ -66,7 +66,7 @@ async fn start() -> anyhow::Result<()> {
 
     let client = reqwest::Client::builder().cookie_store(true).build()?;
 
-    download_and_parse_dats(&client).await?;
+    download_and_parse_dats(&client, &conn).await?;
 
     let conn_data = Data::new(conn);
     let client_data = Data::new(client);

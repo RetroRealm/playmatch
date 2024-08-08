@@ -6,6 +6,23 @@ use ::entity::{
 	game_release_id_mapping, game_release_id_mapping::Entity as GameReleaseIdMapping,
 };
 
+pub async fn insert_game_release(conn: &DbConn) -> Result<(), DbErr> {
+    let game_release = game_release::ActiveModel {
+        game_release_provider: Default::default(),
+        platform_company: Default::default(),
+        platform: Default::default(),
+        game_id: Default::default(),
+        name: Default::default(),
+        description: Default::default(),
+        categories: Default::default(),
+        ..Default::default()
+    };
+
+    game_release.save(conn).await?;
+
+    Ok(())
+}
+
 pub async fn find_game_release_by_name_and_platform_and_platform_company(
     name: &str,
     platform: &str,

@@ -19,6 +19,7 @@ regex = "^1"
 lazy_static = "^1"
 futures-util = "^0.3"
 zip = "^2.1"
+async-recursion = "^1.1"
 
 [dependencies.sea-orm]
 version = "^0.12" # sea-orm version

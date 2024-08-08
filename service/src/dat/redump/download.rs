@@ -5,6 +5,7 @@ use reqwest::Client;
 use scraper::{Html, Selector};
 use tokio::fs;
 
+use crate::dat::DATS_PATH;
 use crate::http::download::{download_file, DownloadFileNameResult};
 use crate::zip::extract_zip_to_directory;
 
@@ -58,7 +59,7 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
 async fn download_single_dat(client: &Client, url: &String) -> anyhow::Result<()> {
     let current_dir = std::env::current_dir()?;
     debug!("Downloading DAT from: {}", url);
-    let redump_dir = current_dir.join("dats/redump/");
+    let redump_dir = current_dir.join(format!("{}/redump", DATS_PATH));
     let res = download_file(client, &url, &redump_dir).await?;
     let (name_source, path) = match res {
         DownloadFileNameResult::FromContentDisposition(path) => {

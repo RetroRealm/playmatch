@@ -3,7 +3,7 @@ use actix_web::web::Data;
 use log::debug;
 use sea_orm::DatabaseConnection;
 
-use service::db::query::find_game_release_and_id_mapping_by_md5;
+use service::db::game::find_game_release_and_id_mapping_by_md5;
 
 use crate::abstraction::cache::InsertCacheHeaders;
 use crate::error;

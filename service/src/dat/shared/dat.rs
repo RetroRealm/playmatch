@@ -1,32 +1,20 @@
 use std::collections::VecDeque;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
 use log::debug;
 use sea_orm::DbConn;
 use tokio::{fs, task};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::task::JoinHandle;
 
 use crate::dat::shared::model::{Datafile, Game};
-use crate::db::query::find_game_release_by_name_and_platform_and_platform_company;
+use crate::db::game::find_game_release_by_name_and_platform_and_platform_company;
 
-pub async fn read_and_import_no_intro_dat_files(path: &Path, conn: &DbConn) -> anyhow::Result<()> {
-    let mut entries = fs::read_dir(path).await?;
-
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-
-        if path.is_file() && path.extension().unwrap_or_default() == "dat" {
-            parse_and_import_no_intro_dat(&path, conn).await?;
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn parse_and_import_no_intro_dat(path: &Path, conn: &DbConn) -> anyhow::Result<()> {
-    let dat = parse_no_intro_dat(path).await?;
+pub async fn parse_and_import_dat_file(path: &PathBuf, conn: &DbConn) -> anyhow::Result<()> {
+    let dat = parse_dat_file(path).await?;
 
     let mut split = dat.header.name.split(" - ").collect::<VecDeque<&str>>();
 
@@ -39,8 +27,6 @@ pub async fn parse_and_import_no_intro_dat(path: &Path, conn: &DbConn) -> anyhow
 
     debug!("Parsed company: {:?}", &company);
     debug!("Parsed system: {:?}", &system);
-
-    let now = Utc::now();
 
     let company_arc = Arc::new(company);
     let system_arc = Arc::new(system);
@@ -69,8 +55,7 @@ pub async fn parse_and_import_no_intro_dat(path: &Path, conn: &DbConn) -> anyhow
 
                     if let Some(game_release) = result {
                         debug!("Game release already exists: {:?}", game_release);
-                    } else {
-                        debug!("Game release does not exist {:?}, creating it", &game.name);
+                        return Ok(());
                     }
 
                     Ok(())
@@ -86,10 +71,13 @@ pub async fn parse_and_import_no_intro_dat(path: &Path, conn: &DbConn) -> anyhow
     Ok(())
 }
 
-pub async fn parse_no_intro_dat(path: &Path) -> anyhow::Result<Datafile> {
-    let dat = fs::read_to_string(path).await?;
+pub async fn parse_dat_file(path: &Path) -> anyhow::Result<Datafile> {
+    let mut dat_file = File::open(path).await?;
 
-    let result: Datafile = serde_xml_rs::from_str(&dat)?;
+    let mut content = Vec::new();
+    dat_file.read_to_end(&mut content).await?;
+
+    let result: Datafile = serde_xml_rs::from_reader(content.as_slice())?;
 
     Ok(result)
 }
