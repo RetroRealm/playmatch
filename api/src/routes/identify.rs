@@ -13,7 +13,9 @@ use crate::models::game_file::{
 use crate::models::game_file::GameMatchType::MD5;
 
 #[utoipa::path(
+	get,
 	context_path = "/api",
+	params(GameFileRequest),
 	responses(
 		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMatchResponse)
 	)

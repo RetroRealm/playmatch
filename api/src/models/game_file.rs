@@ -1,9 +1,9 @@
 use derive_builder::Builder;
 use serde_derive::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct GameFileRequest {
     pub file_name: String,
