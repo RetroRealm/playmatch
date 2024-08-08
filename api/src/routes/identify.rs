@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, post, Responder, web};
+use actix_web::{get, HttpResponse, post, Responder, web};
 use actix_web::web::Data;
 use log::debug;
 use sea_orm::DatabaseConnection;
@@ -18,9 +18,9 @@ use crate::models::game_file::GameMatchType::MD5;
 		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMatchResponse)
 	)
 )]
-#[post("/identify/ids")]
+#[get("/identify/ids")]
 pub async fn identify(
-    body: web::Json<GameFileRequest>,
+    body: web::Query<GameFileRequest>,
     db_conn: Data<DatabaseConnection>,
 ) -> error::Result<impl Responder> {
     debug!("Received request: {:?}", body);
