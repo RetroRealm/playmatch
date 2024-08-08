@@ -32,7 +32,8 @@ pub mod built_info {
 
 #[actix_web::main]
 async fn start() -> anyhow::Result<()> {
-    dotenv()?;
+    // Load environment variables from .env file, if present but do nothing if it fails
+    let _ = dotenv();
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).try_init()?;
 
     let port = env::var("PORT").unwrap_or("8080".to_string());
