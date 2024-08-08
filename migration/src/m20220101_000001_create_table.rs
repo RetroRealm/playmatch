@@ -93,7 +93,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(GameRelease::PlatformCompany).text())
                     .col(ColumnDef::new(GameRelease::Platform).text())
-                    .col(ColumnDef::new(GameRelease::GameID).text().not_null())
+                    .col(ColumnDef::new(GameRelease::GameID).text())
                     .col(ColumnDef::new(GameRelease::Name).text().not_null())
                     .col(ColumnDef::new(GameRelease::Description).text())
                     .col(ColumnDef::new(GameRelease::Categories).array(ColumnType::Text))

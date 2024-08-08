@@ -14,8 +14,8 @@ pub struct Model {
     pub platform_company: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub platform: Option<String>,
-    #[sea_orm(column_type = "Text")]
-    pub game_id: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub game_id: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub name: String,
     #[sea_orm(column_type = "Text", nullable)]
