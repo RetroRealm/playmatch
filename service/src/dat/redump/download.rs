@@ -52,7 +52,6 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
         let mut tasks: Vec<tokio::task::JoinHandle<anyhow::Result<()>>> = vec![];
         for url in url_chunk {
             let redump_dir = redump_dir.clone();
-            let redump_tmp_dir = redump_tmp_dir.clone();
             let tmp_dir = redump_dir.join(format!("tmp/{}", random_sized_string(16)));
             let client = client.clone();
             let url = url.to_string();
