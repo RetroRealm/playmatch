@@ -44,9 +44,12 @@ pub async fn download_file(
         }
     }
 
-    let file_name_final = file_name.clone().unwrap_or(random_sized_string(16));
+    let file_name_final = match &file_name {
+        None => &random_sized_string(16),
+        Some(file_name) => file_name,
+    };
 
-    let file_path = path.join(&file_name_final);
+    let file_path = path.join(file_name_final);
     let mut file = File::create(&file_path).await?;
     let mut stream = response.bytes_stream();
     while let Some(v) = stream.next().await {
