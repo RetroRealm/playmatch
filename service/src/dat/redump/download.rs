@@ -36,7 +36,7 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
                 let path = download_single_dat(&client, &url, &tmp_dir).await?;
 
                 if let Err(e) = extract_if_archived(&path).await {
-                    error!("Failed to extract DAT archive: {:?}", e);
+                    error!("Failed to extract DAT archive {} {:?}", path.display(), e);
                 }
 
                 Ok(())
