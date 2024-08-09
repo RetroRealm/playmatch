@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
 use reqwest::Client;
-use tempdir::TempDir;
+use tokio::fs::File;
 use tokio::fs;
 use tokio::fs::{create_dir_all, File};
 use tokio::io::AsyncWriteExt;
