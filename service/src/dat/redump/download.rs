@@ -15,8 +15,6 @@ const REDUMP_NAME: &str = "redump";
 const REDUMP_URL: &str = "http://redump.org";
 
 pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
-    // TODO: make download and unzip happen in tmp dir, only delete files when all new files are downloaded to prevent data loss when redump is down or not reachable
-
     let dats_download_urls = get_redump_dat_download_urls(client).await?;
 
     let current_dir = std::env::current_dir()?;
