@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
-use log::debug;
+use log::{debug, info};
 use sea_orm::DbConn;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -61,7 +61,6 @@ pub async fn parse_and_import_dat_file(
                     .await?;
 
                     if let Some(game_release) = result {
-                        debug!("Game release already exists: {:?}", game_release);
                         return Ok(());
                     }
 
@@ -92,6 +91,8 @@ pub async fn parse_and_import_dat_file(
                 future.await??;
             }
         }
+
+        info!("Imported DAT file: {}", path.display());
     }
 
     Ok(())

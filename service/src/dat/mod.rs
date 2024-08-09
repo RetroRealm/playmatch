@@ -36,8 +36,6 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 
         let parent = file.to_str().unwrap_or_default();
 
-        debug!("parent: {:?}", parent);
-
         let mut provider = None;
 
         if parent.contains("no-intro") {
