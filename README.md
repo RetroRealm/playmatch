@@ -10,9 +10,6 @@ at [playmatch.retrorealm.dev](https://playmatch.retrorealm.dev/swagger-ui/)
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing
-purposes.
-
 ### Prerequisites
 
 1. Rust 1.80+ from [here](https://www.rust-lang.org/tools/install)
@@ -22,7 +19,7 @@ purposes.
 
 1. Clone the repository
 2. Rename .env.example to .env and fill in the required environment variables
-3. Run `run --package playmatch --bin playmatch` to start the server
+3. Run `cargo run --package playmatch --bin playmatch` to start the server
 
 ## Deployment
 
@@ -35,6 +32,7 @@ Docker images are available [Here](https://github.com/RetroRealm/playmatch/pkgs/
 * [reqwest](https://github.com/seanmonstar/reqwest) - HTTP client
 * [serde](https://serde.rs/) - Serialization/Deserialization
 * [actix-web](https://github.com/actix/actix-web) - The web framework used
+* [SeaORM](https://www.sea-ql.org/SeaORM/) - The Database ORM used
 
 ## Contributing
 
