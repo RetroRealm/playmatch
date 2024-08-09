@@ -22,7 +22,7 @@ async-recursion = "^1.1"
 strum = { version = "^0.26", features = ["derive"] }
 
 [dependencies.sea-orm]
-version = "^0.12" # sea-orm version
+version = "~1" # sea-orm version
 features = [
 	"debug-print",
 	"runtime-tokio-rustls",

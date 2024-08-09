@@ -10,7 +10,7 @@ service = { path = "../service" }
 actix-web = "^4"
 tokio = { version = "^1", features = ["full"] }
 reqwest = { version = "^0.12", features = ["rustls-tls", "json", "cookies", "socks"], default-features = false }
-sea-orm = { version = "0.12", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
+sea-orm = { version = "~1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
 chrono = "^0.4"
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
