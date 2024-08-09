@@ -144,7 +144,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(GameFile::Name).text().not_null())
-                    .col(ColumnDef::new(GameFile::Size).big_integer())
+                    .col(ColumnDef::new(GameFile::Size).big_integer().not_null())
                     .col(ColumnDef::new(GameFile::CRC).text())
                     .col(ColumnDef::new(GameFile::MD5).char_len(32))
                     .col(ColumnDef::new(GameFile::SHA1).char_len(40))

@@ -5,15 +5,24 @@ use std::sync::Arc;
 use chrono::Utc;
 use log::debug;
 use sea_orm::DbConn;
-use tokio::{fs, task};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use tokio::task;
 use tokio::task::JoinHandle;
 
-use crate::dat::shared::model::{Datafile, Game};
-use crate::db::game::find_game_release_by_name_and_platform_and_platform_company;
+use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 
-pub async fn parse_and_import_dat_file(path: &PathBuf, conn: &DbConn) -> anyhow::Result<()> {
+use crate::dat::shared::model::{Datafile, Game};
+use crate::db::game::{
+	find_game_release_by_name_and_platform_and_platform_company, insert_game_file,
+	insert_game_release,
+};
+
+pub async fn parse_and_import_dat_file(
+    path: &PathBuf,
+    provider: GameReleaseProviderEnum,
+    conn: &DbConn,
+) -> anyhow::Result<()> {
     let dat = parse_dat_file(path).await?;
 
     let mut split = dat.header.name.split(" - ").collect::<VecDeque<&str>>();
@@ -43,11 +52,9 @@ pub async fn parse_and_import_dat_file(path: &PathBuf, conn: &DbConn) -> anyhow:
             for game in game_chunk {
                 let company = company_arc.clone();
                 let system = system_arc.clone();
+                let provider = provider.clone();
                 let conn = conn.clone();
                 futures.push(task::spawn(async move {
-                    let conn = conn.clone();
-                    let company = company.clone();
-                    let system = system.clone();
                     let result = find_game_release_by_name_and_platform_and_platform_company(
                         &game.name, &system, &company, &conn,
                     )
@@ -56,6 +63,25 @@ pub async fn parse_and_import_dat_file(path: &PathBuf, conn: &DbConn) -> anyhow:
                     if let Some(game_release) = result {
                         debug!("Game release already exists: {:?}", game_release);
                         return Ok(());
+                    }
+
+                    let roms = game.rom.clone();
+
+                    let game_release = insert_game_release(
+                        provider,
+                        company.as_ref().to_owned(),
+                        system.as_ref().to_owned(),
+                        game,
+                        &conn,
+                    )
+                    .await?;
+
+                    debug!("Game release inserted: {:?}", &game_release);
+
+                    for rom in roms {
+                        let inserted =
+                            insert_game_file(rom, game_release.id.clone().unwrap(), &conn).await?;
+                        debug!("Game file inserted: {:?}", &inserted);
                     }
 
                     Ok(())

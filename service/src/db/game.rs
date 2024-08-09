@@ -1,26 +1,57 @@
-use sea_orm::*;
-use sea_orm::sea_query::SimpleExpr;
+use sea_orm::{
+	ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
+	QueryFilter, sea_query::SimpleExpr,
+};
+use sea_orm::prelude::Uuid;
 
 use ::entity::{
 	game_file, game_file::Entity as GameFile, game_release, game_release::Entity as GameRelease,
 	game_release_id_mapping, game_release_id_mapping::Entity as GameReleaseIdMapping,
 };
+use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 
-pub async fn insert_game_release(conn: &DbConn) -> Result<(), DbErr> {
-    let game_release = game_release::ActiveModel {
-        game_release_provider: Default::default(),
-        platform_company: Default::default(),
-        platform: Default::default(),
-        game_id: Default::default(),
-        name: Default::default(),
-        description: Default::default(),
-        categories: Default::default(),
+use crate::dat::shared::model::{Game, RomElement};
+
+pub async fn insert_game_file(
+    game_file: RomElement,
+    game_release_id: Uuid,
+    conn: &DbConn,
+) -> anyhow::Result<game_file::ActiveModel> {
+    let game_file = game_file::ActiveModel {
+        name: Set(game_file.name),
+        size: Set(game_file.size.parse()?),
+        crc: Set(Some(game_file.crc)),
+        md5: Set(game_file.md5),
+        sha1: Set(game_file.sha1),
+        sha256: Set(game_file.sha256),
+        status: Set(game_file.status.map(|s| s.to_string())),
+        serial: Set(game_file.serial),
+        game_release_id: Set(game_release_id),
         ..Default::default()
     };
 
-    game_release.save(conn).await?;
+    game_file.save(conn).await.map_err(|e| e.into())
+}
 
-    Ok(())
+pub async fn insert_game_release(
+    release_provider: GameReleaseProviderEnum,
+    company: String,
+    platform: String,
+    game: Game,
+    conn: &DbConn,
+) -> Result<game_release::ActiveModel, DbErr> {
+    let game_release = game_release::ActiveModel {
+        game_release_provider: Set(release_provider),
+        platform_company: Set(Some(company)),
+        platform: Set(Some(platform)),
+        game_id: Set(game.id),
+        name: Set(game.name),
+        description: Set(game.description),
+        categories: Set(game.category),
+        ..Default::default()
+    };
+
+    game_release.save(conn).await
 }
 
 pub async fn find_game_release_by_name_and_platform_and_platform_company(

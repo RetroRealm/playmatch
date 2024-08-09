@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use strum::Display;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Datafile {
@@ -9,7 +10,7 @@ pub struct Datafile {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Game {
-    pub description: String,
+    pub description: Option<String>,
 
     pub game_id: Option<Vec<String>>,
 
@@ -62,7 +63,7 @@ pub struct Header {
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Display)]
 pub enum Status {
     #[serde(rename = "baddump")]
     Baddump,

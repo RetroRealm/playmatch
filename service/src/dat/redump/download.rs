@@ -79,7 +79,7 @@ async fn download_single_dat(client: &Client, url: &String) -> anyhow::Result<()
     );
 
     if let Some(file_extension) = normalized_path.extension() {
-        let file_extension = file_extension.to_str().unwrap();
+        let file_extension = file_extension.to_str().unwrap_or_default();
         if file_extension == "zip" {
             debug!("Found zip file, extracting...");
             let out = normalized_path

@@ -10,7 +10,7 @@ pub struct Model {
     pub id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub name: String,
-    pub size: Option<i64>,
+    pub size: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub crc: Option<String>,
     pub md5: Option<String>,

@@ -30,6 +30,8 @@ pub async fn download_file(
     path: &Path,
 ) -> anyhow::Result<DownloadFileNameResult> {
     let mut path = PathBuf::from(path);
+    let tmp_path = path.join("tmp");
+    fs::create_dir_all(&tmp_path).await?;
     let response = client.get(url).send().await?;
     let content_disposition = response.headers().get("content-disposition");
 
@@ -48,7 +50,7 @@ pub async fn download_file(
         }
     }
 
-    let tmp_dir = TempDir::new(&("playmatch_".to_owned() + random_sized_string(15).as_str()))?;
+    let tmp_dir = TempDir::new_in(&tmp_path, random_sized_string(15).as_str())?;
     let tmp_dir_path = tmp_dir
         .path()
         .join(path.file_name().unwrap().to_str().unwrap());
@@ -61,11 +63,11 @@ pub async fn download_file(
     create_dir_all(path.parent().unwrap()).await?;
     fs::rename(&tmp_dir_path, &path).await?;
 
-    return if found_filename_in_content_disposition {
+    if found_filename_in_content_disposition {
         Ok(DownloadFileNameResult::FromContentDisposition(path))
     } else {
         Ok(DownloadFileNameResult::Random(path))
-    };
+    }
 }
 
 // Function to extract the filename from Content-Disposition header value
