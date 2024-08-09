@@ -1,6 +1,6 @@
 use crate::zip::extract_zip_to_directory;
 use log::debug;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::{fs, task};
 
 pub async fn extract_if_archived(path: &PathBuf) -> anyhow::Result<()> {

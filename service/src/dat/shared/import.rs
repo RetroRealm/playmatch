@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use log::{debug, info};
@@ -13,8 +13,8 @@ use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 
 use crate::dat::shared::model::{Datafile, Game};
 use crate::db::game::{
-    find_game_release_by_name_and_platform_and_platform_company, insert_game_file,
-    insert_game_release,
+	find_game_release_by_name_and_platform_and_platform_company, insert_game_file,
+	insert_game_release,
 };
 
 pub async fn parse_and_import_dat_file(
