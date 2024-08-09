@@ -1,12 +1,15 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use log::debug;
 use reqwest::Client;
 use scraper::{Html, Selector};
 use tokio::fs;
 
+use crate::dat::shared::zip::extract_if_archived;
 use crate::dat::DATS_PATH;
+use crate::fs::read_files_recursive;
 use crate::http::download::{download_file, DownloadFileNameResult};
+use crate::util::random_sized_string;
 use crate::zip::extract_zip_to_directory;
 
 const REDUMP_NAME: &str = "redump";
@@ -40,13 +43,52 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
         }
     }
 
+    let current_dir = std::env::current_dir()?;
+    let redump_dir = current_dir.join(format!("{}/{}", DATS_PATH, REDUMP_NAME));
+    let redump_tmp_dir = redump_dir.join("tmp");
+    fs::create_dir_all(&redump_tmp_dir).await?;
+
     for url_chunk in dats_download_urls.chunks(5) {
-        let mut tasks = vec![];
+        let mut tasks: Vec<tokio::task::JoinHandle<anyhow::Result<()>>> = vec![];
         for url in url_chunk {
+            let redump_dir = redump_dir.clone();
+            let redump_tmp_dir = redump_tmp_dir.clone();
+            let tmp_dir = redump_dir.join(format!("tmp/{}", random_sized_string(16)));
             let client = client.clone();
             let url = url.to_string();
             tasks.push(tokio::spawn(async move {
-                download_single_dat(&client, &url).await
+                fs::create_dir_all(&tmp_dir).await?;
+                let path = download_single_dat(&client, &url, &tmp_dir).await?;
+
+                extract_if_archived(&path).await?;
+
+                let tmp_files = read_files_recursive(&tmp_dir).await?;
+
+                debug!("Read {} temporary files", tmp_files.len());
+
+                for tmp_file in tmp_files {
+                    let extension = tmp_file
+                        .extension()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default();
+                    let file_name = tmp_file
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default();
+
+                    if extension == "dat" {
+                        debug!("Moving DAT file: {:?}", tmp_file);
+                        let out = redump_dir.join(file_name);
+                        fs::rename(&tmp_file, &out).await?;
+                    }
+                }
+
+                debug!("Removing tmp download dir: {:?}", tmp_dir);
+                fs::remove_dir_all(&tmp_dir).await?;
+
+                Ok(())
             }));
         }
         for task in tasks {
@@ -54,15 +96,20 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
         }
     }
 
+    debug!("Removing redump tmp dir: {:?}", redump_tmp_dir);
+    fs::remove_dir(&redump_tmp_dir).await?;
+
     Ok(())
 }
 
-async fn download_single_dat(client: &Client, url: &String) -> anyhow::Result<()> {
-    let current_dir = std::env::current_dir()?;
+async fn download_single_dat(
+    client: &Client,
+    url: &String,
+    path: &PathBuf,
+) -> anyhow::Result<PathBuf> {
     debug!("Downloading DAT from: {}", url);
-    let redump_dir = current_dir.join(format!("{}/{}", DATS_PATH, REDUMP_NAME));
-    let res = download_file(client, &url, &redump_dir).await?;
-    let (name_source, path) = match res {
+
+    let (name_source, path) = match download_file(client, &url, &path).await? {
         DownloadFileNameResult::FromContentDisposition(path) => {
             (Some("Content-Disposition Header"), path)
         }
@@ -79,22 +126,5 @@ async fn download_single_dat(client: &Client, url: &String) -> anyhow::Result<()
         name_source.unwrap_or("None")
     );
 
-    if let Some(file_extension) = normalized_path.extension() {
-        let file_extension = file_extension.to_str().unwrap_or_default();
-        if file_extension == "zip" {
-            debug!("Found zip file, extracting...");
-            let out = normalized_path
-                .parent()
-                .unwrap()
-                .join(normalized_path.file_stem().unwrap().to_owned());
-            debug!("Extracting DAT(s) to: {:?}", &out);
-            let path_owned = normalized_path.to_owned();
-            tokio::task::spawn_blocking(move || {
-                extract_zip_to_directory(&path_owned, Path::new(&out))
-            })
-            .await??;
-            fs::remove_file(&path).await?;
-        }
-    }
-    Ok(())
+    Ok(normalized_path)
 }

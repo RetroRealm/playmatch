@@ -29,13 +29,10 @@ pub async fn download_file(
     url: &str,
     path: &Path,
 ) -> anyhow::Result<DownloadFileNameResult> {
-    let mut path = PathBuf::from(path);
-    let tmp_path = path.join("tmp");
-    fs::create_dir_all(&tmp_path).await?;
     let response = client.get_default_user_agent(url).send().await?;
     let content_disposition = response.headers().get("content-disposition");
 
-    let mut found_filename_in_content_disposition = false;
+    let mut file_name = None;
 
     if let Some(content_disposition) = content_disposition {
         if let Ok(content_disposition) = content_disposition.to_str() {
@@ -44,29 +41,23 @@ pub async fn download_file(
                     "Filename extracted from Content-Disposition header: {:?}",
                     &filename
                 );
-                path.push(&filename);
-                found_filename_in_content_disposition = true;
+                file_name = Some(filename);
             }
         }
     }
 
-    let tmp_dir = TempDir::new_in(&tmp_path, random_sized_string(15).as_str())?;
-    let tmp_dir_path = tmp_dir
-        .path()
-        .join(path.file_name().unwrap().to_str().unwrap());
-    let mut file = File::create(&tmp_dir_path).await?;
+    let file_name_final = file_name.clone().unwrap_or(random_sized_string(16));
+
+    let file_path = path.join(&file_name_final);
+    let mut file = File::create(&file_path).await?;
     let mut stream = response.bytes_stream();
     while let Some(v) = stream.next().await {
         file.write_buf(&mut v?).await?;
     }
 
-    create_dir_all(path.parent().unwrap()).await?;
-    fs::rename(&tmp_dir_path, &path).await?;
-
-    if found_filename_in_content_disposition {
-        Ok(DownloadFileNameResult::FromContentDisposition(path))
-    } else {
-        Ok(DownloadFileNameResult::Random(path))
+    match file_name {
+        Some(_) => Ok(DownloadFileNameResult::FromContentDisposition(file_path)),
+        None => Ok(DownloadFileNameResult::Random(file_path)),
     }
 }
 
