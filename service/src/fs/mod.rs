@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use async_recursion::async_recursion;
 use tokio::fs;
 
 #[async_recursion]
-pub async fn read_files_recursive(folder_path: &PathBuf) -> anyhow::Result<Vec<PathBuf>> {
+pub async fn read_files_recursive(folder_path: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let mut dir = fs::read_dir(folder_path).await?;
     let mut files = Vec::new();
 
@@ -18,5 +18,20 @@ pub async fn read_files_recursive(folder_path: &PathBuf) -> anyhow::Result<Vec<P
         }
     }
 
-    return Ok(files);
+    Ok(files)
+}
+
+pub async fn read_files(path_: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    let mut dir = fs::read_dir(path_).await?;
+    let mut files = Vec::new();
+
+    while let Some(entry) = dir.next_entry().await? {
+        let path = entry.path();
+
+        if path.is_file() {
+            files.push(path);
+        }
+    }
+
+    Ok(files)
 }

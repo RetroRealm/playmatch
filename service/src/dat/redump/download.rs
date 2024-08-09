@@ -7,7 +7,7 @@ use tokio::fs;
 
 use crate::dat::shared::zip::extract_if_archived;
 use crate::dat::DATS_PATH;
-use crate::fs::read_files_recursive;
+use crate::fs::{read_files, read_files_recursive};
 use crate::http::download::{download_file, DownloadFileNameResult};
 use crate::util::random_sized_string;
 
@@ -37,32 +37,6 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
 
                 extract_if_archived(&path).await?;
 
-                let tmp_files = read_files_recursive(&tmp_dir).await?;
-
-                debug!("Read {} temporary files", tmp_files.len());
-
-                for tmp_file in tmp_files {
-                    let extension = tmp_file
-                        .extension()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or_default();
-                    let file_name = tmp_file
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or_default();
-
-                    if extension == "dat" {
-                        debug!("Moving DAT file: {:?}", tmp_file);
-                        let out = redump_dir.join(file_name);
-                        fs::rename(&tmp_file, &out).await?;
-                    }
-                }
-
-                debug!("Removing tmp download dir: {:?}", tmp_dir);
-                fs::remove_dir_all(&tmp_dir).await?;
-
                 Ok(())
             }));
         }
@@ -71,8 +45,37 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
         }
     }
 
+    let old_files = read_files(&redump_dir).await?;
+
+    for old_file in &old_files {
+        fs::remove_file(old_file).await?
+    }
+
+    let tmp_files = read_files_recursive(&redump_tmp_dir).await?;
+
+    debug!("Read {} temporary files", tmp_files.len());
+
+    for tmp_file in tmp_files {
+        let extension = tmp_file
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default();
+        let file_name = tmp_file
+            .file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default();
+
+        if extension == "dat" {
+            debug!("Moving DAT file: {:?}", tmp_file);
+            let out = redump_dir.join(file_name);
+            fs::rename(&tmp_file, &out).await?;
+        }
+    }
+
     debug!("Removing redump tmp dir: {:?}", redump_tmp_dir);
-    fs::remove_dir(&redump_tmp_dir).await?;
+    fs::remove_dir_all(&redump_tmp_dir).await?;
 
     Ok(())
 }
