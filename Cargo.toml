@@ -11,6 +11,7 @@ members = [".", "api", "service", "entity", "migration"]
 
 [dependencies]
 api = { path = "api" }
+service = { path = "service" }
 
 [build-dependencies]
 built = "^0.7"

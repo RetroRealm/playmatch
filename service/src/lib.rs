@@ -1,6 +1,6 @@
 pub mod dat;
 pub mod db;
 mod fs;
-mod http;
+pub mod http;
 mod util;
 mod zip;

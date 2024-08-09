@@ -9,6 +9,7 @@ use crate::dat::DATS_PATH;
 use crate::http::download::{download_file, DownloadFileNameResult};
 use crate::zip::extract_zip_to_directory;
 
+const REDUMP_NAME: &str = "redump";
 const REDUMP_URL: &str = "http://redump.org";
 
 pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
@@ -59,7 +60,7 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
 async fn download_single_dat(client: &Client, url: &String) -> anyhow::Result<()> {
     let current_dir = std::env::current_dir()?;
     debug!("Downloading DAT from: {}", url);
-    let redump_dir = current_dir.join(format!("{}/redump", DATS_PATH));
+    let redump_dir = current_dir.join(format!("{}/{}", DATS_PATH, REDUMP_NAME));
     let res = download_file(client, &url, &redump_dir).await?;
     let (name_source, path) = match res {
         DownloadFileNameResult::FromContentDisposition(path) => {
@@ -86,7 +87,7 @@ async fn download_single_dat(client: &Client, url: &String) -> anyhow::Result<()
                 .parent()
                 .unwrap()
                 .join(normalized_path.file_stem().unwrap().to_owned());
-            debug!("Extracting DAT to: {:?}", &out);
+            debug!("Extracting DAT(s) to: {:?}", &out);
             let path_owned = normalized_path.to_owned();
             tokio::task::spawn_blocking(move || {
                 extract_zip_to_directory(&path_owned, Path::new(&out))

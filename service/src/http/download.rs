@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use crate::http::abstraction::RequestClientExt;
+use crate::util::random_sized_string;
 use futures_util::stream::StreamExt;
 use lazy_static::lazy_static;
 use log::debug;
@@ -9,8 +11,6 @@ use tempdir::TempDir;
 use tokio::fs;
 use tokio::fs::{create_dir_all, File};
 use tokio::io::AsyncWriteExt;
-
-use crate::util::random_sized_string;
 
 lazy_static! {
     // Define the regex pattern for extracting the filename
@@ -32,7 +32,7 @@ pub async fn download_file(
     let mut path = PathBuf::from(path);
     let tmp_path = path.join("tmp");
     fs::create_dir_all(&tmp_path).await?;
-    let response = client.get(url).send().await?;
+    let response = client.get_default_user_agent(url).send().await?;
     let content_disposition = response.headers().get("content-disposition");
 
     let mut found_filename_in_content_disposition = false;
