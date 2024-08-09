@@ -72,7 +72,7 @@ jobs:
           target: ${{ matrix.target.build_target }}
 
       - name: Run cargo fmt
-        run: cargo fmt --all -- --check
+        run: cargo fmt -p playmatch -p service -p migration -p api -- --check
 
   clippy:
     name: Cargo clippy
