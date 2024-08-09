@@ -17,30 +17,7 @@ const REDUMP_URL: &str = "http://redump.org";
 pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
     // TODO: make download and unzip happen in tmp dir, only delete files when all new files are downloaded to prevent data loss when redump is down or not reachable
 
-    let response = client
-        .get(format!("{}/downloads", REDUMP_URL))
-        .send()
-        .await?;
-
-    let body = response.text().await?;
-
-    let html_parsed = Html::parse_document(&body);
-
-    let selector = Selector::parse("#main > table > tbody > tr > td > a").unwrap();
-
-    let mut dats_download_urls = vec![];
-
-    for element in html_parsed.select(&selector) {
-        let href = element.attr("href");
-
-        if let Some(href) = href {
-            if !href.contains("/datfile/") {
-                continue;
-            }
-
-            dats_download_urls.push(format!("{}{}", REDUMP_URL, href));
-        }
-    }
+    let dats_download_urls = get_redump_dat_download_urls(client).await?;
 
     let current_dir = std::env::current_dir()?;
     let redump_dir = current_dir.join(format!("{}/{}", DATS_PATH, REDUMP_NAME));
@@ -98,6 +75,35 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
     fs::remove_dir(&redump_tmp_dir).await?;
 
     Ok(())
+}
+
+async fn get_redump_dat_download_urls(client: &Client) -> anyhow::Result<Vec<String>> {
+    let response = client
+        .get(format!("{}/downloads", REDUMP_URL))
+        .send()
+        .await?;
+
+    let body = response.text().await?;
+
+    let html_parsed = Html::parse_document(&body);
+
+    let selector = Selector::parse("#main > table > tbody > tr > td > a").unwrap();
+
+    let mut dats_download_urls = vec![];
+
+    for element in html_parsed.select(&selector) {
+        let href = element.attr("href");
+
+        if let Some(href) = href {
+            if !href.contains("/datfile/") {
+                continue;
+            }
+
+            dats_download_urls.push(format!("{}{}", REDUMP_URL, href));
+        }
+    }
+
+    Ok(dats_download_urls)
 }
 
 async fn download_single_dat(
