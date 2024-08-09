@@ -47,8 +47,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push amd64
-        id: docker_build_amd64
+      - name: Build and push
+        id: docker_build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -57,26 +57,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push arm64
-        id: docker_build_arm64
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
-          platforms: linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Image digest amd64
-        run: echo ${{ steps.docker_build_amd64.outputs.digest }}
-
-      - name: Image digest arm64
-        run: echo ${{ steps.docker_build_arm64.outputs.digest }}
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
