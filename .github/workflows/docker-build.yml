@@ -12,6 +12,7 @@ on:
       - migration/**
       - Cargo.toml
       - Cargo.lock
+      - Dockerfile
       - .github/workflows/docker-build.yml
 
 jobs:
