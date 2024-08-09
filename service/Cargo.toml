@@ -20,6 +20,7 @@ futures-util = "^0.3"
 zip = "^2.1"
 async-recursion = "^1.1"
 strum = { version = "^0.26", features = ["derive"] }
+derive_builder = "^0.20"
 
 [dependencies.sea-orm]
 version = "~1" # sea-orm version

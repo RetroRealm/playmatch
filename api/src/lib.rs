@@ -14,14 +14,13 @@ use utoipa_swagger_ui::{SwaggerUi, Url};
 use migration::{Migrator, MigratorTrait};
 use service::dat::download_and_parse_dats;
 
-use crate::models::game_file::GameMatchResponse;
-use crate::models::game_file::GameMatchType;
 use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
+use model::game_file::GameMatchResponse;
+use model::game_file::GameMatchType;
 
-mod abstraction;
 pub mod error;
-mod models;
+pub mod model;
 pub mod routes;
 
 pub mod built_info {
@@ -81,7 +80,7 @@ async fn start() -> anyhow::Result<()> {
                     .service(identify),
             )
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
-                Url::new("api", "/api-docs/openapi.json"),
+                Url::new("playmatch API", "/api-docs/openapi.json"),
                 ApiDoc::openapi(),
             )]))
     })

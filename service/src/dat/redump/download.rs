@@ -1,15 +1,15 @@
 use std::path::{Path, PathBuf};
 
-use log::{debug, error};
-use reqwest::Client;
-use scraper::{Html, Selector};
-use tokio::fs;
-
 use crate::dat::shared::zip::extract_if_archived;
 use crate::dat::DATS_PATH;
 use crate::fs::{read_files, read_files_recursive};
 use crate::http::download::{download_file, DownloadFileNameResult};
 use crate::util::random_sized_string;
+use log::{debug, error};
+use reqwest::Client;
+use scraper::{Html, Selector};
+use tokio::fs;
+use tokio::task::JoinHandle;
 
 const REDUMP_NAME: &str = "redump";
 const REDUMP_URL: &str = "http://redump.org";
@@ -23,7 +23,7 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
     fs::create_dir_all(&redump_tmp_dir).await?;
 
     for url_chunk in dats_download_urls.chunks(5) {
-        let mut tasks: Vec<tokio::task::JoinHandle<anyhow::Result<()>>> = vec![];
+        let mut tasks: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
         for url in url_chunk {
             let redump_dir = redump_dir.clone();
             let tmp_dir = redump_dir.join(format!("tmp/{}", random_sized_string(16)));

@@ -1,20 +1,18 @@
 use derive_builder::Builder;
-use serde_derive::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
-use uuid::Uuid;
+use sea_orm::prelude::Uuid;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, IntoParams)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GameFileRequest {
+pub struct GameFileMatchSearch {
     pub file_name: String,
-    pub file_size: i32,
-    pub crc: Option<String>,
+    pub file_size: i64,
     pub md5: Option<String>,
     pub sha1: Option<String>,
     pub sha256: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum GameMatchType {
     SHA256,
     SHA1,
@@ -23,9 +21,9 @@ pub enum GameMatchType {
     NoMatch,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
-pub struct GameMatchResponse {
+pub struct GameMatchResult {
     pub game_match_type: GameMatchType,
     pub playmatch_id: Option<Uuid>,
     pub igdb_id: Option<i32>,
