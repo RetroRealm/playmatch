@@ -1,16 +1,14 @@
-use actix_web::{get, HttpResponse, post, Responder, web};
 use actix_web::web::Data;
+use actix_web::{get, post, web, HttpResponse, Responder};
 use log::debug;
 use sea_orm::DatabaseConnection;
 
-use service::db::game::find_game_release_and_id_mapping_by_md5;
-
-use crate::abstraction::cache::InsertCacheHeaders;
 use crate::error;
-use crate::models::game_file::{
-	GameFileRequest, GameMatchResponse, GameMatchResponseBuilder, GameMatchType,
-};
 use crate::models::game_file::GameMatchType::MD5;
+use crate::models::game_file::{
+    GameFileRequest, GameMatchResponse, GameMatchResponseBuilder, GameMatchType,
+};
+use service::db::game::find_game_release_and_id_mapping_by_md5;
 
 #[utoipa::path(
 	get,
@@ -45,8 +43,6 @@ pub async fn identify(
             );
         }
     }
-
-    builder.set_public_cacheable(7200u32);
 
     Ok(
         builder.json(response_body.unwrap_or_else(|| GameMatchResponse {
