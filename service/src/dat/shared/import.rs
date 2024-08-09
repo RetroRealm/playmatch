@@ -18,92 +18,92 @@ use crate::db::game::{
 };
 
 pub async fn parse_and_import_dat_file(
-    path: &Path,
-    provider: GameReleaseProviderEnum,
-    conn: &DbConn,
+	path: &Path,
+	provider: GameReleaseProviderEnum,
+	conn: &DbConn,
 ) -> anyhow::Result<()> {
-    let dat = parse_dat_file(path).await?;
+	let dat = parse_dat_file(path).await?;
 
-    let mut split = dat.header.name.split(" - ").collect::<VecDeque<&str>>();
+	let mut split = dat.header.name.split(" - ").collect::<VecDeque<&str>>();
 
-    if split.is_empty() {
-        return Err(anyhow::anyhow!("No company or system found"));
-    }
+	if split.is_empty() {
+		return Err(anyhow::anyhow!("No company or system found"));
+	}
 
-    let company = split.pop_front().map(|c| c.to_string()).unwrap();
-    let system = split.into_iter().collect::<Vec<&str>>().join(" - ");
+	let company = split.pop_front().map(|c| c.to_string()).unwrap();
+	let system = split.into_iter().collect::<Vec<&str>>().join(" - ");
 
-    debug!("Parsed company: {:?}", &company);
-    debug!("Parsed system: {:?}", &system);
+	debug!("Parsed company: {:?}", &company);
+	debug!("Parsed system: {:?}", &system);
 
-    let company_arc = Arc::new(company);
-    let system_arc = Arc::new(system);
+	let company_arc = Arc::new(company);
+	let system_arc = Arc::new(system);
 
-    if let Some(games) = dat.game {
-        let games_chunked = games
-            .chunks(64)
-            .map(|x: &[Game]| x.to_vec())
-            .collect::<Vec<Vec<Game>>>();
+	if let Some(games) = dat.game {
+		let games_chunked = games
+			.chunks(64)
+			.map(|x: &[Game]| x.to_vec())
+			.collect::<Vec<Vec<Game>>>();
 
-        for game_chunk in games_chunked {
-            let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
+		for game_chunk in games_chunked {
+			let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
 
-            for game in game_chunk {
-                let company = company_arc.clone();
-                let system = system_arc.clone();
-                let provider = provider.clone();
-                let conn = conn.clone();
-                futures.push(task::spawn(async move {
-                    let result = find_game_release_by_name_and_platform_and_platform_company(
-                        &game.name, &system, &company, &conn,
-                    )
-                    .await?;
+			for game in game_chunk {
+				let company = company_arc.clone();
+				let system = system_arc.clone();
+				let provider = provider.clone();
+				let conn = conn.clone();
+				futures.push(task::spawn(async move {
+					let result = find_game_release_by_name_and_platform_and_platform_company(
+						&game.name, &system, &company, &conn,
+					)
+					.await?;
 
-                    if let Some(_) = result {
-                        return Ok(());
-                    }
+					if result.is_some() {
+						return Ok(());
+					}
 
-                    let roms = game.rom.clone();
+					let roms = game.rom.clone();
 
-                    let game_release = insert_game_release(
-                        provider,
-                        company.as_ref().to_owned(),
-                        system.as_ref().to_owned(),
-                        game,
-                        &conn,
-                    )
-                    .await?;
+					let game_release = insert_game_release(
+						provider,
+						company.as_ref().to_owned(),
+						system.as_ref().to_owned(),
+						game,
+						&conn,
+					)
+					.await?;
 
-                    debug!("Game release inserted: {:?}", &game_release);
+					debug!("Game release inserted: {:?}", &game_release);
 
-                    for rom in roms {
-                        let inserted =
-                            insert_game_file(rom, game_release.id.clone().unwrap(), &conn).await?;
-                        debug!("Game file inserted: {:?}", &inserted);
-                    }
+					for rom in roms {
+						let inserted =
+							insert_game_file(rom, game_release.id.clone().unwrap(), &conn).await?;
+						debug!("Game file inserted: {:?}", &inserted);
+					}
 
-                    Ok(())
-                }));
-            }
+					Ok(())
+				}));
+			}
 
-            for future in futures {
-                future.await??;
-            }
-        }
+			for future in futures {
+				future.await??;
+			}
+		}
 
-        info!("Imported DAT file: {}", path.display());
-    }
+		info!("Imported DAT file: {}", path.display());
+	}
 
-    Ok(())
+	Ok(())
 }
 
 pub async fn parse_dat_file(path: &Path) -> anyhow::Result<Datafile> {
-    let mut dat_file = File::open(path).await?;
+	let mut dat_file = File::open(path).await?;
 
-    let mut content = Vec::new();
-    dat_file.read_to_end(&mut content).await?;
+	let mut content = Vec::new();
+	dat_file.read_to_end(&mut content).await?;
 
-    let result: Datafile = serde_xml_rs::from_reader(content.as_slice())?;
+	let result: Datafile = serde_xml_rs::from_reader(content.as_slice())?;
 
-    Ok(result)
+	Ok(result)
 }

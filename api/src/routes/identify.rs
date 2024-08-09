@@ -18,15 +18,15 @@ use web::Query;
 )]
 #[get("/identify/ids")]
 pub async fn identify(
-    query: Query<GameFileRequest>,
-    db_conn: Data<DatabaseConnection>,
+	query: Query<GameFileRequest>,
+	db_conn: Data<DatabaseConnection>,
 ) -> error::Result<impl Responder> {
-    debug!("Received request: {:?}", query);
+	debug!("Received request: {:?}", query);
 
-    let response: GameMatchResponse =
-        match_game_if_possible(query.into_inner().into(), db_conn.get_ref())
-            .await?
-            .into();
+	let response: GameMatchResponse =
+		match_game_if_possible(query.into_inner().into(), db_conn.get_ref())
+			.await?
+			.into();
 
-    Ok(HttpResponse::Ok().json(response))
+	Ok(HttpResponse::Ok().json(response))
 }
