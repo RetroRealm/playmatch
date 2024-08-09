@@ -1,16 +1,15 @@
-use sea_orm::{
-	ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
-	QueryFilter, sea_query::SimpleExpr,
-};
 use sea_orm::prelude::Uuid;
+use sea_orm::{
+	sea_query::SimpleExpr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr,
+	EntityTrait, QueryFilter,
+};
 
+use crate::dat::shared::model::{Game, RomElement};
+use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 use ::entity::{
 	game_file, game_file::Entity as GameFile, game_release, game_release::Entity as GameRelease,
 	game_release_id_mapping, game_release_id_mapping::Entity as GameReleaseIdMapping,
 };
-use entity::sea_orm_active_enums::GameReleaseProviderEnum;
-
-use crate::dat::shared::model::{Game, RomElement};
 
 pub async fn insert_game_file(
     game_file: RomElement,
@@ -118,21 +117,18 @@ async fn find_game_release_id_mapping_if_exists_by_filter(
         .await?;
 
     match game_file {
-        None => Ok(None),
-        Some((_, game_release)) => match game_release {
-            None => Ok(None),
-            Some(game_release) => {
-                let game_release_id_mapping = GameReleaseIdMapping::find()
-                    .filter(game_release_id_mapping::Column::GameReleaseId.eq(game_release.id))
-                    .one(conn)
-                    .await?;
+        Some((_, Some(game_release))) => {
+            let game_release_id_mapping = GameReleaseIdMapping::find()
+                .filter(game_release_id_mapping::Column::GameReleaseId.eq(game_release.id))
+                .one(conn)
+                .await?;
 
-                if let Some(game_release_id_mapping) = game_release_id_mapping {
-                    Ok(Some((game_release, game_release_id_mapping)))
-                } else {
-                    Ok(None)
-                }
+            if let Some(game_release_id_mapping) = game_release_id_mapping {
+                Ok(Some((game_release, game_release_id_mapping)))
+            } else {
+                Ok(None)
             }
-        },
+        }
+        _ => Ok(None),
     }
 }

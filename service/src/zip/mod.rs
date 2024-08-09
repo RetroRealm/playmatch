@@ -1,6 +1,6 @@
-use std::{fs, io};
 use std::fs::File;
 use std::path::Path;
+use std::{fs, io};
 
 use zip::ZipArchive;
 

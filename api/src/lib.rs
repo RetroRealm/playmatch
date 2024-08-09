@@ -1,9 +1,9 @@
 use std::env;
 
 use actix_governor::{Governor, GovernorConfigBuilder};
-use actix_web::{App, HttpServer};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
-use actix_web::web::{Data, scope};
+use actix_web::web::{scope, Data};
+use actix_web::{App, HttpServer};
 use dotenvy::dotenv;
 use env_logger::Env;
 use log::LevelFilter;

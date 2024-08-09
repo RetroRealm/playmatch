@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use log::debug;
 use reqwest::Client;
@@ -112,11 +112,11 @@ async fn get_redump_dat_download_urls(client: &Client) -> anyhow::Result<Vec<Str
 async fn download_single_dat(
     client: &Client,
     url: &String,
-    path: &PathBuf,
+    path: &Path,
 ) -> anyhow::Result<PathBuf> {
     debug!("Downloading DAT from: {}", url);
 
-    let (name_source, path) = match download_file(client, &url, &path).await? {
+    let (name_source, path) = match download_file(client, url, path).await? {
         DownloadFileNameResult::FromContentDisposition(path) => {
             (Some("Content-Disposition Header"), path)
         }

@@ -2,9 +2,9 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 
 pub fn random_sized_string(size: usize) -> String {
-    return rand::thread_rng()
+    rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(size)
         .map(char::from)
-        .collect();
+        .collect()
 }

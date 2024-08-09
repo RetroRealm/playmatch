@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 use fs::read_files_recursive;
-use log::{debug, error};
+use log::error;
 use reqwest::Client;
 use sea_orm::DbConn;
 use std::path::PathBuf;

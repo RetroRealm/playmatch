@@ -18,10 +18,7 @@ pub async fn extract_if_archived(path: &PathBuf) -> anyhow::Result<()> {
 }
 
 async fn extract_zip_in_same_path(path: &PathBuf) -> anyhow::Result<()> {
-    let out = path
-        .parent()
-        .unwrap()
-        .join(path.file_stem().unwrap().to_owned());
+    let out = path.parent().unwrap().join(path.file_stem().unwrap());
     debug!("Extracting DAT(s) to: {:?}", &out);
     let path_owned = path.to_owned();
     tokio::task::spawn_blocking(move || extract_zip_to_directory(&path_owned, Path::new(&out)))

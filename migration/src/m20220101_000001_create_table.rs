@@ -14,7 +14,7 @@ enum GameReleaseProviderVariants {
     NoIntro,
     Redump,
 }
-
+#[allow(clippy::enum_variant_names)]
 #[derive(DeriveIden)]
 enum GameRelease {
     Table,
@@ -36,7 +36,7 @@ enum GameFile {
     Id,
     Name,
     Size,
-    CRC,
+    Crc,
     MD5,
     SHA1,
     SHA256,
@@ -145,7 +145,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(GameFile::Name).text().not_null())
                     .col(ColumnDef::new(GameFile::Size).big_integer().not_null())
-                    .col(ColumnDef::new(GameFile::CRC).text())
+                    .col(ColumnDef::new(GameFile::Crc).text())
                     .col(ColumnDef::new(GameFile::MD5).char_len(32))
                     .col(ColumnDef::new(GameFile::SHA1).char_len(40))
                     .col(ColumnDef::new(GameFile::SHA256).char_len(64))
@@ -201,7 +201,7 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .table(GameFile::Table)
-                    .col(GameFile::CRC)
+                    .col(GameFile::Crc)
                     .to_owned(),
             )
             .await?;

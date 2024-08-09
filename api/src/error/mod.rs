@@ -1,5 +1,5 @@
-use actix_web::{HttpResponse, ResponseError};
 use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, ResponseError};
 
 use crate::models::game_file::GameMatchResponseBuilderError;
 

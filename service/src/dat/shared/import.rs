@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::Utc;
 use log::{debug, info};
 use sea_orm::DbConn;
 use tokio::fs::File;
@@ -14,12 +13,12 @@ use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 
 use crate::dat::shared::model::{Datafile, Game};
 use crate::db::game::{
-	find_game_release_by_name_and_platform_and_platform_company, insert_game_file,
-	insert_game_release,
+    find_game_release_by_name_and_platform_and_platform_company, insert_game_file,
+    insert_game_release,
 };
 
 pub async fn parse_and_import_dat_file(
-    path: &PathBuf,
+    path: &Path,
     provider: GameReleaseProviderEnum,
     conn: &DbConn,
 ) -> anyhow::Result<()> {
@@ -27,7 +26,7 @@ pub async fn parse_and_import_dat_file(
 
     let mut split = dat.header.name.split(" - ").collect::<VecDeque<&str>>();
 
-    if split.len() == 0 {
+    if split.is_empty() {
         return Err(anyhow::anyhow!("No company or system found"));
     }
 
@@ -60,7 +59,7 @@ pub async fn parse_and_import_dat_file(
                     )
                     .await?;
 
-                    if let Some(game_release) = result {
+                    if let Some(_) = result {
                         return Ok(());
                     }
 
