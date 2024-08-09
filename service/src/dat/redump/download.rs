@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use log::debug;
+use log::{debug, error};
 use reqwest::Client;
 use scraper::{Html, Selector};
 use tokio::fs;
@@ -35,7 +35,9 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
                 fs::create_dir_all(&tmp_dir).await?;
                 let path = download_single_dat(&client, &url, &tmp_dir).await?;
 
-                extract_if_archived(&path).await?;
+                if let Err(e) = extract_if_archived(&path).await {
+                    error!("Failed to extract DAT archive: {:?}", e);
+                }
 
                 Ok(())
             }));
