@@ -1,7 +1,7 @@
 use crate::zip::extract_zip_to_directory;
 use log::debug;
 use std::path::{Path, PathBuf};
-use tokio::fs;
+use tokio::{fs, task};
 
 pub async fn extract_if_archived(path: &PathBuf) -> anyhow::Result<()> {
     if let Some(file_extension) = path.extension() {
@@ -21,8 +21,7 @@ async fn extract_zip_in_same_path(path: &PathBuf) -> anyhow::Result<()> {
     let out = path.parent().unwrap().join(path.file_stem().unwrap());
     debug!("Extracting DAT(s) to: {:?}", &out);
     let path_owned = path.to_owned();
-    tokio::task::spawn_blocking(move || extract_zip_to_directory(&path_owned, Path::new(&out)))
-        .await??;
+    task::spawn_blocking(move || extract_zip_to_directory(&path_owned, &out)).await??;
 
     Ok(())
 }
