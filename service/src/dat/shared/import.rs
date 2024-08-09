@@ -7,8 +7,8 @@ use log::debug;
 use sea_orm::DbConn;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use tokio::task;
 use tokio::task::JoinHandle;
-use tokio::{fs, task};
 
 use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 
@@ -17,7 +17,6 @@ use crate::db::game::{
 	find_game_release_by_name_and_platform_and_platform_company, insert_game_file,
 	insert_game_release,
 };
-use crate::zip::extract_zip_to_directory;
 
 pub async fn parse_and_import_dat_file(
     path: &PathBuf,

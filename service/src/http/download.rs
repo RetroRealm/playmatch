@@ -8,8 +8,6 @@ use log::debug;
 use regex::Regex;
 use reqwest::Client;
 use tokio::fs::File;
-use tokio::fs;
-use tokio::fs::{create_dir_all, File};
 use tokio::io::AsyncWriteExt;
 
 lazy_static! {

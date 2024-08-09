@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use log::debug;
 use reqwest::Client;
@@ -10,7 +10,6 @@ use crate::dat::DATS_PATH;
 use crate::fs::read_files_recursive;
 use crate::http::download::{download_file, DownloadFileNameResult};
 use crate::util::random_sized_string;
-use crate::zip::extract_zip_to_directory;
 
 const REDUMP_NAME: &str = "redump";
 const REDUMP_URL: &str = "http://redump.org";
