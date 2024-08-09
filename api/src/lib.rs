@@ -14,7 +14,6 @@ use utoipa_swagger_ui::{SwaggerUi, Url};
 use migration::{Migrator, MigratorTrait};
 use service::dat::download_and_parse_dats;
 
-use crate::models::game_file::GameFileRequest;
 use crate::models::game_file::GameMatchResponse;
 use crate::models::game_file::GameMatchType;
 use crate::routes::identify::__path_identify;
@@ -52,10 +51,7 @@ async fn start() -> anyhow::Result<()> {
         .unwrap();
 
     #[derive(OpenApi)]
-    #[openapi(
-        paths(identify),
-        components(schemas(GameFileRequest, GameMatchResponse, GameMatchType))
-    )]
+    #[openapi(paths(identify), components(schemas(GameMatchResponse, GameMatchType)))]
     struct ApiDoc;
 
     let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
