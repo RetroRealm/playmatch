@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
-pub struct GameFileRequest {
+pub struct GameFileQuery {
 	pub file_name: String,
 	pub file_size: i64,
 	pub md5: Option<String>,
@@ -32,8 +32,8 @@ pub struct GameMatchResponse {
 	pub mobygames_id: Option<i32>,
 }
 
-impl From<GameFileRequest> for GameFileMatchSearch {
-	fn from(value: GameFileRequest) -> Self {
+impl From<GameFileQuery> for GameFileMatchSearch {
+	fn from(value: GameFileQuery) -> Self {
 		GameFileMatchSearch {
 			file_name: value.file_name,
 			file_size: value.file_size,

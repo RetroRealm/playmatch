@@ -1,5 +1,5 @@
 use crate::error;
-use crate::model::game_file::{GameFileRequest, GameMatchResponse};
+use crate::model::game_file::{GameFileQuery, GameMatchResponse};
 use actix_web::web::Data;
 use actix_web::{get, web, HttpResponse, Responder};
 use log::debug;
@@ -11,14 +11,14 @@ use web::Query;
 #[utoipa::path(
 	get,
 	context_path = "/api",
-	params(GameFileRequest),
+	params(GameFileQuery),
 	responses(
 		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMatchResponse)
 	)
 )]
 #[get("/identify/ids")]
 pub async fn identify(
-	query: Query<GameFileRequest>,
+	query: Query<GameFileQuery>,
 	db_conn: Data<DatabaseConnection>,
 ) -> error::Result<impl Responder> {
 	debug!("Received request: {:?}", query);

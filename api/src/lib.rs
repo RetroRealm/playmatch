@@ -1,3 +1,5 @@
+use crate::model::igdb::GameResponse;
+use crate::routes::igdb::__path_get_game;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
@@ -9,6 +11,7 @@ use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use std::env;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
@@ -17,9 +20,11 @@ use migration::{Migrator, MigratorTrait};
 
 use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
+use crate::routes::igdb::get_game;
 use crate::util::download_and_parse_dats_wrapper;
 use model::game_file::GameMatchResponse;
 use model::game_file::GameMatchType;
+use service::metadata::igdb::IgdbClient;
 
 pub mod error;
 pub mod model;
@@ -32,7 +37,10 @@ pub mod built_info {
 }
 
 #[derive(OpenApi)]
-#[openapi(paths(identify), components(schemas(GameMatchResponse, GameMatchType)))]
+#[openapi(
+	paths(identify, get_game),
+	components(schemas(GameMatchResponse, GameMatchType, GameResponse))
+)]
 struct ApiDoc;
 
 #[actix_web::main]
@@ -64,24 +72,32 @@ async fn start() -> anyhow::Result<()> {
 
 	let sched = JobScheduler::new().await?;
 	let client = Client::builder().cookie_store(true).build()?;
+	let igdb_client = IgdbClient::new(
+		env::var("IGDB_CLIENT_ID")?,
+		env::var("IGDB_CLIENT_SECRET")?,
+		client.clone(),
+	)?;
 
 	let conn_arc = Arc::new(conn);
 	let client_arc = Arc::new(client);
 
 	let conn_data = Data::from(conn_arc.clone());
 	let client_data = Data::from(client_arc.clone());
+	let igdb_data = Data::new(Mutex::new(igdb_client));
 
 	let serv = HttpServer::new(move || {
 		App::new()
 			.wrap(Compress::default())
 			.app_data(conn_data.clone())
 			.app_data(client_data.clone())
+			.app_data(igdb_data.clone())
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))
 					.wrap(Logger::default())
 					.wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
-					.service(identify),
+					.service(identify)
+					.service(get_game),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),

@@ -1,7 +1,6 @@
+use crate::model::game_file::GameMatchResponseBuilderError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
-
-use crate::model::game_file::GameMatchResponseBuilderError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

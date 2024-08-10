@@ -21,6 +21,8 @@ zip = "^2.1"
 async-recursion = "^1.1"
 strum = { version = "^0.26", features = ["derive"] }
 derive_builder = "^0.20"
+tower = { version = "^0.4", features = ["util", "limit"] }
+oauth2 = "^4"
 
 [dependencies.sea-orm]
 version = "~1" # sea-orm version
