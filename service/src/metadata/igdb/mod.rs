@@ -1,5 +1,5 @@
 use crate::http::abstraction::USER_AGENT;
-use crate::metadata::igdb::constants::API_URL;
+use crate::metadata::igdb::constants::{API_URL, IGDB_ROUTE_GAMES};
 use crate::metadata::igdb::model::Game;
 use chrono::{DateTime, Utc};
 use log::debug;
@@ -54,17 +54,17 @@ impl IgdbClient {
 	}
 
 	pub async fn get_game_by_id(&mut self, id: i64) -> anyhow::Result<Option<Game>> {
-		self.get_single_by_id("games", id).await
+		self.get_single_by_id(IGDB_ROUTE_GAMES, id).await
 	}
 
 	pub async fn get_games_by_id(&mut self, ids: Vec<i64>) -> anyhow::Result<Vec<Game>> {
-		self.get_vec_by_ids("games", ids).await
+		self.get_vec_by_ids(IGDB_ROUTE_GAMES, ids).await
 	}
 
 	pub async fn search_game_by_name(&mut self, name: String) -> anyhow::Result<Vec<Game>> {
 		self.do_request_parsed::<Vec<Game>>(
 			Method::POST,
-			"games".to_string(),
+			IGDB_ROUTE_GAMES,
 			None,
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
