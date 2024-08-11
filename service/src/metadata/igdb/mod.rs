@@ -75,6 +75,7 @@ impl IgdbClient {
 		Ok(res.pop())
 	}
 
+	#[allow(dead_code)]
 	async fn get_vec_by_ids<T: DeserializeOwned>(
 		&mut self,
 		endpoint: &str,
