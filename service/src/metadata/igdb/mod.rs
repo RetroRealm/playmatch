@@ -69,7 +69,7 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	async fn get_single_by_id<T: DeserializeOwned>(
@@ -108,7 +108,7 @@ impl IgdbClient {
 			)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	async fn refresh_token(&mut self) -> anyhow::Result<()> {
@@ -175,7 +175,7 @@ impl IgdbClient {
 					.secret()
 					.as_str()
 			)
-				.parse()?,
+			.parse()?,
 		);
 
 		let req = self
