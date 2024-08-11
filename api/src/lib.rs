@@ -123,7 +123,15 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
-	tokio::spawn(async move { download_and_parse_dats_wrapper(client, conn).await });
+
+	let download_dats_on_startup = env::var("DOWNLOAD_DATS_ON_STARTUP")
+		.unwrap_or("true".to_string())
+		.to_lowercase()
+		== "true";
+
+	if download_dats_on_startup {
+		tokio::spawn(async move { download_and_parse_dats_wrapper(client, conn).await });
+	}
 
 	sched.start().await?;
 	debug!("Scheduler started");
