@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod dat;
 pub mod db;
 mod fs;

@@ -4,7 +4,11 @@ use actix_web::web::Data;
 use actix_web::{get, HttpResponse, Responder};
 use actix_web_lab::extract::Query;
 use log::debug;
+use service::cache::igdb::{
+	get_game_by_id_cached, get_games_by_ids_cached, search_game_by_name_cached,
+};
 use service::metadata::igdb::IgdbClient;
+use std::ops::DerefMut;
 use tokio::sync::Mutex;
 
 /// Queries the IGDB API for a game by its Id
@@ -26,7 +30,9 @@ pub async fn get_game_by_id(
 
 	let mut guard = igdb_client.lock().await;
 
-	let response = guard.get_game_by_id(query.into_inner().id).await?;
+	let igdb_client = guard.deref_mut();
+
+	let response = get_game_by_id_cached(igdb_client, query.into_inner().id).await?;
 
 	drop(guard);
 
@@ -55,7 +61,9 @@ pub async fn get_games_by_ids(
 
 	let mut guard = igdb_client.lock().await;
 
-	let response = guard.get_games_by_id(query.into_inner().ids).await?;
+	let igdb_client = guard.deref_mut();
+
+	let response = get_games_by_ids_cached(igdb_client, query.into_inner().ids).await?;
 
 	drop(guard);
 
@@ -80,7 +88,9 @@ pub async fn search_game_by_name(
 
 	let mut guard = igdb_client.lock().await;
 
-	let response = guard.search_game_by_name(query.into_inner().query).await?;
+	let igdb_client = guard.deref_mut();
+
+	let response = search_game_by_name_cached(igdb_client, query.into_inner().query).await?;
 
 	drop(guard);
 

@@ -155,6 +155,8 @@ impl IgdbClient {
 		where_clause: Option<String>,
 		limit_clause: Option<String>,
 	) -> anyhow::Result<T> {
+		// TODO: Change this method to not refresh and instead refresh in an own async task so that we do not need a mutable reference to self and can save on that mutex lock
+
 		self.refresh_token_if_needed().await?;
 
 		let mut headers = HeaderMap::new();
