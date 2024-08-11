@@ -153,7 +153,7 @@ pub struct Game {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct Genres {
+pub struct Genres {
 	checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	created_at: DateTime<Utc>,
@@ -165,7 +165,7 @@ struct Genres {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct Franchise {
+pub struct Franchise {
 	checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	created_at: DateTime<Utc>,
@@ -179,7 +179,7 @@ struct Franchise {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]
-enum ExternalGameCategory {
+pub enum ExternalGameCategory {
 	Steam = 1,
 	GoodOldGames = 5,
 	Youtube = 10,
@@ -204,13 +204,13 @@ enum ExternalGameCategory {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]
-enum ExternalGameMedia {
+pub enum ExternalGameMedia {
 	Digital = 1,
 	Physical,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct ExternalGame {
+pub struct ExternalGame {
 	category: ExternalGameCategory,
 	checksum: Uuid,
 	countries: Vec<i32>,
@@ -228,7 +228,7 @@ struct ExternalGame {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct Cover {
+pub struct Cover {
 	alpha_channel: bool,
 	animated: bool,
 	checksum: Uuid,
@@ -241,7 +241,7 @@ struct Cover {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct Collection {
+pub struct Collection {
 	as_child_relations: Vec<i32>,
 	as_parent_relations: Vec<i32>,
 	checksum: Uuid,
@@ -258,7 +258,7 @@ struct Collection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct Artwork {
+pub struct Artwork {
 	alpha_channel: bool,
 	animated: bool,
 	checksum: Uuid,
@@ -270,7 +270,7 @@ struct Artwork {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct AlternativeName {
+pub struct AlternativeName {
 	checksum: Uuid,
 	comment: String,
 	game: i32,
@@ -279,7 +279,7 @@ struct AlternativeName {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]
-enum RatingCategory {
+pub enum RatingCategory {
 	Esrb = 1,
 	Pegi,
 	Cero,
@@ -291,7 +291,7 @@ enum RatingCategory {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]
-enum RatingEnum {
+pub enum RatingEnum {
 	Three = 1,
 	Seven,
 	Twelve,
@@ -334,7 +334,7 @@ enum RatingEnum {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct AgeRating {
+pub struct AgeRating {
 	category: RatingCategory,
 	checksum: Uuid,
 	content_descriptions: Vec<AgeRatingContentDescription>,
@@ -345,7 +345,7 @@ struct AgeRating {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]
-enum AgeRatingContentCategory {
+pub enum AgeRatingContentCategory {
 	EsrbAlcoholReference = 1,
 	EsrbAnimatedBlood,
 	EsrbBlood,
@@ -434,7 +434,7 @@ enum AgeRatingContentCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-struct AgeRatingContentDescription {
+pub struct AgeRatingContentDescription {
 	category: AgeRatingContentCategory,
 	checksum: Uuid,
 	description: String,
