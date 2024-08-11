@@ -6,7 +6,7 @@ use cached::TimedCache;
 #[cached(
 	result = true,
 	ty = "TimedCache<i64, Option<Game>>",
-	create = "{ TimedCache::with_lifespan(7200) }",
+	create = "{ TimedCache::with_lifespan(86400) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_game_by_id_cached(
@@ -19,7 +19,7 @@ pub async fn get_game_by_id_cached(
 #[cached(
 	result = true,
 	ty = "TimedCache<Vec<i64>, Vec<Game>>",
-	create = "{ TimedCache::with_lifespan(7200) }",
+	create = "{ TimedCache::with_lifespan(86400) }",
 	convert = r#"{ ids.clone() }"#
 )]
 pub async fn get_games_by_ids_cached(
@@ -32,7 +32,7 @@ pub async fn get_games_by_ids_cached(
 #[cached(
 	result = true,
 	ty = "TimedCache<String, Vec<Game>>",
-	create = "{ TimedCache::with_lifespan(7200) }",
+	create = "{ TimedCache::with_lifespan(86400) }",
 	convert = r#"{ query.clone() }"#
 )]
 pub async fn search_game_by_name_cached(
