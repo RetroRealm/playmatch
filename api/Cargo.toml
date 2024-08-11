@@ -8,6 +8,7 @@ entity = { path = "../entity" }
 migration = { path = "../migration" }
 service = { path = "../service" }
 actix-web = "^4"
+actix-web-lab = "^0.22"
 tokio = { version = "^1", features = ["full"] }
 reqwest = { version = "^0.12", features = ["rustls-tls", "json", "cookies", "socks"], default-features = false }
 sea-orm = { version = "~1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }

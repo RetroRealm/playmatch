@@ -57,6 +57,21 @@ impl IgdbClient {
 		self.get_single_by_id("games", id).await
 	}
 
+	pub async fn get_games_by_id(&mut self, ids: Vec<i64>) -> anyhow::Result<Vec<Game>> {
+		self.get_vec_by_ids("games", ids).await
+	}
+
+	pub async fn search_game_by_name(&mut self, name: String) -> anyhow::Result<Vec<Game>> {
+		self.do_request_parsed::<Vec<Game>>(
+			Method::POST,
+			"games".to_string(),
+			None,
+			Some(format!("search \"{}\";", name)),
+			Some("".to_string()),
+		)
+		.await
+	}
+
 	async fn get_single_by_id<T: DeserializeOwned>(
 		&mut self,
 		endpoint: &str,
@@ -75,7 +90,6 @@ impl IgdbClient {
 		Ok(res.pop())
 	}
 
-	#[allow(dead_code)]
 	async fn get_vec_by_ids<T: DeserializeOwned>(
 		&mut self,
 		endpoint: &str,
@@ -94,7 +108,7 @@ impl IgdbClient {
 			)),
 			Some("".to_string()),
 		)
-			.await
+		.await
 	}
 
 	async fn refresh_token(&mut self) -> anyhow::Result<()> {
@@ -159,7 +173,7 @@ impl IgdbClient {
 					.secret()
 					.as_str()
 			)
-				.parse()?,
+			.parse()?,
 		);
 
 		let req = self

@@ -1,4 +1,4 @@
-use crate::routes::igdb::__path_get_game;
+use crate::routes::igdb::__path_search_game_by_name;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
@@ -24,7 +24,10 @@ use migration::{Migrator, MigratorTrait};
 
 use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
-use crate::routes::igdb::get_game;
+use crate::routes::igdb::{
+	__path_get_game_by_id, __path_get_games_by_ids, get_game_by_id, get_games_by_ids,
+	search_game_by_name,
+};
 use crate::util::download_and_parse_dats_wrapper;
 use service::metadata::igdb::IgdbClient;
 
@@ -40,7 +43,7 @@ pub mod built_info {
 
 #[derive(OpenApi)]
 #[openapi(
-	paths(identify, get_game),
+	paths(identify, get_game_by_id, get_games_by_ids, search_game_by_name),
 	components(schemas(GameMatchResult, GameMatchType, Game, GameCategory, GameStatus))
 )]
 struct ApiDoc;
@@ -99,7 +102,9 @@ async fn start() -> anyhow::Result<()> {
 					.wrap(Logger::default())
 					.wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
 					.service(identify)
-					.service(get_game),
+					.service(get_game_by_id)
+					.service(get_games_by_ids)
+					.service(search_game_by_name),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),

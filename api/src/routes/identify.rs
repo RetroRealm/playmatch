@@ -23,7 +23,7 @@ pub async fn identify(
 ) -> error::Result<impl Responder> {
 	debug!("Received request: {:?}", query);
 
-	let response = match_game_if_possible(query.into_inner().into(), db_conn.get_ref()).await?;
+	let response = match_game_if_possible(query.into_inner(), db_conn.get_ref()).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
