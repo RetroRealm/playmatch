@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 	context_path = "/api",
 	params(GameIdQuery),
 	responses(
-		(status = 200, description = "Returns IGDB metadata about an game", body = GameResponse),
+		(status = 200, description = "Returns IGDB metadata about an game", body = Game),
 		(status = 404, description = "Game not found")
 	)
 )]

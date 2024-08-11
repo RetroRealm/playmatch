@@ -1,68 +1,152 @@
+use chrono::serde::ts_seconds;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
+use utoipa::ToSchema;
 
-pub type GameResponses = Vec<GameResponse>;
+pub type GameResponses = Vec<Game>;
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GameResponse {
-	pub id: i64,
-	#[serde(rename = "age_ratings")]
-	pub age_ratings: Vec<i64>,
-	#[serde(rename = "aggregated_rating")]
-	pub aggregated_rating: f64,
-	#[serde(rename = "aggregated_rating_count")]
-	pub aggregated_rating_count: i64,
-	#[serde(rename = "alternative_names")]
-	pub alternative_names: Vec<i64>,
-	pub artworks: Vec<i64>,
-	pub category: i64,
-	pub cover: i64,
-	#[serde(rename = "created_at")]
-	pub created_at: i64,
-	#[serde(rename = "external_games")]
-	pub external_games: Vec<i64>,
-	#[serde(rename = "first_release_date")]
-	pub first_release_date: i64,
-	pub franchises: Vec<i64>,
-	#[serde(rename = "game_modes")]
-	pub game_modes: Vec<i64>,
-	pub genres: Vec<i64>,
-	#[serde(rename = "involved_companies")]
-	pub involved_companies: Vec<i64>,
-	pub keywords: Vec<i64>,
-	pub name: String,
-	pub platforms: Vec<i64>,
-	#[serde(rename = "player_perspectives")]
-	pub player_perspectives: Vec<i64>,
-	pub rating: f64,
-	#[serde(rename = "rating_count")]
-	pub rating_count: i64,
-	#[serde(rename = "release_dates")]
-	pub release_dates: Vec<i64>,
-	pub screenshots: Vec<i64>,
-	#[serde(rename = "similar_games")]
-	pub similar_games: Vec<i64>,
-	pub slug: String,
-	pub storyline: String,
-	pub summary: String,
-	pub tags: Vec<i64>,
-	pub themes: Vec<i64>,
-	#[serde(rename = "total_rating")]
-	pub total_rating: f64,
-	#[serde(rename = "total_rating_count")]
-	pub total_rating_count: i64,
-	#[serde(rename = "updated_at")]
-	pub updated_at: i64,
-	pub url: String,
-	pub videos: Vec<i64>,
-	pub websites: Vec<i64>,
-	pub checksum: String,
-	pub remakes: Vec<i64>,
-	#[serde(rename = "expanded_games")]
-	pub expanded_games: Vec<i64>,
-	#[serde(rename = "language_supports")]
-	pub language_supports: Vec<i64>,
-	#[serde(rename = "game_localizations")]
-	pub game_localizations: Vec<i64>,
-	pub collections: Vec<i64>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
+#[repr(u8)]
+pub enum GameCategory {
+	MainGame,
+	DLCAddon,
+	Expansion,
+	Bundle,
+	StandaloneExpansion,
+	Mod,
+	Episode,
+	Season,
+	Remake,
+	Remaster,
+	ExpandedGame,
+	Port,
+	Fork,
+	Pack,
+	Update,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
+#[repr(u8)]
+pub enum GameStatus {
+	Released = 0,
+	Alpha = 2,
+	Beta,
+	EarlyAccess,
+	Offline,
+	Cancelled,
+	Rumored,
+	Delisted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct Game {
+	id: i32,
+	category: GameCategory,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	external_games: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	expanded_games: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	expansions: Option<Vec<i32>>,
+	name: String,
+	slug: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+	url: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	websites: Option<Vec<i32>>,
+	checksum: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	cover: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	game_modes: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	genres: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	involved_companies: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	summary: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	language_supports: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	bundles: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	first_release_date: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	forks: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	platforms: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	player_perspectives: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	release_dates: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	similar_games: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	tags: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	themes: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	artworks: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	screenshots: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	age_ratings: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	aggregated_rating: Option<f64>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	aggregated_rating_count: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	total_rating: Option<f64>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	total_rating_count: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	status: Option<GameStatus>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	videos: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	parent_game: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	game_engines: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	keywords: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	storyline: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	rating: Option<f64>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	rating_count: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	alternative_names: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	collection: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	collections: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	game_localizations: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	version_parent: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	version_title: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	follows: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	franchises: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	dlcs: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	hypes: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	multiplayer_modes: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	ports: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	remakes: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	remasters: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	standalone_expansions: Option<Vec<i32>>,
 }

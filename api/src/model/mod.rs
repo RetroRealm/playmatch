@@ -1,2 +1,1 @@
-pub mod game_file;
-pub mod igdb;
+pub(crate) mod igdb;

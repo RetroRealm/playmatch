@@ -1,6 +1,6 @@
 use crate::http::abstraction::USER_AGENT;
 use crate::metadata::igdb::constants::API_URL;
-use crate::metadata::igdb::model::{GameResponse, GameResponses};
+use crate::metadata::igdb::model::Game;
 use chrono::{DateTime, Utc};
 use log::debug;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
@@ -53,17 +53,47 @@ impl IgdbClient {
 		})
 	}
 
-	pub async fn get_game_by_id(&mut self, id: i64) -> anyhow::Result<Option<GameResponse>> {
-		Ok(self
-			.do_request_parsed::<GameResponses>(
+	pub async fn get_game_by_id(&mut self, id: i64) -> anyhow::Result<Option<Game>> {
+		self.get_single_by_id("games", id).await
+	}
+
+	async fn get_single_by_id<T: DeserializeOwned>(
+		&mut self,
+		endpoint: &str,
+		id: i64,
+	) -> anyhow::Result<Option<T>> {
+		let mut res = self
+			.do_request_parsed::<Vec<T>>(
 				Method::POST,
-				"games".to_string(),
+				endpoint.to_string(),
 				None,
-				Some(format!("id = {}", id)),
-				None,
+				Some(format!("where id = {};", id)),
+				Some("limit 1;".to_string()),
 			)
-			.await?
-			.pop())
+			.await?;
+
+		Ok(res.pop())
+	}
+
+	async fn get_vec_by_ids<T: DeserializeOwned>(
+		&mut self,
+		endpoint: &str,
+		ids: Vec<i64>,
+	) -> anyhow::Result<Vec<T>> {
+		self.do_request_parsed::<Vec<T>>(
+			Method::POST,
+			endpoint.to_string(),
+			None,
+			Some(format!(
+				"where id =({});",
+				ids.iter()
+					.map(|id| id.to_string())
+					.collect::<Vec<String>>()
+					.join(",")
+			)),
+			Some("".to_string()),
+		)
+			.await
 	}
 
 	async fn refresh_token(&mut self) -> anyhow::Result<()> {
@@ -128,7 +158,7 @@ impl IgdbClient {
 					.secret()
 					.as_str()
 			)
-			.parse()?,
+				.parse()?,
 		);
 
 		let req = self
@@ -139,10 +169,10 @@ impl IgdbClient {
 			)
 			.headers(headers)
 			.body(format!(
-				"fields {}; where {}; limit {};",
-				fields_clause.unwrap_or("*".to_string()),
+				"{}{}{}",
+				fields_clause.unwrap_or("fields *;".to_string()),
 				where_clause.unwrap_or("".to_string()),
-				limit_clause.unwrap_or("1".to_string())
+				limit_clause.unwrap_or("limit 1;".to_string())
 			))
 			.build()?;
 

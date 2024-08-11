@@ -10,6 +10,7 @@ reqwest = { version = "^0.12", features = ["rustls-tls", "cookies", "stream"], d
 scraper = "^0.20"
 serde = { version = "^1", features = ["derive"] }
 serde-xml-rs = "^0.6"
+serde_repr = "^0.1"
 anyhow = "^1"
 log = "^0.4"
 chrono = "^0.4"
@@ -23,6 +24,7 @@ strum = { version = "^0.26", features = ["derive"] }
 derive_builder = "^0.20"
 tower = { version = "^0.4", features = ["util", "limit"] }
 oauth2 = "^4"
+utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono"] }
 
 [dependencies.sea-orm]
 version = "~1" # sea-orm version

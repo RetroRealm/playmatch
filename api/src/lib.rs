@@ -1,4 +1,3 @@
-use crate::model::igdb::GameResponse;
 use crate::routes::igdb::__path_get_game;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
@@ -9,6 +8,11 @@ use env_logger::Env;
 use log::{debug, error, info, LevelFilter};
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
+use service::metadata::igdb::model::Game;
+use service::metadata::igdb::model::GameCategory;
+use service::metadata::igdb::model::GameStatus;
+use service::model::GameMatchResult;
+use service::model::GameMatchType;
 use std::env;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -22,8 +26,6 @@ use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
 use crate::routes::igdb::get_game;
 use crate::util::download_and_parse_dats_wrapper;
-use model::game_file::GameMatchResponse;
-use model::game_file::GameMatchType;
 use service::metadata::igdb::IgdbClient;
 
 pub mod error;
@@ -39,7 +41,7 @@ pub mod built_info {
 #[derive(OpenApi)]
 #[openapi(
 	paths(identify, get_game),
-	components(schemas(GameMatchResponse, GameMatchType, GameResponse))
+	components(schemas(GameMatchResult, GameMatchType, Game, GameCategory, GameStatus))
 )]
 struct ApiDoc;
 
@@ -121,7 +123,7 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
-	tokio::spawn(async move { download_and_parse_dats_wrapper(client, conn).await });
+	//tokio::spawn(async move { download_and_parse_dats_wrapper(client, conn).await });
 
 	sched.start().await?;
 	debug!("Scheduler started");

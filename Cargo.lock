@@ -3755,9 +3755,11 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde-xml-rs",
+ "serde_repr",
  "strum",
  "tokio",
  "tower",
+ "utoipa",
  "zip 2.1.6",
 ]
 
