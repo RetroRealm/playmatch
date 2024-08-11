@@ -11,6 +11,7 @@ use web::Query;
 #[utoipa::path(
 	get,
 	context_path = "/api",
+	tag = "Identify",
 	params(GameFileMatchSearch),
 	responses(
 		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMatchResponse)

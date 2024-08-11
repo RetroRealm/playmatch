@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 #[utoipa::path(
 	get,
 	context_path = "/api",
+	tag = "IGDB",
 	params(GameIdQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about an game", body = Game),
@@ -47,6 +48,7 @@ pub async fn get_game_by_id(
 #[utoipa::path(
 	get,
 	context_path = "/api",
+	tag = "IGDB",
 	params(GameIdsQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about games", body = Vec<Game>)
@@ -74,6 +76,7 @@ pub async fn get_games_by_ids(
 #[utoipa::path(
 	get,
 	context_path = "/api",
+	tag = "IGDB",
 	params(GameSearchQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about games", body = Vec<Game>)
