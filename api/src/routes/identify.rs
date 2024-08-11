@@ -14,7 +14,7 @@ use web::Query;
 	tag = "Identify",
 	params(GameFileMatchSearch),
 	responses(
-		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMatchResponse)
+		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMatchResult)
 	)
 )]
 #[get("/identify/ids")]
