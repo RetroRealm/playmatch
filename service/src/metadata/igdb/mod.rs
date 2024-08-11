@@ -66,10 +66,10 @@ impl IgdbClient {
 			Method::POST,
 			"games".to_string(),
 			None,
-			Some(format!("search \"{}\";", name)),
-			Some("".to_string()),
+			Some(&format!("search \"{}\";", name)),
+			Some(""),
 		)
-		.await
+			.await
 	}
 
 	async fn get_single_by_id<T: DeserializeOwned>(
@@ -80,10 +80,10 @@ impl IgdbClient {
 		let mut res = self
 			.do_request_parsed::<Vec<T>>(
 				Method::POST,
-				endpoint.to_string(),
+				endpoint,
 				None,
-				Some(format!("where id = {};", id)),
-				Some("limit 1;".to_string()),
+				Some(&format!("where id = {};", id)),
+				Some("limit 1;"),
 			)
 			.await?;
 
@@ -97,18 +97,18 @@ impl IgdbClient {
 	) -> anyhow::Result<Vec<T>> {
 		self.do_request_parsed::<Vec<T>>(
 			Method::POST,
-			endpoint.to_string(),
+			endpoint,
 			None,
-			Some(format!(
+			Some(&format!(
 				"where id =({});",
 				ids.iter()
 					.map(|id| id.to_string())
 					.collect::<Vec<String>>()
 					.join(",")
 			)),
-			Some("".to_string()),
+			Some(""),
 		)
-		.await
+			.await
 	}
 
 	async fn refresh_token(&mut self) -> anyhow::Result<()> {
@@ -150,10 +150,10 @@ impl IgdbClient {
 	async fn do_request_parsed<T: DeserializeOwned>(
 		&mut self,
 		method: Method,
-		path: String,
-		fields_clause: Option<String>,
-		where_clause: Option<String>,
-		limit_clause: Option<String>,
+		path: &str,
+		fields_clause: Option<&str>,
+		where_clause: Option<&str>,
+		limit_clause: Option<&str>,
 	) -> anyhow::Result<T> {
 		// TODO: Change this method to not refresh and instead refresh in an own async task so that we do not need a mutable reference to self and can save on that mutex lock
 
@@ -175,7 +175,7 @@ impl IgdbClient {
 					.secret()
 					.as_str()
 			)
-			.parse()?,
+				.parse()?,
 		);
 
 		let req = self
@@ -187,9 +187,9 @@ impl IgdbClient {
 			.headers(headers)
 			.body(format!(
 				"{}{}{}",
-				fields_clause.unwrap_or("fields *;".to_string()),
-				where_clause.unwrap_or("".to_string()),
-				limit_clause.unwrap_or("limit 1;".to_string())
+				fields_clause.unwrap_or("fields *;"),
+				where_clause.unwrap_or(""),
+				limit_clause.unwrap_or("limit 1;")
 			))
 			.build()?;
 
