@@ -2,16 +2,16 @@ use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
-pub struct GameIdQuery {
+pub struct IdQuery {
 	pub id: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
-pub struct GameIdsQuery {
+pub struct IdsQuery {
 	pub ids: Vec<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
-pub struct GameSearchQuery {
+pub struct SearchQuery {
 	pub query: String,
 }

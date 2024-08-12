@@ -1,4 +1,3 @@
-use crate::routes::igdb::__path_search_game_by_name;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
@@ -8,9 +7,10 @@ use env_logger::Env;
 use log::{debug, error, info, LevelFilter};
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
-use service::metadata::igdb::model::Game;
-use service::metadata::igdb::model::GameCategory;
-use service::metadata::igdb::model::GameStatus;
+use service::metadata::igdb::model::{
+	AgeRating, AgeRatingContentCategory, AgeRatingContentDescription, AlternativeName, Game,
+	GameCategory, GameStatus, RatingCategory, RatingEnum,
+};
 use service::model::GameMatchResult;
 use service::model::GameMatchType;
 use std::env;
@@ -25,7 +25,10 @@ use migration::{Migrator, MigratorTrait};
 use crate::routes::identify::__path_identify;
 use crate::routes::identify::identify;
 use crate::routes::igdb::{
-	__path_get_game_by_id, __path_get_games_by_ids, get_game_by_id, get_games_by_ids,
+	__path_get_age_rating_by_id, __path_get_age_ratings_by_ids, __path_get_alternative_name_by_id,
+	__path_get_alternative_names_by_ids, __path_get_game_by_id, __path_get_games_by_ids,
+	__path_search_game_by_name, get_age_rating_by_id, get_age_ratings_by_ids,
+	get_alternative_name_by_id, get_alternative_names_by_ids, get_game_by_id, get_games_by_ids,
 	search_game_by_name,
 };
 use crate::util::download_and_parse_dats_wrapper;
@@ -43,8 +46,29 @@ pub mod built_info {
 
 #[derive(OpenApi)]
 #[openapi(
-	paths(identify, get_game_by_id, get_games_by_ids, search_game_by_name),
-	components(schemas(GameMatchResult, GameMatchType, Game, GameCategory, GameStatus))
+	paths(
+		identify,
+		get_game_by_id,
+		get_games_by_ids,
+		search_game_by_name,
+		get_age_rating_by_id,
+		get_age_ratings_by_ids,
+		get_alternative_name_by_id,
+		get_alternative_names_by_ids
+	),
+	components(schemas(
+		GameMatchResult,
+		GameMatchType,
+		Game,
+		GameCategory,
+		GameStatus,
+		AgeRating,
+		AlternativeName,
+		RatingCategory,
+		AgeRatingContentDescription,
+		AgeRatingContentCategory,
+		RatingEnum
+	))
 )]
 struct ApiDoc;
 
@@ -104,7 +128,11 @@ async fn start() -> anyhow::Result<()> {
 					.service(identify)
 					.service(get_game_by_id)
 					.service(get_games_by_ids)
-					.service(search_game_by_name),
+					.service(search_game_by_name)
+					.service(get_age_rating_by_id)
+					.service(get_age_ratings_by_ids)
+					.service(get_alternative_name_by_id)
+					.service(get_alternative_names_by_ids),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),

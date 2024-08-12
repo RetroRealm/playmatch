@@ -1,11 +1,12 @@
 use crate::error;
-use crate::model::igdb::{GameIdQuery, GameIdsQuery, GameSearchQuery};
+use crate::model::igdb::{IdQuery, IdsQuery, SearchQuery};
 use actix_web::web::Data;
 use actix_web::{get, HttpResponse, Responder};
 use actix_web_lab::extract::Query;
-use log::debug;
 use service::cache::igdb::{
-	get_game_by_id_cached, get_games_by_ids_cached, search_game_by_name_cached,
+	get_age_rating_by_id_cached, get_age_ratings_by_id_cached, get_alternative_name_by_id_cached,
+	get_alternative_names_by_id_cached, get_game_by_id_cached, get_games_by_ids_cached,
+	search_game_by_name_cached,
 };
 use service::metadata::igdb::IgdbClient;
 use std::ops::DerefMut;
@@ -16,7 +17,7 @@ use tokio::sync::Mutex;
 	get,
 	context_path = "/api",
 	tag = "IGDB",
-	params(GameIdQuery),
+	params(IdQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about an game", body = Game),
 		(status = 404, description = "Game not found")
@@ -24,11 +25,9 @@ use tokio::sync::Mutex;
 )]
 #[get("/igdb/game")]
 pub async fn get_game_by_id(
-	query: Query<GameIdQuery>,
+	query: Query<IdQuery>,
 	igdb_client: Data<Mutex<IgdbClient>>,
 ) -> error::Result<impl Responder> {
-	debug!("Received request: {:?}", query);
-
 	let mut guard = igdb_client.lock().await;
 
 	let igdb_client = guard.deref_mut();
@@ -49,18 +48,16 @@ pub async fn get_game_by_id(
 	get,
 	context_path = "/api",
 	tag = "IGDB",
-	params(GameIdsQuery),
+	params(IdsQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about games", body = Vec<Game>)
 	)
 )]
 #[get("/igdb/games")]
 pub async fn get_games_by_ids(
-	query: Query<GameIdsQuery>,
+	query: Query<IdsQuery>,
 	igdb_client: Data<Mutex<IgdbClient>>,
 ) -> error::Result<impl Responder> {
-	debug!("Received request: {:?}", query);
-
 	let mut guard = igdb_client.lock().await;
 
 	let igdb_client = guard.deref_mut();
@@ -77,23 +74,135 @@ pub async fn get_games_by_ids(
 	get,
 	context_path = "/api",
 	tag = "IGDB",
-	params(GameSearchQuery),
+	params(SearchQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about games", body = Vec<Game>)
 	)
 )]
 #[get("/igdb/game/search")]
 pub async fn search_game_by_name(
-	query: Query<GameSearchQuery>,
+	query: Query<SearchQuery>,
 	igdb_client: Data<Mutex<IgdbClient>>,
 ) -> error::Result<impl Responder> {
-	debug!("Received request: {:?}", query);
-
 	let mut guard = igdb_client.lock().await;
 
 	let igdb_client = guard.deref_mut();
 
 	let response = search_game_by_name_cached(igdb_client, query.into_inner().query).await?;
+
+	drop(guard);
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for an Age Rating by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an age rating", body = AgeRating),
+		(status = 404, description = "Age rating not found")
+	)
+)]
+#[get("/igdb/age-rating")]
+pub async fn get_age_rating_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<Mutex<IgdbClient>>,
+) -> error::Result<impl Responder> {
+	let mut guard = igdb_client.lock().await;
+
+	let igdb_client = guard.deref_mut();
+
+	let response = get_age_rating_by_id_cached(igdb_client, query.into_inner().id).await?;
+
+	drop(guard);
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Age Ratings by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about age ratings", body = Vec<AgeRating>)
+	)
+)]
+#[get("/igdb/age-ratings")]
+pub async fn get_age_ratings_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<Mutex<IgdbClient>>,
+) -> error::Result<impl Responder> {
+	let mut guard = igdb_client.lock().await;
+
+	let igdb_client = guard.deref_mut();
+
+	let response = get_age_ratings_by_id_cached(igdb_client, query.into_inner().ids).await?;
+
+	drop(guard);
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for an Alternative Name by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an alternative name", body = AlternativeName),
+		(status = 404, description = "Age rating not found")
+	)
+)]
+#[get("/igdb/alternative-name")]
+pub async fn get_alternative_name_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<Mutex<IgdbClient>>,
+) -> error::Result<impl Responder> {
+	let mut guard = igdb_client.lock().await;
+
+	let igdb_client = guard.deref_mut();
+
+	let response = get_alternative_name_by_id_cached(igdb_client, query.into_inner().id).await?;
+
+	drop(guard);
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Alternative Names by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about Alternative Names", body = Vec<AlternativeName>)
+	)
+)]
+#[get("/igdb/alternative-names")]
+pub async fn get_alternative_names_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<Mutex<IgdbClient>>,
+) -> error::Result<impl Responder> {
+	let mut guard = igdb_client.lock().await;
+
+	let igdb_client = guard.deref_mut();
+
+	let response = get_alternative_names_by_id_cached(igdb_client, query.into_inner().ids).await?;
 
 	drop(guard);
 

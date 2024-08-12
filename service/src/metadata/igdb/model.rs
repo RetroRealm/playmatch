@@ -271,6 +271,7 @@ pub struct Artwork {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AlternativeName {
+	id: i32,
 	checksum: Uuid,
 	comment: String,
 	game: i32,
@@ -335,12 +336,16 @@ pub enum RatingEnum {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AgeRating {
+	id: i32,
 	category: RatingCategory,
 	checksum: Uuid,
-	content_descriptions: Vec<AgeRatingContentDescription>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	content_descriptions: Option<Vec<i64>>,
 	rating: RatingEnum,
-	rating_cover_url: String,
-	synopsis: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	rating_cover_url: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	synopsis: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]

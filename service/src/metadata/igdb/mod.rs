@@ -1,6 +1,8 @@
 use crate::http::abstraction::USER_AGENT;
-use crate::metadata::igdb::constants::{API_URL, IGDB_ROUTE_GAMES};
-use crate::metadata::igdb::model::Game;
+use crate::metadata::igdb::constants::{
+	API_URL, IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_GAMES,
+};
+use crate::metadata::igdb::model::{AgeRating, AlternativeName, Game};
 use chrono::{DateTime, Utc};
 use log::debug;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
@@ -61,6 +63,29 @@ impl IgdbClient {
 		self.get_vec_by_ids(IGDB_ROUTE_GAMES, ids).await
 	}
 
+	pub async fn get_age_rating_by_id(&mut self, id: i64) -> anyhow::Result<Option<AgeRating>> {
+		self.get_single_by_id(IGDB_ROUTE_AGE_RATINGS, id).await
+	}
+
+	pub async fn get_age_ratings_by_id(&mut self, ids: Vec<i64>) -> anyhow::Result<Vec<AgeRating>> {
+		self.get_vec_by_ids(IGDB_ROUTE_AGE_RATINGS, ids).await
+	}
+
+	pub async fn get_alternative_name_by_id(
+		&mut self,
+		id: i64,
+	) -> anyhow::Result<Option<AlternativeName>> {
+		self.get_single_by_id(IGDB_ROUTE_ALTERNATIVE_NAMES, id)
+			.await
+	}
+
+	pub async fn get_alternative_names_by_id(
+		&mut self,
+		ids: Vec<i64>,
+	) -> anyhow::Result<Vec<AlternativeName>> {
+		self.get_vec_by_ids(IGDB_ROUTE_ALTERNATIVE_NAMES, ids).await
+	}
+
 	pub async fn search_game_by_name(&mut self, name: String) -> anyhow::Result<Vec<Game>> {
 		self.do_request_parsed::<Vec<Game>>(
 			Method::POST,
@@ -69,7 +94,7 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	async fn get_single_by_id<T: DeserializeOwned>(
@@ -108,7 +133,7 @@ impl IgdbClient {
 			)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	async fn refresh_token(&mut self) -> anyhow::Result<()> {
@@ -161,6 +186,7 @@ impl IgdbClient {
 
 		let mut headers = HeaderMap::new();
 		headers.insert("Client-Id", self.client_id.parse()?);
+		// Safety: The User Agent is only mutated on startup and is a constant string
 		unsafe {
 			headers.insert("User-Agent", USER_AGENT.parse()?);
 		}
@@ -175,7 +201,7 @@ impl IgdbClient {
 					.secret()
 					.as_str()
 			)
-			.parse()?,
+				.parse()?,
 		);
 
 		let req = self
@@ -193,8 +219,18 @@ impl IgdbClient {
 			))
 			.build()?;
 
+		debug!("Request: {:?}", req);
+		if let Some(body) = req.body() {
+			if let Some(bytes) = body.as_bytes() {
+				debug!("Request body: {:?}", std::str::from_utf8(bytes)?);
+			}
+		}
+
 		let res = self.service.ready().await?.call(req).await?;
 
-		Ok(res.json().await?)
+		let body = res.text().await?;
+		debug!("Response: {}", body);
+
+		Ok(serde_json::from_str(&body)?)
 	}
 }
