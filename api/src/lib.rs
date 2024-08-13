@@ -122,7 +122,9 @@ async fn start() -> anyhow::Result<()> {
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))
-					.wrap(Logger::default())
+					.wrap(Logger::new(
+						"\"%{r}a\" %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T",
+					))
 					.wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
 					.service(identify)
 					.service(get_game_by_id)
