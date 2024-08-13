@@ -5,8 +5,7 @@ identification
 and efficient metadata retrieval, made for RetroRealm but offers an api which any Rom Manager or Archival System can
 use.
 
-A public instance of this service is available
-at [playmatch.retrorealm.dev](https://playmatch.retrorealm.dev/swagger-ui/)
+The public API is available at [playmatch.retrorealm.dev](https://playmatch.retrorealm.dev/swagger-ui/)
 
 ## Getting Started
 
