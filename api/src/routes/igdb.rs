@@ -9,8 +9,6 @@ use service::cache::igdb::{
 	search_game_by_name_cached,
 };
 use service::metadata::igdb::IgdbClient;
-use std::ops::DerefMut;
-use tokio::sync::Mutex;
 
 /// Queries the IGDB API for a game by its Id
 #[utoipa::path(
@@ -26,15 +24,9 @@ use tokio::sync::Mutex;
 #[get("/igdb/game")]
 pub async fn get_game_by_id(
 	query: Query<IdQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = get_game_by_id_cached(igdb_client, query.into_inner().id).await?;
-
-	drop(guard);
+	let response = get_game_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -56,15 +48,9 @@ pub async fn get_game_by_id(
 #[get("/igdb/games")]
 pub async fn get_games_by_ids(
 	query: Query<IdsQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = get_games_by_ids_cached(igdb_client, query.into_inner().ids).await?;
-
-	drop(guard);
+	let response = get_games_by_ids_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -82,15 +68,10 @@ pub async fn get_games_by_ids(
 #[get("/igdb/game/search")]
 pub async fn search_game_by_name(
 	query: Query<SearchQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = search_game_by_name_cached(igdb_client, query.into_inner().query).await?;
-
-	drop(guard);
+	let response =
+		search_game_by_name_cached(igdb_client.as_ref(), query.into_inner().query).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -109,15 +90,9 @@ pub async fn search_game_by_name(
 #[get("/igdb/age-rating")]
 pub async fn get_age_rating_by_id(
 	query: Query<IdQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = get_age_rating_by_id_cached(igdb_client, query.into_inner().id).await?;
-
-	drop(guard);
+	let response = get_age_rating_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -139,15 +114,10 @@ pub async fn get_age_rating_by_id(
 #[get("/igdb/age-ratings")]
 pub async fn get_age_ratings_by_ids(
 	query: Query<IdsQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = get_age_ratings_by_id_cached(igdb_client, query.into_inner().ids).await?;
-
-	drop(guard);
+	let response =
+		get_age_ratings_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -166,15 +136,10 @@ pub async fn get_age_ratings_by_ids(
 #[get("/igdb/alternative-name")]
 pub async fn get_alternative_name_by_id(
 	query: Query<IdQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = get_alternative_name_by_id_cached(igdb_client, query.into_inner().id).await?;
-
-	drop(guard);
+	let response =
+		get_alternative_name_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -196,15 +161,10 @@ pub async fn get_alternative_name_by_id(
 #[get("/igdb/alternative-names")]
 pub async fn get_alternative_names_by_ids(
 	query: Query<IdsQuery>,
-	igdb_client: Data<Mutex<IgdbClient>>,
+	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let mut guard = igdb_client.lock().await;
-
-	let igdb_client = guard.deref_mut();
-
-	let response = get_alternative_names_by_id_cached(igdb_client, query.into_inner().ids).await?;
-
-	drop(guard);
+	let response =
+		get_alternative_names_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }

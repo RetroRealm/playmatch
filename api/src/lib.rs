@@ -15,7 +15,6 @@ use service::model::GameMatchResult;
 use service::model::GameMatchType;
 use std::env;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
@@ -112,7 +111,7 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn_data = Data::from(conn_arc.clone());
 	let client_data = Data::from(client_arc.clone());
-	let igdb_data = Data::new(Mutex::new(igdb_client));
+	let igdb_data = Data::new(igdb_client);
 
 	let serv = HttpServer::new(move || {
 		App::new()

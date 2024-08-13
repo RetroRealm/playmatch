@@ -12,20 +12,26 @@ use oauth2::{AuthUrl, ClientId, ClientSecret, TokenResponse, TokenUrl};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, Url};
 use serde::de::DeserializeOwned;
+use std::ops::DerefMut;
 use std::time::Duration;
+use tokio::sync::{Mutex, RwLock};
 use tower::limit::RateLimit;
 use tower::{Service, ServiceExt};
 
 mod constants;
 pub mod model;
 
-pub struct IgdbClient {
-	client: Client,
+struct OAuth2Handler {
 	oauth2: BasicClient,
-	service: RateLimit<Client>,
-	client_id: String,
 	token_response: Option<BasicTokenResponse>,
 	last_token_request: Option<DateTime<Utc>>,
+}
+
+pub struct IgdbClient {
+	client: Client,
+	service: Mutex<RateLimit<Client>>,
+	oauth2handler: RwLock<OAuth2Handler>,
+	client_id: String,
 }
 
 impl IgdbClient {
@@ -47,32 +53,34 @@ impl IgdbClient {
 
 		Ok(Self {
 			client,
-			oauth2: oauth2_client,
-			service,
 			client_id,
-			token_response: None,
-			last_token_request: None,
+			service: Mutex::new(service),
+			oauth2handler: RwLock::new(OAuth2Handler {
+				oauth2: oauth2_client,
+				token_response: None,
+				last_token_request: None,
+			}),
 		})
 	}
 
-	pub async fn get_game_by_id(&mut self, id: i64) -> anyhow::Result<Option<Game>> {
+	pub async fn get_game_by_id(&self, id: i64) -> anyhow::Result<Option<Game>> {
 		self.get_single_by_id(IGDB_ROUTE_GAMES, id).await
 	}
 
-	pub async fn get_games_by_id(&mut self, ids: Vec<i64>) -> anyhow::Result<Vec<Game>> {
+	pub async fn get_games_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<Game>> {
 		self.get_vec_by_ids(IGDB_ROUTE_GAMES, ids).await
 	}
 
-	pub async fn get_age_rating_by_id(&mut self, id: i64) -> anyhow::Result<Option<AgeRating>> {
+	pub async fn get_age_rating_by_id(&self, id: i64) -> anyhow::Result<Option<AgeRating>> {
 		self.get_single_by_id(IGDB_ROUTE_AGE_RATINGS, id).await
 	}
 
-	pub async fn get_age_ratings_by_id(&mut self, ids: Vec<i64>) -> anyhow::Result<Vec<AgeRating>> {
+	pub async fn get_age_ratings_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<AgeRating>> {
 		self.get_vec_by_ids(IGDB_ROUTE_AGE_RATINGS, ids).await
 	}
 
 	pub async fn get_alternative_name_by_id(
-		&mut self,
+		&self,
 		id: i64,
 	) -> anyhow::Result<Option<AlternativeName>> {
 		self.get_single_by_id(IGDB_ROUTE_ALTERNATIVE_NAMES, id)
@@ -80,13 +88,13 @@ impl IgdbClient {
 	}
 
 	pub async fn get_alternative_names_by_id(
-		&mut self,
+		&self,
 		ids: Vec<i64>,
 	) -> anyhow::Result<Vec<AlternativeName>> {
 		self.get_vec_by_ids(IGDB_ROUTE_ALTERNATIVE_NAMES, ids).await
 	}
 
-	pub async fn search_game_by_name(&mut self, name: String) -> anyhow::Result<Vec<Game>> {
+	pub async fn search_game_by_name(&self, name: String) -> anyhow::Result<Vec<Game>> {
 		self.do_request_parsed::<Vec<Game>>(
 			Method::POST,
 			IGDB_ROUTE_GAMES,
@@ -94,11 +102,11 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	async fn get_single_by_id<T: DeserializeOwned>(
-		&mut self,
+		&self,
 		endpoint: &str,
 		id: i64,
 	) -> anyhow::Result<Option<T>> {
@@ -116,7 +124,7 @@ impl IgdbClient {
 	}
 
 	async fn get_vec_by_ids<T: DeserializeOwned>(
-		&mut self,
+		&self,
 		endpoint: &str,
 		ids: Vec<i64>,
 	) -> anyhow::Result<Vec<T>> {
@@ -133,11 +141,14 @@ impl IgdbClient {
 			)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
-	async fn refresh_token(&mut self) -> anyhow::Result<()> {
-		let token_result = self
+	async fn refresh_token(&self) -> anyhow::Result<()> {
+		let mut handler = self.oauth2handler.write().await;
+		let handler_ref = handler.deref_mut();
+
+		let token_result = handler_ref
 			.oauth2
 			.exchange_client_credentials()
 			.request_async(async_http_client)
@@ -145,25 +156,31 @@ impl IgdbClient {
 
 		debug!("Token result: {:?}", token_result);
 
-		self.last_token_request = Some(Utc::now());
-		self.token_response = Some(token_result);
+		handler_ref.last_token_request = Some(Utc::now());
+		handler_ref.token_response = Some(token_result);
 
 		Ok(())
 	}
 
-	async fn refresh_token_if_needed(&mut self) -> anyhow::Result<()> {
-		if self.token_response.is_none() {
+	async fn refresh_token_if_needed(&self) -> anyhow::Result<()> {
+		let oauth2 = self.oauth2handler.read().await;
+		let oauth2_token = oauth2.token_response.as_ref();
+		let oauth2_last_token_request = oauth2.last_token_request.as_ref();
+
+		if oauth2_token.is_none() {
+			drop(oauth2);
 			self.refresh_token().await?;
 			return Ok(());
 		}
 
-		if let Some(token) = &self.token_response {
-			if let Some(last_request) = self.last_token_request {
+		if let Some(token) = oauth2_token {
+			if let Some(last_request) = oauth2_last_token_request {
 				let now = Utc::now();
 				let diff = now - last_request;
 
 				if diff.num_seconds() + 60 > token.expires_in().unwrap_or_default().as_secs() as i64
 				{
+					drop(oauth2);
 					self.refresh_token().await?;
 				}
 			}
@@ -173,15 +190,13 @@ impl IgdbClient {
 	}
 
 	async fn do_request_parsed<T: DeserializeOwned>(
-		&mut self,
+		&self,
 		method: Method,
 		path: &str,
 		fields_clause: Option<&str>,
 		where_clause: Option<&str>,
 		limit_clause: Option<&str>,
 	) -> anyhow::Result<T> {
-		// TODO: Change this method to not refresh and instead refresh in an own async task so that we do not need a mutable reference to self and can save on that mutex lock
-
 		self.refresh_token_if_needed().await?;
 
 		let mut headers = HeaderMap::new();
@@ -190,19 +205,16 @@ impl IgdbClient {
 		unsafe {
 			headers.insert("User-Agent", USER_AGENT.parse()?);
 		}
-		headers.insert(
-			"Authorization",
-			format!(
-				"Bearer {}",
-				self.token_response
-					.as_ref()
-					.unwrap()
-					.access_token()
-					.secret()
-					.as_str()
-			)
-			.parse()?,
-		);
+		let oauth2 = self.oauth2handler.read().await;
+		let access_token = oauth2
+			.token_response
+			.as_ref()
+			.unwrap()
+			.access_token()
+			.secret();
+
+		headers.insert("Authorization", format!("Bearer {}", access_token).parse()?);
+		drop(oauth2);
 
 		let req = self
 			.client
@@ -226,7 +238,9 @@ impl IgdbClient {
 			}
 		}
 
-		let res = self.service.ready().await?.call(req).await?;
+		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
+		// MutexGuard has to have been dropped here, so it's 2 statements
+		let res = rate_limited_future.await?;
 
 		let body = res.text().await?;
 		debug!("Response: {}", body);
