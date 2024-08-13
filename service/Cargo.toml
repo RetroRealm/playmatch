@@ -25,7 +25,7 @@ strum = { version = "^0.26", features = ["derive"] }
 derive_builder = "^0.20"
 tower = { version = "^0.4", features = ["util", "limit"] }
 oauth2 = "^4"
-utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono"] }
+utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono", "repr"] }
 cached = { version = "^0.53", features = ["async"] }
 
 [dependencies.sea-orm]
