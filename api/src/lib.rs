@@ -123,7 +123,7 @@ async fn start() -> anyhow::Result<()> {
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))
 					.wrap(Logger::new(
-						"\"%{r}a\" %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T",
+						"%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T",
 					))
 					.wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
 					.service(identify)
