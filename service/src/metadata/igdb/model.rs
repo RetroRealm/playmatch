@@ -153,7 +153,7 @@ pub struct Game {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct Genres {
+pub struct Genre {
 	checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	created_at: DateTime<Utc>,
@@ -213,27 +213,35 @@ pub enum ExternalGameMedia {
 pub struct ExternalGame {
 	category: ExternalGameCategory,
 	checksum: Uuid,
-	countries: Vec<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	countries: Option<Vec<i32>>,
 	#[serde(with = "ts_seconds")]
 	created_at: DateTime<Utc>,
 	game: i32,
-	media: ExternalGameMedia,
-	name: String,
-	platform: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	media: Option<ExternalGameMedia>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	name: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	platform: Option<i32>,
 	uid: String,
 	#[serde(with = "ts_seconds")]
 	updated_at: DateTime<Utc>,
 	url: String,
-	year: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	year: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Cover {
-	alpha_channel: bool,
-	animated: bool,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	alpha_channel: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	animated: Option<bool>,
 	checksum: Uuid,
 	game: i32,
-	game_localization: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	game_localization: Option<i32>,
 	height: i32,
 	image_id: String,
 	url: String,
@@ -242,8 +250,10 @@ pub struct Cover {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Collection {
-	as_child_relations: Vec<i32>,
-	as_parent_relations: Vec<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	as_child_relations: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	as_parent_relations: Option<Vec<i32>>,
 	checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	created_at: DateTime<Utc>,
@@ -259,8 +269,10 @@ pub struct Collection {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Artwork {
-	alpha_channel: bool,
-	animated: bool,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	alpha_channel: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	animated: Option<bool>,
 	checksum: Uuid,
 	game: i32,
 	height: i32,

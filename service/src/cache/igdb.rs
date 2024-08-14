@@ -1,4 +1,6 @@
-use crate::metadata::igdb::model::{AgeRating, AlternativeName, Game};
+use crate::metadata::igdb::model::{
+	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
+};
 use crate::metadata::igdb::IgdbClient;
 use cached::proc_macro::cached;
 use cached::TimedCache;
@@ -89,4 +91,154 @@ pub async fn get_alternative_names_by_id_cached(
 	ids: Vec<i64>,
 ) -> anyhow::Result<Vec<AlternativeName>> {
 	client.get_alternative_names_by_id(ids).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<i64, Option<Artwork>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ id.clone() }"#
+)]
+pub async fn get_artwork_by_id_cached(
+	client: &IgdbClient,
+	id: i64,
+) -> anyhow::Result<Option<Artwork>> {
+	client.get_artwork_by_id(id).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<Vec<i64>, Vec<Artwork>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ ids.clone() }"#
+)]
+pub async fn get_artworks_by_id_cached(
+	client: &IgdbClient,
+	ids: Vec<i64>,
+) -> anyhow::Result<Vec<Artwork>> {
+	client.get_artworks_by_id(ids).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<i64, Option<Collection>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ id.clone() }"#
+)]
+pub async fn get_collection_by_id_cached(
+	client: &IgdbClient,
+	id: i64,
+) -> anyhow::Result<Option<Collection>> {
+	client.get_collection_by_id(id).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<Vec<i64>, Vec<Collection>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ ids.clone() }"#
+)]
+pub async fn get_collections_by_id_cached(
+	client: &IgdbClient,
+	ids: Vec<i64>,
+) -> anyhow::Result<Vec<Collection>> {
+	client.get_collections_by_id(ids).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<i64, Option<Cover>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ id.clone() }"#
+)]
+pub async fn get_cover_by_id_cached(client: &IgdbClient, id: i64) -> anyhow::Result<Option<Cover>> {
+	client.get_cover_by_id(id).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<Vec<i64>, Vec<Cover>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ ids.clone() }"#
+)]
+pub async fn get_covers_by_id_cached(
+	client: &IgdbClient,
+	ids: Vec<i64>,
+) -> anyhow::Result<Vec<Cover>> {
+	client.get_covers_by_id(ids).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<i64, Option<ExternalGame>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ id.clone() }"#
+)]
+pub async fn get_external_game_by_id_cached(
+	client: &IgdbClient,
+	id: i64,
+) -> anyhow::Result<Option<ExternalGame>> {
+	client.get_external_game_by_id(id).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<Vec<i64>, Vec<ExternalGame>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ ids.clone() }"#
+)]
+pub async fn get_external_games_by_id_cached(
+	client: &IgdbClient,
+	ids: Vec<i64>,
+) -> anyhow::Result<Vec<ExternalGame>> {
+	client.get_external_games_by_id(ids).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<i64, Option<Franchise>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ id.clone() }"#
+)]
+pub async fn get_franchise_by_id_cached(
+	client: &IgdbClient,
+	id: i64,
+) -> anyhow::Result<Option<Franchise>> {
+	client.get_franchise_by_id(id).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<Vec<i64>, Vec<Franchise>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ ids.clone() }"#
+)]
+pub async fn get_franchises_by_id_cached(
+	client: &IgdbClient,
+	ids: Vec<i64>,
+) -> anyhow::Result<Vec<Franchise>> {
+	client.get_franchises_by_id(ids).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<i64, Option<Genre>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ id.clone() }"#
+)]
+pub async fn get_genre_by_id_cached(client: &IgdbClient, id: i64) -> anyhow::Result<Option<Genre>> {
+	client.get_genre_by_id(id).await
+}
+
+#[cached(
+	result = true,
+	ty = "TimedCache<Vec<i64>, Vec<Genre>>",
+	create = "{ TimedCache::with_lifespan(86400) }",
+	convert = r#"{ ids.clone() }"#
+)]
+pub async fn get_genres_by_id_cached(
+	client: &IgdbClient,
+	ids: Vec<i64>,
+) -> anyhow::Result<Vec<Genre>> {
+	client.get_genres_by_id(ids).await
 }

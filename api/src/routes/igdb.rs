@@ -5,7 +5,11 @@ use actix_web::{get, HttpResponse, Responder};
 use actix_web_lab::extract::Query;
 use service::cache::igdb::{
 	get_age_rating_by_id_cached, get_age_ratings_by_id_cached, get_alternative_name_by_id_cached,
-	get_alternative_names_by_id_cached, get_game_by_id_cached, get_games_by_ids_cached,
+	get_alternative_names_by_id_cached, get_artwork_by_id_cached, get_artworks_by_id_cached,
+	get_collection_by_id_cached, get_collections_by_id_cached, get_cover_by_id_cached,
+	get_covers_by_id_cached, get_external_game_by_id_cached, get_external_games_by_id_cached,
+	get_franchise_by_id_cached, get_franchises_by_id_cached, get_game_by_id_cached,
+	get_games_by_ids_cached, get_genre_by_id_cached, get_genres_by_id_cached,
 	search_game_by_name_cached,
 };
 use service::metadata::igdb::IgdbClient;
@@ -165,6 +169,280 @@ pub async fn get_alternative_names_by_ids(
 ) -> error::Result<impl Responder> {
 	let response =
 		get_alternative_names_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for an Artwork by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an Artwork", body = Artwork),
+		(status = 404, description = "Artwork not found")
+	)
+)]
+#[get("/igdb/artwork")]
+pub async fn get_artwork_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_artwork_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Artworks by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about Artworks", body = Vec<Artwork>)
+	)
+)]
+#[get("/igdb/artworks")]
+pub async fn get_artworks_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_artworks_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for an Collection by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an Collection", body = Collection),
+		(status = 404, description = "Collection not found")
+	)
+)]
+#[get("/igdb/collection")]
+pub async fn get_collection_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_collection_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Collections by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about Collections", body = Vec<Collection>)
+	)
+)]
+#[get("/igdb/collections")]
+pub async fn get_collections_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response =
+		get_collections_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for an Cover by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an Cover", body = Cover),
+		(status = 404, description = "Cover not found")
+	)
+)]
+#[get("/igdb/cover")]
+pub async fn get_cover_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_cover_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Covers by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about Covers", body = Vec<Cover>)
+	)
+)]
+#[get("/igdb/covers")]
+pub async fn get_covers_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_covers_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for an External Game by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an External Game", body = ExternalGame),
+		(status = 404, description = "External Game not found")
+	)
+)]
+#[get("/igdb/external-game")]
+pub async fn get_external_game_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response =
+		get_external_game_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for External Games by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about External Games", body = Vec<ExternalGame>)
+	)
+)]
+#[get("/igdb/external-games")]
+pub async fn get_external_games_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response =
+		get_external_games_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for a Franchise by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about an Franchise", body = Franchise),
+		(status = 404, description = "Franchise not found")
+	)
+)]
+#[get("/igdb/franchise")]
+pub async fn get_franchise_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_franchise_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Franchise by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about Franchise", body = Vec<Franchise>)
+	)
+)]
+#[get("/igdb/franchises")]
+pub async fn get_franchises_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response =
+		get_franchises_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for a Genre by Id
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about a Genre", body = Genre),
+		(status = 404, description = "Genre not found")
+	)
+)]
+#[get("/igdb/genre")]
+pub async fn get_genre_by_id(
+	query: Query<IdQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_genre_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+
+	if response.is_none() {
+		return Ok(HttpResponse::NotFound().finish());
+	}
+
+	Ok(HttpResponse::Ok().json(response))
+}
+
+/// Queries the IGDB API for Genres by Ids
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "IGDB",
+	params(IdsQuery),
+	responses(
+		(status = 200, description = "Returns IGDB metadata about Genres", body = Vec<Genre>)
+	)
+)]
+#[get("/igdb/genres")]
+pub async fn get_genres_by_ids(
+	query: Query<IdsQuery>,
+	igdb_client: Data<IgdbClient>,
+) -> error::Result<impl Responder> {
+	let response = get_genres_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }

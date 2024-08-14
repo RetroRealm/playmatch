@@ -1,3 +1,12 @@
+use crate::routes::identify::identify;
+use crate::routes::igdb::{
+	get_age_rating_by_id, get_age_ratings_by_ids, get_alternative_name_by_id,
+	get_alternative_names_by_ids, get_artwork_by_id, get_artworks_by_ids, get_collection_by_id,
+	get_collections_by_ids, get_cover_by_id, get_covers_by_ids, get_external_game_by_id,
+	get_external_games_by_ids, get_franchise_by_id, get_franchises_by_ids, get_game_by_id,
+	get_games_by_ids, get_genre_by_id, get_genres_by_ids, search_game_by_name,
+};
+use crate::util::download_and_parse_dats_wrapper;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
@@ -5,36 +14,20 @@ use actix_web::{App, HttpServer};
 use dotenvy::dotenv;
 use env_logger::Env;
 use log::{debug, error, info, LevelFilter};
+use migration::{Migrator, MigratorTrait};
+use openapi::ApiDoc;
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
-use service::metadata::igdb::model::{
-	AgeRating, AgeRatingContentCategory, AgeRatingContentDescription, AlternativeName, Game,
-	GameCategory, GameStatus, RatingCategory, RatingEnum,
-};
-use service::model::GameMatchResult;
-use service::model::GameMatchType;
+use service::metadata::igdb::IgdbClient;
 use std::env;
 use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
-use migration::{Migrator, MigratorTrait};
-
-use crate::routes::identify::__path_identify;
-use crate::routes::identify::identify;
-use crate::routes::igdb::{
-	__path_get_age_rating_by_id, __path_get_age_ratings_by_ids, __path_get_alternative_name_by_id,
-	__path_get_alternative_names_by_ids, __path_get_game_by_id, __path_get_games_by_ids,
-	__path_search_game_by_name, get_age_rating_by_id, get_age_ratings_by_ids,
-	get_alternative_name_by_id, get_alternative_names_by_ids, get_game_by_id, get_games_by_ids,
-	search_game_by_name,
-};
-use crate::util::download_and_parse_dats_wrapper;
-use service::metadata::igdb::IgdbClient;
-
 pub mod error;
 pub mod model;
+mod openapi;
 pub mod routes;
 mod util;
 
@@ -42,34 +35,6 @@ pub mod built_info {
 	// The file has been placed there by the build script.
 	include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
-
-#[derive(OpenApi)]
-#[openapi(
-	paths(
-		identify,
-		get_game_by_id,
-		get_games_by_ids,
-		search_game_by_name,
-		get_age_rating_by_id,
-		get_age_ratings_by_ids,
-		get_alternative_name_by_id,
-		get_alternative_names_by_ids
-	),
-	components(schemas(
-		GameMatchResult,
-		GameMatchType,
-		Game,
-		GameCategory,
-		GameStatus,
-		AgeRating,
-		AlternativeName,
-		RatingCategory,
-		AgeRatingContentDescription,
-		AgeRatingContentCategory,
-		RatingEnum
-	))
-)]
-struct ApiDoc;
 
 #[actix_web::main]
 async fn start() -> anyhow::Result<()> {
@@ -133,17 +98,29 @@ async fn start() -> anyhow::Result<()> {
 					.service(get_age_rating_by_id)
 					.service(get_age_ratings_by_ids)
 					.service(get_alternative_name_by_id)
-					.service(get_alternative_names_by_ids),
+					.service(get_alternative_names_by_ids)
+					.service(get_artwork_by_id)
+					.service(get_artworks_by_ids)
+					.service(get_collection_by_id)
+					.service(get_collections_by_ids)
+					.service(get_cover_by_id)
+					.service(get_covers_by_ids)
+					.service(get_external_game_by_id)
+					.service(get_external_games_by_ids)
+					.service(get_franchise_by_id)
+					.service(get_franchises_by_ids)
+					.service(get_genre_by_id)
+					.service(get_genres_by_ids),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),
 				ApiDoc::openapi(),
 			)]))
 	})
-	.bind(format!("0.0.0.0:{}", port))?
-	.shutdown_timeout(15)
-	.workers(worker_amount)
-	.run();
+		.bind(format!("0.0.0.0:{}", port))?
+		.shutdown_timeout(15)
+		.workers(worker_amount)
+		.run();
 
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();

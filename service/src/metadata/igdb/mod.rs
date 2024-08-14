@@ -1,8 +1,12 @@
 use crate::http::abstraction::USER_AGENT;
 use crate::metadata::igdb::constants::{
-	API_URL, IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_GAMES,
+	API_URL, IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORKS,
+	IGDB_ROUTE_COLLECTIONS, IGDB_ROUTE_COVERS, IGDB_ROUTE_EXTERNAL_GAMES, IGDB_ROUTE_FRANCHISES,
+	IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES,
 };
-use crate::metadata::igdb::model::{AgeRating, AlternativeName, Game};
+use crate::metadata::igdb::model::{
+	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
+};
 use chrono::{DateTime, Utc};
 use log::debug;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
@@ -71,6 +75,17 @@ impl IgdbClient {
 		self.get_vec_by_ids(IGDB_ROUTE_GAMES, ids).await
 	}
 
+	pub async fn search_game_by_name(&self, name: String) -> anyhow::Result<Vec<Game>> {
+		self.do_request_parsed::<Vec<Game>>(
+			Method::POST,
+			IGDB_ROUTE_GAMES,
+			None,
+			Some(&format!("search \"{}\";", name)),
+			Some(""),
+		)
+		.await
+	}
+
 	pub async fn get_age_rating_by_id(&self, id: i64) -> anyhow::Result<Option<AgeRating>> {
 		self.get_single_by_id(IGDB_ROUTE_AGE_RATINGS, id).await
 	}
@@ -94,15 +109,55 @@ impl IgdbClient {
 		self.get_vec_by_ids(IGDB_ROUTE_ALTERNATIVE_NAMES, ids).await
 	}
 
-	pub async fn search_game_by_name(&self, name: String) -> anyhow::Result<Vec<Game>> {
-		self.do_request_parsed::<Vec<Game>>(
-			Method::POST,
-			IGDB_ROUTE_GAMES,
-			None,
-			Some(&format!("search \"{}\";", name)),
-			Some(""),
-		)
-		.await
+	pub async fn get_artwork_by_id(&self, id: i64) -> anyhow::Result<Option<Artwork>> {
+		self.get_single_by_id(IGDB_ROUTE_ARTWORKS, id).await
+	}
+
+	pub async fn get_artworks_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<Artwork>> {
+		self.get_vec_by_ids(IGDB_ROUTE_ARTWORKS, ids).await
+	}
+
+	pub async fn get_collection_by_id(&self, id: i64) -> anyhow::Result<Option<Collection>> {
+		self.get_single_by_id(IGDB_ROUTE_COLLECTIONS, id).await
+	}
+
+	pub async fn get_collections_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<Collection>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COLLECTIONS, ids).await
+	}
+
+	pub async fn get_cover_by_id(&self, id: i64) -> anyhow::Result<Option<Cover>> {
+		self.get_single_by_id(IGDB_ROUTE_COVERS, id).await
+	}
+
+	pub async fn get_covers_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<Cover>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COVERS, ids).await
+	}
+
+	pub async fn get_external_game_by_id(&self, id: i64) -> anyhow::Result<Option<ExternalGame>> {
+		self.get_single_by_id(IGDB_ROUTE_EXTERNAL_GAMES, id).await
+	}
+
+	pub async fn get_external_games_by_id(
+		&self,
+		ids: Vec<i64>,
+	) -> anyhow::Result<Vec<ExternalGame>> {
+		self.get_vec_by_ids(IGDB_ROUTE_EXTERNAL_GAMES, ids).await
+	}
+
+	pub async fn get_franchise_by_id(&self, id: i64) -> anyhow::Result<Option<Franchise>> {
+		self.get_single_by_id(IGDB_ROUTE_FRANCHISES, id).await
+	}
+
+	pub async fn get_franchises_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<Franchise>> {
+		self.get_vec_by_ids(IGDB_ROUTE_FRANCHISES, ids).await
+	}
+
+	pub async fn get_genre_by_id(&self, id: i64) -> anyhow::Result<Option<Genre>> {
+		self.get_single_by_id(IGDB_ROUTE_GENRES, id).await
+	}
+
+	pub async fn get_genres_by_id(&self, ids: Vec<i64>) -> anyhow::Result<Vec<Genre>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GENRES, ids).await
 	}
 
 	async fn get_single_by_id<T: DeserializeOwned>(
