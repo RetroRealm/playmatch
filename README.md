@@ -53,3 +53,7 @@ project.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+
+## Acknowledgments
+
+* [hasheous](https://github.com/gaseous-project/hasheous) - Another Project for the same goal
