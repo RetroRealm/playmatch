@@ -1,6 +1,7 @@
 use derive_builder::Builder;
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
@@ -13,7 +14,7 @@ pub struct GameFileMatchSearch {
 	pub sha256: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, ToSchema)]
 pub enum GameMatchType {
 	SHA256,
 	SHA1,
