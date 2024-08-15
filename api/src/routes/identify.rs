@@ -7,7 +7,7 @@ use service::game::match_game_if_possible;
 use service::model::GameFileMatchSearch;
 use web::Query;
 
-/// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate)
+/// Identify a game by its file hashes or filename and size, returning the matched metadata ids, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate)
 #[utoipa::path(
 	get,
 	context_path = "/api",
