@@ -56,7 +56,7 @@ pub struct Header {
 
 	pub version: String,
 
-	pub author: String,
+	pub author: Option<String>,
 
 	pub homepage: String,
 

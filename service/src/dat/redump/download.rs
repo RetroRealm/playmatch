@@ -1,13 +1,11 @@
+use crate::dat::shared::download;
 use crate::dat::shared::zip::extract_if_archived;
 use crate::dat::DATS_PATH;
-use crate::fs::{read_files, read_files_recursive};
-use crate::http::download::{download_file, DownloadFileNameResult};
 use crate::util::random_sized_string;
 use anyhow::anyhow;
-use log::{debug, error};
+use log::error;
 use reqwest::Client;
 use scraper::{Html, Selector};
-use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::task::JoinHandle;
 
@@ -31,7 +29,7 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
 			let url = url.to_string();
 			tasks.push(tokio::spawn(async move {
 				fs::create_dir_all(&tmp_dir).await?;
-				let path = download_single_dat(&client, &url, &tmp_dir).await?;
+				let path = download::download_dat(&client, &url, &tmp_dir).await?;
 
 				if let Err(e) = extract_if_archived(&path).await {
 					error!("Failed to extract DAT archive {} {:?}", path.display(), e);
@@ -45,37 +43,7 @@ pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
 		}
 	}
 
-	let old_files = read_files(&redump_dir).await?;
-
-	for old_file in &old_files {
-		fs::remove_file(old_file).await?
-	}
-
-	let tmp_files = read_files_recursive(&redump_tmp_dir).await?;
-
-	debug!("Read {} temporary files", tmp_files.len());
-
-	for tmp_file in tmp_files {
-		let extension = tmp_file
-			.extension()
-			.unwrap_or_default()
-			.to_str()
-			.unwrap_or_default();
-		let file_name = tmp_file
-			.file_name()
-			.unwrap_or_default()
-			.to_str()
-			.unwrap_or_default();
-
-		if extension == "dat" {
-			debug!("Moving DAT file: {:?}", tmp_file);
-			let out = redump_dir.join(file_name);
-			fs::rename(&tmp_file, &out).await?;
-		}
-	}
-
-	debug!("Removing redump tmp dir: {:?}", redump_tmp_dir);
-	fs::remove_dir_all(&redump_tmp_dir).await?;
+	download::delete_old_and_move_new_files(&redump_dir, &redump_tmp_dir, false).await?;
 
 	Ok(())
 }
@@ -108,31 +76,4 @@ async fn get_redump_dat_download_urls(client: &Client) -> anyhow::Result<Vec<Str
 	}
 
 	Ok(dats_download_urls)
-}
-
-async fn download_single_dat(
-	client: &Client,
-	url: &String,
-	path: &Path,
-) -> anyhow::Result<PathBuf> {
-	debug!("Downloading DAT from: {}", url);
-
-	let (name_source, path) = match download_file(client, url, path).await? {
-		DownloadFileNameResult::FromContentDisposition(path) => {
-			(Some("Content-Disposition Header"), path)
-		}
-		DownloadFileNameResult::FromUrl(path) => (Some("URL path"), path),
-		DownloadFileNameResult::Random(path) => (None, path),
-	};
-
-	let normalized_path = path.canonicalize()?;
-
-	debug!(
-		"Downloaded DAT from: {} to: {:?} (file name source: {})",
-		url,
-		normalized_path,
-		name_source.unwrap_or("None")
-	);
-
-	Ok(normalized_path)
 }

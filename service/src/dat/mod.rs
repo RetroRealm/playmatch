@@ -1,14 +1,14 @@
-use anyhow::anyhow;
-use entity::sea_orm_active_enums::GameReleaseProviderEnum;
-use fs::read_files_recursive;
-use log::error;
-use reqwest::Client;
-use sea_orm::DbConn;
-use std::path::PathBuf;
-
+use crate::dat::no_intro::download::download_no_intro_dats;
 use crate::dat::redump::download::download_redump_dats;
 use crate::dat::shared::import::parse_and_import_dat_file;
 use crate::fs;
+use anyhow::anyhow;
+use entity::sea_orm_active_enums::GameReleaseProviderEnum;
+use fs::read_files_recursive;
+use log::{debug, error};
+use reqwest::Client;
+use sea_orm::DbConn;
+use std::path::PathBuf;
 
 mod no_intro;
 mod redump;
@@ -18,6 +18,7 @@ const DATS_PATH: &str = "dats";
 
 pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::Result<()> {
 	download_redump_dats(client).await?;
+	download_no_intro_dats(client).await?;
 
 	let files = read_files_recursive(&PathBuf::from(DATS_PATH)).await?;
 
@@ -34,7 +35,9 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			.to_str()
 			.unwrap_or_default();
 
-		let parent = file.to_str().unwrap_or_default();
+		let canonicalized = file.canonicalize()?;
+
+		let parent = canonicalized.to_str().unwrap_or_default();
 
 		let mut provider = None;
 
