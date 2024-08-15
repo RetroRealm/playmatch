@@ -46,7 +46,7 @@ pub async fn match_game_if_possible(
 					search.file_size,
 					conn,
 				)
-					.await?
+				.await?
 			}
 			GameMatchType::NoMatch => unreachable!(),
 		} {

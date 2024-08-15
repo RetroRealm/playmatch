@@ -40,7 +40,7 @@ pub async fn delete_old_and_move_new_files(
 		fs::remove_file(old_file).await?
 	}
 
-	let tmp_files = read_files_recursive(&tmp_dir).await?;
+	let tmp_files = read_files_recursive(tmp_dir).await?;
 
 	debug!("Read {} temporary files", tmp_files.len());
 
@@ -60,12 +60,11 @@ pub async fn delete_old_and_move_new_files(
 			debug!("Moving DAT file: {:?}", tmp_file);
 
 			let out = if should_keep_subfolders {
-				let out = main_dir.join(tmp_file.strip_prefix(&tmp_dir)?);
+				let out = main_dir.join(tmp_file.strip_prefix(tmp_dir)?);
 				fs::create_dir_all(out.parent().unwrap()).await?;
 				out
 			} else {
-				let out = main_dir.join(file_name);
-				out
+				main_dir.join(file_name)
 			};
 
 			fs::rename(&tmp_file, &out).await?;
