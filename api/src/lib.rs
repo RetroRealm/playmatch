@@ -135,12 +135,12 @@ async fn start() -> anyhow::Result<()> {
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
 
-	let download_dats_on_startup = env::var("DOWNLOAD_DATS_ON_STARTUP")
+	let initial_data_init = env::var("INITIAL_DATA_INIT")
 		.unwrap_or("true".to_string())
 		.to_lowercase()
 		== "true";
 
-	if download_dats_on_startup {
+	if initial_data_init {
 		tokio::spawn(async move { download_and_parse_dats_wrapper(client, conn).await });
 	}
 
