@@ -74,13 +74,13 @@ fn build_result(
 		.playmatch_id(Some(game_release.id))
 		.external_metadata(
 			signature_metadata_mappings
-				.iter()
+				.into_iter()
 				.map(|mapping| ExternalMetadata {
-					provider_name: mapping.provider_name.clone(),
-					provider_id: mapping.provider_id.clone(),
-					match_type: mapping.match_type.clone(),
-					manual_match_type: mapping.manual_match_type.clone(),
-					failed_match_reason: mapping.failed_match_reason.clone(),
+					provider_name: mapping.provider_name,
+					provider_id: mapping.provider_id,
+					match_type: mapping.match_type.into(),
+					manual_match_type: mapping.manual_match_type.map(Into::into),
+					failed_match_reason: mapping.failed_match_reason.map(Into::into),
 				})
 				.collect(),
 		)

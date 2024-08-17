@@ -38,9 +38,58 @@ pub struct GameMatchResult {
 pub struct ExternalMetadata {
 	pub provider_name: String,
 	pub provider_id: String,
-	pub match_type: MatchTypeEnum,
+	pub match_type: MatchType,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub manual_match_type: Option<ManualMatchModeEnum>,
+	pub manual_match_type: Option<ManualMatchMode>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub failed_match_reason: Option<FailedMatchReasonEnum>,
+	pub failed_match_reason: Option<FailedMatchReason>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum MatchType {
+	Automatic,
+	Failed,
+	Manual,
+	None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum ManualMatchMode {
+	Admin,
+	Community,
+	Trusted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum FailedMatchReason {
+	TooManyMatches,
+}
+
+impl From<MatchTypeEnum> for MatchType {
+	fn from(match_type: MatchTypeEnum) -> Self {
+		match match_type {
+			MatchTypeEnum::Automatic => MatchType::Automatic,
+			MatchTypeEnum::Failed => MatchType::Failed,
+			MatchTypeEnum::Manual => MatchType::Manual,
+			MatchTypeEnum::None => MatchType::None,
+		}
+	}
+}
+
+impl From<ManualMatchModeEnum> for ManualMatchMode {
+	fn from(manual_match_mode: ManualMatchModeEnum) -> Self {
+		match manual_match_mode {
+			ManualMatchModeEnum::Admin => ManualMatchMode::Admin,
+			ManualMatchModeEnum::Community => ManualMatchMode::Community,
+			ManualMatchModeEnum::Trusted => ManualMatchMode::Trusted,
+		}
+	}
+}
+
+impl From<FailedMatchReasonEnum> for FailedMatchReason {
+	fn from(failed_match_reason: FailedMatchReasonEnum) -> Self {
+		match failed_match_reason {
+			FailedMatchReasonEnum::TooManyMatches => FailedMatchReason::TooManyMatches,
+		}
+	}
 }
