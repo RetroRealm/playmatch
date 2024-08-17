@@ -1,5 +1,5 @@
 use crate::dat::shared::model::{Datafile, Game};
-use crate::dat::shared::regex::DAT_TAG_REGEX;
+use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::create_or_update_dat_file;
 use crate::db::dat_file_history::create_dat_file_import;
@@ -36,12 +36,21 @@ pub async fn parse_and_import_dat_file(
 		.to_str()
 		.unwrap_or_default();
 
+	let file_extension = path
+		.extension()
+		.unwrap_or_default()
+		.to_str()
+		.unwrap_or_default();
+
+	let sanitized_file_name =
+		sanitize_dat_string(file_name.to_string(), file_extension, &dat.header.version);
+
 	let (company, platform) = insert_or_get_company_and_platform(company, &system, &conn).await?;
 	let import = update_dat_file_and_insert_dat_file_import(
 		&signature_group_id,
 		company.clone().map(|c| c.id),
 		&platform.id,
-		file_name,
+		sanitized_file_name.as_str(),
 		&dat.header.version,
 		md5_hash,
 		tags,
@@ -160,6 +169,19 @@ fn parse_company_and_platform(
 		platform,
 		tags,
 	))
+}
+
+pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version: &str) -> String {
+	file_name = file_name.replace(format!(" ({})", version).as_str(), "");
+
+	for tag in DAT_NUMBER_REGEX.captures_iter(&*file_name.clone()) {
+		let tag = tag.get(0).map(|x| x.as_str()).unwrap_or_default();
+		file_name = file_name.replace(&format!(" {}", tag), "");
+	}
+
+	file_name = file_name.replace(format!(".{}", file_extension).as_str(), "");
+
+	file_name
 }
 
 pub async fn parse_dat_file(path: &Path) -> anyhow::Result<Datafile> {
