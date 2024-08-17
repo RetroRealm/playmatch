@@ -5,11 +5,11 @@ use sea_orm::{
 };
 
 use crate::dat::shared::model::{Game, RomElement};
-use entity::{dat_file, dat_file_import};
 use ::entity::{
 	game, game::Entity as GameRelease, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
+use entity::{dat_file, dat_file_import};
 
 pub async fn insert_game_file(
 	game_file: RomElement,
