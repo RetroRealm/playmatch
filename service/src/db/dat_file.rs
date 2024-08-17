@@ -6,28 +6,32 @@ use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, IntoActiveModel, QueryFilter, TryIntoModel,
 };
 
+pub struct DatFileCreateOrUpdateInput {
+	pub signature_group_id: Uuid,
+	pub file_name: String,
+	pub current_version: String,
+	pub tags: Vec<String>,
+	pub subset: Option<String>,
+	pub company_id: Option<Uuid>,
+	pub platform_id: Uuid,
+}
+
 pub async fn create_or_update_dat_file(
-	signature_group_id: Uuid,
-	file_name: &str,
-	current_version: &str,
-	tags: Vec<String>,
-	subset: Option<String>,
-	company_id: Option<Uuid>,
-	platform_id: Uuid,
+	input: DatFileCreateOrUpdateInput,
 	conn: &DbConn,
 ) -> anyhow::Result<dat_file::Model> {
 	let dat_file = DatFile::find()
-		.filter(dat_file::Column::SignatureGroupId.eq(signature_group_id))
-		.filter(dat_file::Column::Name.eq(file_name))
-		.filter(dat_file::Column::CompanyId.eq(company_id))
-		.filter(dat_file::Column::PlatformId.eq(platform_id))
+		.filter(dat_file::Column::SignatureGroupId.eq(input.signature_group_id))
+		.filter(dat_file::Column::Name.eq(input.file_name.clone()))
+		.filter(dat_file::Column::CompanyId.eq(input.company_id))
+		.filter(dat_file::Column::PlatformId.eq(input.platform_id))
 		.one(conn)
 		.await?;
 
 	if let Some(dat_file) = dat_file {
-		if dat_file.current_version != current_version {
+		if dat_file.current_version != input.current_version {
 			let mut active_model = dat_file.into_active_model();
-			active_model.current_version = Set(current_version.to_string());
+			active_model.current_version = Set(input.current_version.to_string());
 
 			return Ok(active_model.save(conn).await?.try_into_model()?);
 		}
@@ -36,13 +40,17 @@ pub async fn create_or_update_dat_file(
 	}
 
 	let dat_file = dat_file::ActiveModel {
-		signature_group_id: Set(signature_group_id),
-		name: Set(file_name.to_string()),
-		current_version: Set(current_version.to_string()),
-		company_id: Set(company_id),
-		platform_id: Set(platform_id),
-		tags: Set(if tags.is_empty() { None } else { Some(tags) }),
-		subset: Set(subset),
+		signature_group_id: Set(input.signature_group_id),
+		name: Set(input.file_name.clone()),
+		current_version: Set(input.current_version.clone()),
+		company_id: Set(input.company_id),
+		platform_id: Set(input.platform_id),
+		tags: Set(if input.tags.is_empty() {
+			None
+		} else {
+			Some(input.tags)
+		}),
+		subset: Set(input.subset),
 		..Default::default()
 	};
 

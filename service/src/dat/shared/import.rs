@@ -1,7 +1,7 @@
 use crate::dat::shared::model::{Datafile, Game};
 use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
-use crate::db::dat_file::create_or_update_dat_file;
+use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_history::create_dat_file_import;
 use crate::db::game::{
 	find_game_by_name_and_platform_and_platform_company, insert_game, insert_game_file,
@@ -47,14 +47,16 @@ pub async fn parse_and_import_dat_file(
 
 	let (company, platform) = insert_or_get_company_and_platform(company, &system, conn).await?;
 	let import = update_dat_file_and_insert_dat_file_import(
-		signature_group_id,
-		company.clone().map(|c| c.id),
-		platform.id,
-		sanitized_file_name.as_str(),
-		&dat.header.version,
+		DatFileCreateOrUpdateInput {
+			signature_group_id,
+			file_name: sanitized_file_name,
+			current_version: dat.header.version.clone(),
+			tags,
+			subset: dat.header.subset.clone(),
+			company_id: company.clone().map(|c| c.id),
+			platform_id: platform.id,
+		},
 		md5_hash,
-		tags,
-		dat.header.subset.clone(),
 		conn,
 	)
 	.await?;
@@ -211,27 +213,12 @@ pub async fn insert_or_get_company_and_platform(
 }
 
 pub async fn update_dat_file_and_insert_dat_file_import(
-	signature_group_id: Uuid,
-	company_id: Option<Uuid>,
-	platform_id: Uuid,
-	file_name: &str,
-	current_version: &str,
+	input: DatFileCreateOrUpdateInput,
 	md5_hash: &str,
-	tags: Vec<String>,
-	subset: Option<String>,
 	conn: &DbConn,
 ) -> anyhow::Result<dat_file_import::Model> {
-	let dat_file = create_or_update_dat_file(
-		signature_group_id,
-		file_name,
-		current_version,
-		tags,
-		subset,
-		company_id,
-		platform_id,
-		conn,
-	)
-	.await?;
+	let current_version = input.current_version.clone();
+	let dat_file = create_or_update_dat_file(input, conn).await?;
 
-	Ok(create_dat_file_import(md5_hash, current_version, dat_file.id, conn).await?)
+	Ok(create_dat_file_import(md5_hash, &current_version, dat_file.id, conn).await?)
 }
