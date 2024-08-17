@@ -1,16 +1,17 @@
 use crate::error;
 use crate::model::igdb::{IdQuery, IdsQuery, SearchQuery};
+use crate::util::igdb_route_mutli_id_helper;
 use actix_web::web::Data;
 use actix_web::{get, HttpResponse, Responder};
 use actix_web_lab::extract::Query;
 use service::cache::igdb::{
-	get_age_rating_by_id_cached, get_age_ratings_by_id_cached, get_alternative_name_by_id_cached,
-	get_alternative_names_by_id_cached, get_artwork_by_id_cached, get_artworks_by_id_cached,
-	get_collection_by_id_cached, get_collections_by_id_cached, get_cover_by_id_cached,
-	get_covers_by_id_cached, get_external_game_by_id_cached, get_external_games_by_id_cached,
-	get_franchise_by_id_cached, get_franchises_by_id_cached, get_game_by_id_cached,
-	get_games_by_ids_cached, get_genre_by_id_cached, get_genres_by_id_cached,
+	get_age_rating_by_id_cached, get_alternative_name_by_id_cached, get_artwork_by_id_cached,
+	get_collection_by_id_cached, get_cover_by_id_cached, get_external_game_by_id_cached,
+	get_franchise_by_id_cached, get_game_by_id_cached, get_genre_by_id_cached,
 	search_game_by_name_cached,
+};
+use service::metadata::igdb::model::{
+	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
 };
 use service::metadata::igdb::IgdbClient;
 
@@ -54,7 +55,13 @@ pub async fn get_games_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_games_by_ids_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<Game>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_game_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -120,8 +127,13 @@ pub async fn get_age_ratings_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_age_ratings_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<AgeRating>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_age_rating_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -167,8 +179,13 @@ pub async fn get_alternative_names_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_alternative_names_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<AlternativeName>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_alternative_name_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -213,7 +230,13 @@ pub async fn get_artworks_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_artworks_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<Artwork>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_artwork_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -258,8 +281,13 @@ pub async fn get_collections_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_collections_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<Collection>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_collection_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -304,7 +332,13 @@ pub async fn get_covers_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_covers_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<Cover>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_cover_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -350,8 +384,13 @@ pub async fn get_external_games_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_external_games_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<ExternalGame>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_external_game_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -396,8 +435,13 @@ pub async fn get_franchises_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_franchises_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<Franchise>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_franchise_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -442,7 +486,13 @@ pub async fn get_genres_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_genres_by_id_cached(igdb_client.as_ref(), query.into_inner().ids).await?;
+	let response = igdb_route_mutli_id_helper::<Genre>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			async move { get_genre_by_id_cached(client.as_ref(), id).await }
+		})
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
