@@ -29,9 +29,9 @@ pub struct Game {
 pub struct RomElement {
 	pub name: String,
 
-	pub size: String,
+	pub size: Option<String>,
 
-	pub crc: String,
+	pub crc: Option<String>,
 
 	pub md5: Option<String>,
 
@@ -55,6 +55,8 @@ pub struct Header {
 	pub description: String,
 
 	pub version: String,
+
+	pub subset: Option<String>,
 
 	pub author: Option<String>,
 

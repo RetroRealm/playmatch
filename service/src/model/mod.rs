@@ -1,4 +1,5 @@
 use derive_builder::Builder;
+use entity::sea_orm_active_enums::{FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum};
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
@@ -28,6 +29,18 @@ pub enum GameMatchType {
 pub struct GameMatchResult {
 	pub game_match_type: GameMatchType,
 	pub playmatch_id: Option<Uuid>,
-	pub igdb_id: Option<i32>,
-	pub mobygames_id: Option<i32>,
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalMetadata {
+	pub provider_name: String,
+	pub provider_id: String,
+	pub match_type: MatchTypeEnum,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub manual_match_type: Option<ManualMatchModeEnum>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub failed_match_reason: Option<FailedMatchReasonEnum>,
 }

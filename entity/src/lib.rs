@@ -2,7 +2,12 @@
 
 pub mod prelude;
 
+pub mod company;
+pub mod dat_file;
+pub mod dat_file_import;
+pub mod game;
 pub mod game_file;
-pub mod game_release;
-pub mod game_release_id_mapping;
+pub mod platform;
 pub mod sea_orm_active_enums;
+pub mod signature_group;
+pub mod signature_metadata_mapping;

@@ -125,7 +125,7 @@ async fn start() -> anyhow::Result<()> {
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
 	sched
-		.add(Job::new_async("* 0 12 * * *", move |_, _| {
+		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
 			let client = client.clone();
 			Box::pin(async move { download_and_parse_dats_wrapper(client, conn).await })

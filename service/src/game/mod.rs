@@ -1,9 +1,11 @@
 use crate::db::game::{
-	find_game_release_and_id_mapping_by_md5, find_game_release_and_id_mapping_by_name_and_size,
-	find_game_release_and_id_mapping_by_sha1, find_game_release_and_id_mapping_by_sha256,
+	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
+	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
 };
-use crate::model::{GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType};
-use entity::{game_release, game_release_id_mapping};
+use crate::model::{
+	ExternalMetadata, GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType,
+};
+use entity::{game, signature_metadata_mapping};
 use sea_orm::DbConn;
 use strum::IntoEnumIterator;
 
@@ -18,39 +20,39 @@ pub async fn match_game_if_possible(
 			continue;
 		}
 
-		if let Some((game_release, game_release_id_mapping)) = match r#type {
+		if let Some((game_release, game_release_id_mappings)) = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
-					find_game_release_and_id_mapping_by_sha256(sha256, conn).await?
+					find_game_and_id_mapping_by_sha256(sha256, conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::SHA1 => {
 				if let Some(sha1) = &search.sha1 {
-					find_game_release_and_id_mapping_by_sha1(sha1, conn).await?
+					find_game_and_id_mapping_by_sha1(sha1, conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::MD5 => {
 				if let Some(md5) = &search.md5 {
-					find_game_release_and_id_mapping_by_md5(md5, conn).await?
+					find_game_and_id_mapping_by_md5(md5, conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::FileNameAndSize => {
-				find_game_release_and_id_mapping_by_name_and_size(
-					&search.file_name,
-					search.file_size,
-					conn,
-				)
-				.await?
+				find_game_and_id_mapping_by_name_and_size(&search.file_name, search.file_size, conn)
+					.await?
 			}
 			GameMatchType::NoMatch => unreachable!(),
 		} {
-			response_body = Some(build_result(r#type, game_release, game_release_id_mapping)?);
+			response_body = Some(build_result(
+				r#type,
+				game_release,
+				game_release_id_mappings,
+			)?);
 			break;
 		}
 	}
@@ -58,20 +60,31 @@ pub async fn match_game_if_possible(
 	Ok(response_body.unwrap_or(GameMatchResult {
 		game_match_type: GameMatchType::NoMatch,
 		playmatch_id: None,
-		igdb_id: None,
-		mobygames_id: None,
+		external_metadata: vec![],
 	}))
 }
 
 fn build_result(
 	game_match_type: GameMatchType,
-	game_release: game_release::Model,
-	game_release_id_mapping: game_release_id_mapping::Model,
+	game_release: game::Model,
+	signature_metadata_mappings: Vec<signature_metadata_mapping::Model>,
 ) -> anyhow::Result<GameMatchResult> {
-	Ok(GameMatchResultBuilder::default()
+	let result = GameMatchResultBuilder::default()
 		.game_match_type(game_match_type)
-		.igdb_id(Some(game_release_id_mapping.igdb_id))
-		.mobygames_id(game_release_id_mapping.moby_games_id)
 		.playmatch_id(Some(game_release.id))
-		.build()?)
+		.external_metadata(
+			signature_metadata_mappings
+				.iter()
+				.map(|mapping| ExternalMetadata {
+					provider_name: mapping.provider_name.clone(),
+					provider_id: mapping.provider_id.clone(),
+					match_type: mapping.match_type.clone(),
+					manual_match_type: mapping.manual_match_type.clone(),
+					failed_match_reason: mapping.failed_match_reason.clone(),
+				})
+				.collect(),
+		)
+		.build()?;
+
+	Ok(result)
 }

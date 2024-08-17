@@ -1,115 +1,137 @@
 use sea_orm::prelude::Uuid;
 use sea_orm::{
 	sea_query::SimpleExpr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr,
-	EntityTrait, QueryFilter,
+	EntityTrait, JoinType, QueryFilter, QuerySelect, RelationTrait,
 };
 
 use crate::dat::shared::model::{Game, RomElement};
+use entity::{dat_file, dat_file_import};
 use ::entity::{
-	game_file, game_file::Entity as GameFile, game_release, game_release::Entity as GameRelease,
-	game_release_id_mapping, game_release_id_mapping::Entity as GameReleaseIdMapping,
+	game, game::Entity as GameRelease, game_file, game_file::Entity as GameFile,
+	signature_metadata_mapping,
 };
-use entity::sea_orm_active_enums::GameReleaseProviderEnum;
 
 pub async fn insert_game_file(
 	game_file: RomElement,
-	game_release_id: Uuid,
+	game_id: Uuid,
 	conn: &DbConn,
 ) -> anyhow::Result<game_file::ActiveModel> {
+	let file_size = match game_file.size {
+		None => None,
+		Some(inner) => {
+			if inner.is_empty() {
+				None
+			} else {
+				Some(inner.parse::<i64>()?)
+			}
+		}
+	};
+
 	let game_file = game_file::ActiveModel {
-		name: Set(game_file.name),
-		size: Set(game_file.size.parse()?),
-		crc: Set(Some(game_file.crc)),
+		file_name: Set(game_file.name),
+		file_size_in_bytes: Set(file_size),
+		crc: Set(game_file.crc),
 		md5: Set(game_file.md5),
 		sha1: Set(game_file.sha1),
 		sha256: Set(game_file.sha256),
 		status: Set(game_file.status.map(|s| s.to_string())),
 		serial: Set(game_file.serial),
-		game_release_id: Set(game_release_id),
+		game_id: Set(game_id),
 		..Default::default()
 	};
 
 	game_file.save(conn).await.map_err(|e| e.into())
 }
 
-pub async fn insert_game_release(
-	release_provider: GameReleaseProviderEnum,
-	company: String,
-	platform: String,
+pub async fn insert_game(
+	dat_file_import_id: &Uuid,
 	game: Game,
 	conn: &DbConn,
-) -> Result<game_release::ActiveModel, DbErr> {
-	let game_release = game_release::ActiveModel {
-		game_release_provider: Set(release_provider),
-		platform_company: Set(Some(company)),
-		platform: Set(Some(platform)),
-		game_id: Set(game.id),
+) -> Result<game::ActiveModel, DbErr> {
+	let original_game_id = match game.cloneofid {
+		None => None,
+		Some(clone_of_id) => {
+			GameRelease::find()
+				.filter(game::Column::SignatureGroupInternalId.eq(clone_of_id))
+				.one(conn)
+				.await?
+		}
+	}
+	.map(|game| game.id);
+
+	let game = game::ActiveModel {
+		dat_file_import_id: Set(dat_file_import_id.clone()),
+		signature_group_internal_id: Set(game.id),
 		name: Set(game.name),
 		description: Set(game.description),
 		categories: Set(game.category),
+		clone_of: Set(original_game_id),
 		..Default::default()
 	};
 
-	game_release.save(conn).await
+	game.save(conn).await
 }
 
-pub async fn find_game_release_by_name_and_platform_and_platform_company(
+pub async fn find_game_by_name_and_platform_and_platform_company(
 	name: &str,
-	platform: &str,
-	platform_company: &str,
+	company_id: Option<Uuid>,
+	platform_id: &Uuid,
 	conn: &DbConn,
-) -> Result<Option<game_release::Model>, DbErr> {
+) -> Result<Option<game::Model>, DbErr> {
 	GameRelease::find()
-		.filter(
-			game_release::Column::Name
-				.eq(name)
-				.and(game_release::Column::Platform.eq(platform))
-				.and(game_release::Column::PlatformCompany.eq(platform_company)),
+		.filter(game::Column::Name.eq(name))
+		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
+		.join(
+			JoinType::InnerJoin,
+			dat_file_import::Relation::DatFile.def(),
 		)
+		.filter(dat_file::Column::PlatformId.eq(platform_id.clone()))
+		.filter(dat_file::Column::CompanyId.eq(company_id))
 		.one(conn)
 		.await
 }
 
-pub async fn find_game_release_and_id_mapping_by_md5(
+pub async fn find_game_and_id_mapping_by_md5(
 	md5: &str,
 	conn: &DbConn,
-) -> Result<Option<(game_release::Model, game_release_id_mapping::Model)>, DbErr> {
-	find_game_release_id_mapping_if_exists_by_filter(game_file::Column::Md5.eq(md5), conn).await
+) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	find_signature_metadata_mapping_if_exists_by_filter(game_file::Column::Md5.eq(md5), conn).await
 }
 
-pub async fn find_game_release_and_id_mapping_by_sha1(
+pub async fn find_game_and_id_mapping_by_sha1(
 	sha1: &str,
 	conn: &DbConn,
-) -> Result<Option<(game_release::Model, game_release_id_mapping::Model)>, DbErr> {
-	find_game_release_id_mapping_if_exists_by_filter(game_file::Column::Sha1.eq(sha1), conn).await
-}
-
-pub async fn find_game_release_and_id_mapping_by_sha256(
-	sha256: &str,
-	conn: &DbConn,
-) -> Result<Option<(game_release::Model, game_release_id_mapping::Model)>, DbErr> {
-	find_game_release_id_mapping_if_exists_by_filter(game_file::Column::Sha256.eq(sha256), conn)
+) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	find_signature_metadata_mapping_if_exists_by_filter(game_file::Column::Sha1.eq(sha1), conn)
 		.await
 }
 
-pub async fn find_game_release_and_id_mapping_by_name_and_size(
+pub async fn find_game_and_id_mapping_by_sha256(
+	sha256: &str,
+	conn: &DbConn,
+) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	find_signature_metadata_mapping_if_exists_by_filter(game_file::Column::Sha256.eq(sha256), conn)
+		.await
+}
+
+pub async fn find_game_and_id_mapping_by_name_and_size(
 	name: &str,
 	size: i64,
 	conn: &DbConn,
-) -> Result<Option<(game_release::Model, game_release_id_mapping::Model)>, DbErr> {
-	find_game_release_id_mapping_if_exists_by_filter(
-		game_file::Column::Name
+) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	find_signature_metadata_mapping_if_exists_by_filter(
+		game_file::Column::FileName
 			.eq(name)
-			.and(game_file::Column::Size.eq(size)),
+			.and(game_file::Column::FileSizeInBytes.eq(size)),
 		conn,
 	)
 	.await
 }
 
-async fn find_game_release_id_mapping_if_exists_by_filter(
+async fn find_signature_metadata_mapping_if_exists_by_filter(
 	input: SimpleExpr,
 	conn: &DbConn,
-) -> Result<Option<(game_release::Model, game_release_id_mapping::Model)>, DbErr> {
+) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
 	let game_file = GameFile::find()
 		.filter(input)
 		.find_also_related(GameRelease)
@@ -117,17 +139,13 @@ async fn find_game_release_id_mapping_if_exists_by_filter(
 		.await?;
 
 	match game_file {
-		Some((_, Some(game_release))) => {
-			let game_release_id_mapping = GameReleaseIdMapping::find()
-				.filter(game_release_id_mapping::Column::GameReleaseId.eq(game_release.id))
-				.one(conn)
+		Some((_, Some(game))) => {
+			let signature_metadata_mappings = signature_metadata_mapping::Entity::find()
+				.filter(signature_metadata_mapping::Column::GameId.eq(game.id))
+				.all(conn)
 				.await?;
 
-			if let Some(game_release_id_mapping) = game_release_id_mapping {
-				Ok(Some((game_release, game_release_id_mapping)))
-			} else {
-				Ok(None)
-			}
+			Ok(Some((game, signature_metadata_mappings)))
 		}
 		_ => Ok(None),
 	}

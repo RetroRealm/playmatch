@@ -4,19 +4,14 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "game_file")]
+#[sea_orm(table_name = "dat_file_import")]
 pub struct Model {
 	#[sea_orm(primary_key, auto_increment = false)]
 	pub id: Uuid,
-	pub game_id: Uuid,
-	pub file_name: String,
-	pub file_size_in_bytes: Option<i64>,
-	pub crc: Option<String>,
-	pub md5: Option<String>,
-	pub sha1: Option<String>,
-	pub sha256: Option<String>,
-	pub status: Option<String>,
-	pub serial: Option<String>,
+	pub dat_file_id: Uuid,
+	pub version: String,
+	pub md5_hash: String,
+	pub imported_at: DateTimeWithTimeZone,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 }
@@ -24,13 +19,21 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
 	#[sea_orm(
-		belongs_to = "super::game::Entity",
-		from = "Column::GameId",
-		to = "super::game::Column::Id",
+		belongs_to = "super::dat_file::Entity",
+		from = "Column::DatFileId",
+		to = "super::dat_file::Column::Id",
 		on_update = "NoAction",
 		on_delete = "Cascade"
 	)]
+	DatFile,
+	#[sea_orm(has_many = "super::game::Entity")]
 	Game,
+}
+
+impl Related<super::dat_file::Entity> for Entity {
+	fn to() -> RelationDef {
+		Relation::DatFile.def()
+	}
 }
 
 impl Related<super::game::Entity> for Entity {
