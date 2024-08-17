@@ -44,7 +44,7 @@ pub async fn insert_game_file(
 }
 
 pub async fn insert_game(
-	dat_file_import_id: &Uuid,
+	dat_file_import_id: Uuid,
 	game: Game,
 	conn: &DbConn,
 ) -> Result<game::ActiveModel, DbErr> {
@@ -60,7 +60,7 @@ pub async fn insert_game(
 	.map(|game| game.id);
 
 	let game = game::ActiveModel {
-		dat_file_import_id: Set(dat_file_import_id.clone()),
+		dat_file_import_id: Set(dat_file_import_id),
 		signature_group_internal_id: Set(game.id),
 		name: Set(game.name),
 		description: Set(game.description),
@@ -75,7 +75,7 @@ pub async fn insert_game(
 pub async fn find_game_by_name_and_platform_and_platform_company(
 	name: &str,
 	company_id: Option<Uuid>,
-	platform_id: &Uuid,
+	platform_id: Uuid,
 	conn: &DbConn,
 ) -> Result<Option<game::Model>, DbErr> {
 	GameRelease::find()
@@ -85,7 +85,7 @@ pub async fn find_game_by_name_and_platform_and_platform_company(
 			JoinType::InnerJoin,
 			dat_file_import::Relation::DatFile.def(),
 		)
-		.filter(dat_file::Column::PlatformId.eq(platform_id.clone()))
+		.filter(dat_file::Column::PlatformId.eq(platform_id))
 		.filter(dat_file::Column::CompanyId.eq(company_id))
 		.one(conn)
 		.await

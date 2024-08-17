@@ -45,11 +45,11 @@ pub async fn parse_and_import_dat_file(
 	let sanitized_file_name =
 		sanitize_dat_string(file_name.to_string(), file_extension, &dat.header.version);
 
-	let (company, platform) = insert_or_get_company_and_platform(company, &system, &conn).await?;
+	let (company, platform) = insert_or_get_company_and_platform(company, &system, conn).await?;
 	let import = update_dat_file_and_insert_dat_file_import(
-		&signature_group_id,
+		signature_group_id,
 		company.clone().map(|c| c.id),
-		&platform.id,
+		platform.id,
 		sanitized_file_name.as_str(),
 		&dat.header.version,
 		md5_hash,
@@ -71,13 +71,13 @@ pub async fn parse_and_import_dat_file(
 			for game in game_chunk {
 				let conn = conn.clone();
 				let company_id = company.clone().map(|c| c.id);
-				let platform_id = platform.id.clone();
-				let import_id = import.id.clone();
+				let platform_id = platform.id;
+				let import_id = import.id;
 				futures.push(task::spawn(async move {
 					let result = find_game_by_name_and_platform_and_platform_company(
 						&game.name,
 						company_id,
-						&platform_id,
+						platform_id,
 						&conn,
 					)
 					.await?;
@@ -88,10 +88,10 @@ pub async fn parse_and_import_dat_file(
 
 					let roms = game.rom.clone();
 
-					let game_release = insert_game(&import_id, game, &conn).await?;
+					let game_release = insert_game(import_id, game, &conn).await?;
 
 					for rom in roms {
-						let inserted =
+						let _ =
 							insert_game_file(rom, game_release.id.clone().unwrap(), &conn).await?;
 					}
 
@@ -126,9 +126,7 @@ fn parse_company_and_platform(
 	let mut platform_parts = Vec::new();
 
 	let mut real_index = 0;
-	for i in 0..split.len() {
-		let part = split[i];
-
+	for part in split {
 		if let Some(subset) = subset {
 			if subset == part {
 				continue;
@@ -154,7 +152,7 @@ fn parse_company_and_platform(
 	// replace version out of name as that's not needed for tags
 	platform = platform.replace(format!(" ({})", version).as_str(), "");
 
-	for tag in DAT_TAG_REGEX.captures_iter(&*platform.clone()) {
+	for tag in DAT_TAG_REGEX.captures_iter(&platform.clone()) {
 		let tag = tag.get(1).map(|x| x.as_str()).unwrap_or_default();
 		tags.push(tag.to_owned());
 		platform = platform.replace(&format!(" ({})", tag), "");
@@ -174,7 +172,7 @@ fn parse_company_and_platform(
 pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version: &str) -> String {
 	file_name = file_name.replace(format!(" ({})", version).as_str(), "");
 
-	for tag in DAT_NUMBER_REGEX.captures_iter(&*file_name.clone()) {
+	for tag in DAT_NUMBER_REGEX.captures_iter(&file_name.clone()) {
 		let tag = tag.get(0).map(|x| x.as_str()).unwrap_or_default();
 		file_name = file_name.replace(&format!(" {}", tag), "");
 	}
@@ -201,22 +199,21 @@ pub async fn insert_or_get_company_and_platform(
 	conn: &DbConn,
 ) -> anyhow::Result<(Option<company::Model>, platform::Model)> {
 	let company = if let Some(company_name) = &company_name {
-		Some(create_or_find_company_by_name(company_name.as_str(), &conn).await?)
+		Some(create_or_find_company_by_name(company_name.as_str(), conn).await?)
 	} else {
 		None
 	};
 
 	let platform =
-		create_or_find_platform_by_name(platform_name, company.clone().map(|c| c.id), &conn)
-			.await?;
+		create_or_find_platform_by_name(platform_name, company.clone().map(|c| c.id), conn).await?;
 
 	Ok((company, platform))
 }
 
 pub async fn update_dat_file_and_insert_dat_file_import(
-	signature_group_id: &Uuid,
+	signature_group_id: Uuid,
 	company_id: Option<Uuid>,
-	platform_id: &Uuid,
+	platform_id: Uuid,
 	file_name: &str,
 	current_version: &str,
 	md5_hash: &str,
@@ -232,9 +229,9 @@ pub async fn update_dat_file_and_insert_dat_file_import(
 		subset,
 		company_id,
 		platform_id,
-		&conn,
+		conn,
 	)
 	.await?;
 
-	Ok(create_dat_file_import(md5_hash, current_version, &dat_file.id, conn).await?)
+	Ok(create_dat_file_import(md5_hash, current_version, dat_file.id, conn).await?)
 }

@@ -7,20 +7,20 @@ use sea_orm::{
 };
 
 pub async fn create_or_update_dat_file(
-	signature_group_id: &Uuid,
+	signature_group_id: Uuid,
 	file_name: &str,
 	current_version: &str,
 	tags: Vec<String>,
 	subset: Option<String>,
 	company_id: Option<Uuid>,
-	platform_id: &Uuid,
+	platform_id: Uuid,
 	conn: &DbConn,
 ) -> anyhow::Result<dat_file::Model> {
 	let dat_file = DatFile::find()
-		.filter(dat_file::Column::SignatureGroupId.eq(signature_group_id.clone()))
+		.filter(dat_file::Column::SignatureGroupId.eq(signature_group_id))
 		.filter(dat_file::Column::Name.eq(file_name))
 		.filter(dat_file::Column::CompanyId.eq(company_id))
-		.filter(dat_file::Column::PlatformId.eq(platform_id.clone()))
+		.filter(dat_file::Column::PlatformId.eq(platform_id))
 		.one(conn)
 		.await?;
 
@@ -36,11 +36,11 @@ pub async fn create_or_update_dat_file(
 	}
 
 	let dat_file = dat_file::ActiveModel {
-		signature_group_id: Set(signature_group_id.clone()),
+		signature_group_id: Set(signature_group_id),
 		name: Set(file_name.to_string()),
 		current_version: Set(current_version.to_string()),
-		company_id: Set(company_id.clone()),
-		platform_id: Set(platform_id.clone()),
+		company_id: Set(company_id),
+		platform_id: Set(platform_id),
 		tags: Set(if tags.is_empty() { None } else { Some(tags) }),
 		subset: Set(subset),
 		..Default::default()
