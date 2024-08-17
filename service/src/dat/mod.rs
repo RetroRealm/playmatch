@@ -7,7 +7,7 @@ use crate::fs;
 use crate::fs::calculate_md5;
 use anyhow::anyhow;
 use fs::read_files_recursive;
-use log::{debug, error};
+use log::{debug, error, info};
 use reqwest::Client;
 use sea_orm::DbConn;
 use std::path::PathBuf;
@@ -19,8 +19,11 @@ pub mod shared;
 const DATS_PATH: &str = "dats";
 
 pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::Result<()> {
-	download_redump_dats(client).await?;
 	download_no_intro_dats(client).await?;
+	info!("Successfully downloaded No-Intro DATs");
+	info!("Starting to download Redump DATs, this may take a while...");
+	download_redump_dats(client).await?;
+	info!("Successfully downloaded Redump DATs");
 
 	let files = read_files_recursive(&PathBuf::from(DATS_PATH)).await?;
 
