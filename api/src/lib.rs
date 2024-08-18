@@ -78,7 +78,7 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn_data = Data::from(conn_arc.clone());
 	let client_data = Data::from(client_arc.clone());
-	let igdb_data = Data::new(igdb_client_arc.clone());
+	let igdb_data = Data::from(igdb_client_arc.clone());
 
 	let serv = HttpServer::new(move || {
 		App::new()
