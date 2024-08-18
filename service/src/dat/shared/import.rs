@@ -3,9 +3,8 @@ use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_history::create_dat_file_import;
-use crate::db::game::{
-	find_game_by_name_and_platform_and_platform_company, insert_game, insert_game_file,
-};
+use crate::db::game::{find_game_by_name_and_platform_and_platform_company, insert_game};
+use crate::db::game_file::insert_game_file;
 use crate::db::platform::create_or_find_platform_by_name;
 use entity::{company, dat_file_import, platform};
 use log::info;
