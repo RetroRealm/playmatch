@@ -78,7 +78,7 @@ pub async fn match_company_to_igdb_entity(
 				},
 				db_conn,
 			)
-				.await?;
+			.await?;
 
 			break;
 		}
@@ -102,7 +102,7 @@ pub async fn match_company_to_igdb_entity(
 			},
 			db_conn,
 		)
-			.await?;
+		.await?;
 	}
 
 	Ok(())
