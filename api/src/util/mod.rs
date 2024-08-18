@@ -18,8 +18,8 @@ pub async fn download_and_parse_dats_wrapper(client: Arc<Client>, conn: Arc<DbCo
 }
 
 pub async fn igdb_route_mutli_id_helper<T: DeserializeOwned>(
-	ids: Vec<i64>,
-	f: impl Fn(i64) -> JoinHandle<anyhow::Result<Option<T>>>,
+	ids: Vec<i32>,
+	f: impl Fn(i32) -> JoinHandle<anyhow::Result<Option<T>>>,
 ) -> anyhow::Result<Vec<T>> {
 	let mut requests = vec![];
 

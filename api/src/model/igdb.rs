@@ -3,12 +3,12 @@ use utoipa::IntoParams;
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct IdQuery {
-	pub id: i64,
+	pub id: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct IdsQuery {
-	pub ids: Vec<i64>,
+	pub ids: Vec<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
