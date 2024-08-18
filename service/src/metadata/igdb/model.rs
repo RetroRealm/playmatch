@@ -7,6 +7,47 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]
+pub enum Category {
+	Console = 1,
+	Arcade,
+	Platform,
+	OperatingSystem,
+	PortableConsole,
+	Computer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct Platform {
+	pub id: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub abbreviation: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub alternative_name: Option<String>,
+	pub category: Category,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub generation: Option<i32>,
+	pub name: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub platform_family: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub platform_logo: Option<i32>,
+	pub slug: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub summary: Option<String>,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+	pub url: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub versions: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub websites: Option<Vec<i32>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
+#[repr(u8)]
 pub enum ChangeDateCategory {
 	YYYYMMMMDD = 0,
 	YYYYMMMM = 1,
@@ -33,7 +74,7 @@ pub enum StartDateCategory {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Company {
-	pub(crate) id: i32,
+	pub id: i32,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub change_date: Option<i64>,
 	pub change_date_category: ChangeDateCategory,

@@ -2,11 +2,11 @@ use crate::http::abstraction::USER_AGENT;
 use crate::metadata::igdb::constants::{
 	API_URL, IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORKS,
 	IGDB_ROUTE_COLLECTIONS, IGDB_ROUTE_COMPANIES, IGDB_ROUTE_COVERS, IGDB_ROUTE_EXTERNAL_GAMES,
-	IGDB_ROUTE_FRANCHISES, IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES,
+	IGDB_ROUTE_FRANCHISES, IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES, IGDB_ROUTE_PLATFORMS,
 };
 use crate::metadata::igdb::model::{
 	AgeRating, AlternativeName, Artwork, Collection, Company, Cover, ExternalGame, Franchise, Game,
-	Genre,
+	Genre, Platform,
 };
 use chrono::{DateTime, Utc};
 use log::debug;
@@ -74,6 +74,17 @@ impl IgdbClient {
 			IGDB_ROUTE_COMPANIES,
 			None,
 			Some(&format!("where name =  \"{}\";", name)),
+			Some(""),
+		)
+		.await
+	}
+
+	pub async fn search_platforms_by_name(&self, name: &str) -> anyhow::Result<Vec<Platform>> {
+		self.do_request_parsed::<Vec<Platform>>(
+			Method::POST,
+			IGDB_ROUTE_PLATFORMS,
+			None,
+			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
 		.await
