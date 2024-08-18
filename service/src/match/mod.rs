@@ -1,15 +1,9 @@
 mod company;
 mod platform;
 
-use crate::db::company::get_companies_unmatched_paginator;
-use crate::db::platform::get_platforms_unmatched_paginator;
-use crate::db::signature_metadata_mapping::{
-	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
-};
 use crate::metadata::igdb::IgdbClient;
 use company::match_companies_to_igdb;
-use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
-use log::{debug, info};
+use log::info;
 use platform::match_platforms_to_igdb;
 use sea_orm::DbConn;
 use std::sync::Arc;
