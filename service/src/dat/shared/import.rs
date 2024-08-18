@@ -49,7 +49,7 @@ pub async fn parse_and_import_dat_file(
 	let import = update_dat_file_and_insert_dat_file_import(
 		DatFileCreateOrUpdateInput {
 			signature_group_id,
-			sanitized_file_name: sanitized_file_name,
+			sanitized_file_name,
 			current_version: dat.header.version.clone(),
 			tags,
 			subset: dat.header.subset.clone(),
