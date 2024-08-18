@@ -3,6 +3,7 @@
 use super::sea_orm_active_enums::FailedMatchReasonEnum;
 use super::sea_orm_active_enums::ManualMatchModeEnum;
 use super::sea_orm_active_enums::MatchTypeEnum;
+use super::sea_orm_active_enums::MetadataProviderEnum;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -14,8 +15,8 @@ pub struct Model {
 	pub game_id: Option<Uuid>,
 	pub company_id: Option<Uuid>,
 	pub platform_id: Option<Uuid>,
-	pub provider_name: String,
-	pub provider_id: String,
+	pub provider_name: MetadataProviderEnum,
+	pub provider_id: Option<String>,
 	pub match_type: MatchTypeEnum,
 	pub manual_match_type: Option<ManualMatchModeEnum>,
 	pub failed_match_reason: Option<FailedMatchReasonEnum>,

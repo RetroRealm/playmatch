@@ -19,6 +19,7 @@ use openapi::ApiDoc;
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::metadata::igdb::IgdbClient;
+use service::r#match::match_db_to_igdb_entities;
 use std::env;
 use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -73,10 +74,11 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn_arc = Arc::new(conn);
 	let client_arc = Arc::new(client);
+	let igdb_client_arc = Arc::new(igdb_client);
 
 	let conn_data = Data::from(conn_arc.clone());
 	let client_data = Data::from(client_arc.clone());
-	let igdb_data = Data::new(igdb_client);
+	let igdb_data = Data::new(igdb_client_arc.clone());
 
 	let serv = HttpServer::new(move || {
 		App::new()
@@ -133,7 +135,8 @@ async fn start() -> anyhow::Result<()> {
 		.await?;
 
 	let conn = conn_arc.clone();
-	let client = client_arc.clone();
+	let http_client = client_arc.clone();
+	let igdb_client = igdb_client_arc.clone();
 
 	let initial_data_init = env::var("INITIAL_DATA_INIT")
 		.unwrap_or("true".to_string())
@@ -141,7 +144,17 @@ async fn start() -> anyhow::Result<()> {
 		== "true";
 
 	if initial_data_init {
-		tokio::spawn(async move { download_and_parse_dats_wrapper(client, conn).await });
+		tokio::spawn(async move {
+			download_and_parse_dats_wrapper(http_client, conn.clone()).await;
+			match match_db_to_igdb_entities(igdb_client, &conn).await {
+				Ok(()) => {
+					info!("Successfully matched database to IGDB entities");
+				}
+				Err(err) => {
+					error!("Failed to match database to IGDB entities: {}", err);
+				}
+			}
+		});
 	}
 
 	sched.start().await?;

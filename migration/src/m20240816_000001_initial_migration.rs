@@ -111,6 +111,14 @@ enum SignatureMetadataMapping {
 }
 
 #[derive(DeriveIden)]
+struct MetadataProviderEnum;
+
+#[derive(DeriveIden, EnumIter)]
+pub enum MetadataProvider {
+	IGDB,
+}
+
+#[derive(DeriveIden)]
 struct MatchTypeEnum;
 
 #[derive(DeriveIden, EnumIter)]
@@ -136,12 +144,22 @@ struct FailedMatchReasonEnum;
 
 #[derive(DeriveIden, EnumIter)]
 pub enum FailedMatchReason {
+	NoDirectMatch,
 	TooManyMatches,
 }
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
 	async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+		manager
+			.create_type(
+				Type::create()
+					.as_enum(MetadataProviderEnum)
+					.values(MetadataProvider::iter())
+					.to_owned(),
+			)
+			.await?;
+
 		manager
 			.create_type(
 				Type::create()
@@ -684,15 +702,15 @@ impl MigrationTrait for Migration {
 							.uuid()
 							.null(),
 					)
-					.col(
-						ColumnDef::new(SignatureMetadataMapping::ProviderName)
-							.string()
-							.not_null(),
-					)
+					.col(enumeration(
+						SignatureMetadataMapping::ProviderName,
+						MetadataProviderEnum,
+						MetadataProvider::iter(),
+					))
 					.col(
 						ColumnDef::new(SignatureMetadataMapping::ProviderId)
 							.string()
-							.not_null(),
+							.null(),
 					)
 					.col(enumeration(
 						SignatureMetadataMapping::MatchType,
@@ -851,6 +869,10 @@ impl MigrationTrait for Migration {
 
 		manager
 			.drop_type(Type::drop().name(FailedMatchReasonEnum).to_owned())
+			.await?;
+
+		manager
+			.drop_type(Type::drop().name(MetadataProviderEnum).to_owned())
 			.await
 	}
 }

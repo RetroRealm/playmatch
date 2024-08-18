@@ -1,9 +1,10 @@
-use entity::company;
 use entity::company::ActiveModel;
 use entity::prelude::Company;
+use entity::{company, signature_metadata_mapping};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter, TryIntoModel,
+	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, Paginator, PaginatorTrait,
+	QueryFilter, QueryOrder, SelectModel, TryIntoModel,
 };
 
 pub async fn create_or_find_company_by_name(
@@ -27,4 +28,20 @@ pub async fn create_or_find_company_by_name(
 
 		Ok(company.try_into_model()?)
 	}
+}
+
+pub fn get_companies_unmatched_paginator(
+	page_size: u64,
+	conn: &DbConn,
+) -> Paginator<DbConn, SelectModel<company::Model>> {
+	Company::find()
+		.left_join(signature_metadata_mapping::Entity)
+		.filter(signature_metadata_mapping::Column::CompanyId.is_null().or(
+			signature_metadata_mapping::Column::MatchType.is_in(vec![
+				entity::sea_orm_active_enums::MatchTypeEnum::None,
+				entity::sea_orm_active_enums::MatchTypeEnum::Failed,
+			]),
+		))
+		.order_by_asc(company::Column::Id)
+		.paginate(conn, page_size)
 }

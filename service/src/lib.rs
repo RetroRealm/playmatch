@@ -4,7 +4,7 @@ pub mod db;
 mod fs;
 pub mod game;
 pub mod http;
-mod r#match;
+pub mod r#match;
 pub mod metadata;
 pub mod model;
 mod util;

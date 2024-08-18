@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 	enum_name = "failed_match_reason_enum"
 )]
 pub enum FailedMatchReasonEnum {
+	#[sea_orm(string_value = "no_direct_match")]
+	NoDirectMatch,
 	#[sea_orm(string_value = "too_many_matches")]
 	TooManyMatches,
 }
@@ -38,4 +40,14 @@ pub enum MatchTypeEnum {
 	Manual,
 	#[sea_orm(string_value = "none")]
 	None,
+}
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(
+	rs_type = "String",
+	db_type = "Enum",
+	enum_name = "metadata_provider_enum"
+)]
+pub enum MetadataProviderEnum {
+	#[sea_orm(string_value = "igdb")]
+	Igdb,
 }

@@ -25,7 +25,7 @@ pub async fn search_game_by_name_cached(
 	client: &IgdbClient,
 	query: String,
 ) -> anyhow::Result<Vec<Game>> {
-	client.search_game_by_name(query).await
+	client.search_game_by_name(&query).await
 }
 
 #[cached(

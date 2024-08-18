@@ -5,7 +5,67 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use utoipa::ToSchema;
 
-pub type GameResponses = Vec<Game>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
+#[repr(u8)]
+pub enum ChangeDateCategory {
+	YYYYMMMMDD = 0,
+	YYYYMMMM = 1,
+	YYYY = 2,
+	YYYYQ1 = 3,
+	YYYYQ2 = 4,
+	YYYYQ3 = 5,
+	YYYYQ4 = 6,
+	TBD = 7,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
+#[repr(u8)]
+pub enum StartDateCategory {
+	YYYYMMMMDD = 0,
+	YYYYMMMM = 1,
+	YYYY = 2,
+	YYYYQ1 = 3,
+	YYYYQ2 = 4,
+	YYYYQ3 = 5,
+	YYYYQ4 = 6,
+	TBD = 7,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct Company {
+	pub(crate) id: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub change_date: Option<i64>,
+	pub change_date_category: ChangeDateCategory,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub changed_company_id: Option<i32>,
+	pub checksum: Uuid,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub country: Option<i32>,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub description: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub developed: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub logo: Option<i32>,
+	pub name: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub parent: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub published: Option<Vec<i32>>,
+	pub slug: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub start_date: Option<i64>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub start_date_category: Option<StartDateCategory>,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+	pub url: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub websites: Option<Vec<i32>>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
 #[repr(u8)]

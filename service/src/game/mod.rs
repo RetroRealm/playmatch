@@ -76,7 +76,7 @@ fn build_result(
 			signature_metadata_mappings
 				.into_iter()
 				.map(|mapping| ExternalMetadata {
-					provider_name: mapping.provider_name,
+					provider_name: mapping.provider_name.into(),
 					provider_id: mapping.provider_id,
 					match_type: mapping.match_type.into(),
 					manual_match_type: mapping.manual_match_type.map(Into::into),

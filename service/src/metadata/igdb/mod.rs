@@ -1,11 +1,12 @@
 use crate::http::abstraction::USER_AGENT;
 use crate::metadata::igdb::constants::{
 	API_URL, IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORKS,
-	IGDB_ROUTE_COLLECTIONS, IGDB_ROUTE_COVERS, IGDB_ROUTE_EXTERNAL_GAMES, IGDB_ROUTE_FRANCHISES,
-	IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES,
+	IGDB_ROUTE_COLLECTIONS, IGDB_ROUTE_COMPANIES, IGDB_ROUTE_COVERS, IGDB_ROUTE_EXTERNAL_GAMES,
+	IGDB_ROUTE_FRANCHISES, IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES,
 };
 use crate::metadata::igdb::model::{
-	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
+	AgeRating, AlternativeName, Artwork, Collection, Company, Cover, ExternalGame, Franchise, Game,
+	Genre,
 };
 use chrono::{DateTime, Utc};
 use log::debug;
@@ -67,6 +68,17 @@ impl IgdbClient {
 		})
 	}
 
+	pub async fn search_company_by_name(&self, name: &str) -> anyhow::Result<Vec<Company>> {
+		self.do_request_parsed::<Vec<Company>>(
+			Method::POST,
+			IGDB_ROUTE_COMPANIES,
+			None,
+			Some(&format!("where name =  \"{}\";", name)),
+			Some(""),
+		)
+		.await
+	}
+
 	pub async fn get_game_by_id(&self, id: i64) -> anyhow::Result<Option<Game>> {
 		self.get_single_by_id(IGDB_ROUTE_GAMES, id).await
 	}
@@ -75,7 +87,7 @@ impl IgdbClient {
 		self.get_vec_by_ids(IGDB_ROUTE_GAMES, ids).await
 	}
 
-	pub async fn search_game_by_name(&self, name: String) -> anyhow::Result<Vec<Game>> {
+	pub async fn search_game_by_name(&self, name: &str) -> anyhow::Result<Vec<Game>> {
 		self.do_request_parsed::<Vec<Game>>(
 			Method::POST,
 			IGDB_ROUTE_GAMES,

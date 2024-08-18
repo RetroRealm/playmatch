@@ -1,5 +1,7 @@
 use derive_builder::Builder;
-use entity::sea_orm_active_enums::{FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum};
+use entity::sea_orm_active_enums::{
+	FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum, MetadataProviderEnum,
+};
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
@@ -36,13 +38,18 @@ pub struct GameMatchResult {
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalMetadata {
-	pub provider_name: String,
-	pub provider_id: String,
+	pub provider_name: MetadataProvider,
+	pub provider_id: Option<String>,
 	pub match_type: MatchType,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub manual_match_type: Option<ManualMatchMode>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub failed_match_reason: Option<FailedMatchReason>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum MetadataProvider {
+	IGDB,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -62,7 +69,16 @@ pub enum ManualMatchMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum FailedMatchReason {
+	NoDirectMatch,
 	TooManyMatches,
+}
+
+impl From<MetadataProviderEnum> for MetadataProvider {
+	fn from(metadata_provider: MetadataProviderEnum) -> Self {
+		match metadata_provider {
+			MetadataProviderEnum::Igdb => MetadataProvider::IGDB,
+		}
+	}
 }
 
 impl From<MatchTypeEnum> for MatchType {
@@ -89,6 +105,7 @@ impl From<ManualMatchModeEnum> for ManualMatchMode {
 impl From<FailedMatchReasonEnum> for FailedMatchReason {
 	fn from(failed_match_reason: FailedMatchReasonEnum) -> Self {
 		match failed_match_reason {
+			FailedMatchReasonEnum::NoDirectMatch => FailedMatchReason::NoDirectMatch,
 			FailedMatchReasonEnum::TooManyMatches => FailedMatchReason::TooManyMatches,
 		}
 	}
