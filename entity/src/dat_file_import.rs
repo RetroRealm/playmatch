@@ -9,6 +9,7 @@ pub struct Model {
 	#[sea_orm(primary_key, auto_increment = false)]
 	pub id: Uuid,
 	pub dat_file_id: Uuid,
+	pub name: String,
 	pub version: String,
 	pub md5_hash: String,
 	pub imported_at: DateTimeWithTimeZone,

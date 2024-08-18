@@ -8,7 +8,7 @@ use sea_orm::{
 
 pub struct DatFileCreateOrUpdateInput {
 	pub signature_group_id: Uuid,
-	pub file_name: String,
+	pub sanitized_file_name: String,
 	pub current_version: String,
 	pub tags: Vec<String>,
 	pub subset: Option<String>,
@@ -22,7 +22,7 @@ pub async fn create_or_update_dat_file(
 ) -> anyhow::Result<dat_file::Model> {
 	let dat_file = DatFile::find()
 		.filter(dat_file::Column::SignatureGroupId.eq(input.signature_group_id))
-		.filter(dat_file::Column::Name.eq(input.file_name.clone()))
+		.filter(dat_file::Column::Name.eq(input.sanitized_file_name.clone()))
 		.filter(dat_file::Column::CompanyId.eq(input.company_id))
 		.filter(dat_file::Column::PlatformId.eq(input.platform_id))
 		.one(conn)
@@ -41,7 +41,7 @@ pub async fn create_or_update_dat_file(
 
 	let dat_file = dat_file::ActiveModel {
 		signature_group_id: Set(input.signature_group_id),
-		name: Set(input.file_name.clone()),
+		name: Set(input.sanitized_file_name.clone()),
 		current_version: Set(input.current_version.clone()),
 		company_id: Set(input.company_id),
 		platform_id: Set(input.platform_id),

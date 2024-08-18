@@ -36,6 +36,7 @@ enum DatFileImport {
 	Table,
 	Id,
 	DatFileId,
+	Name,
 	Version,
 	Md5Hash,
 	ImportedAt,
@@ -429,6 +430,7 @@ impl MigrationTrait for Migration {
 							.extra("DEFAULT gen_random_uuid()"),
 					)
 					.col(ColumnDef::new(DatFileImport::DatFileId).uuid().not_null())
+					.col(ColumnDef::new(DatFileImport::Name).string().not_null())
 					.col(ColumnDef::new(DatFileImport::Version).string().not_null())
 					.col(ColumnDef::new(DatFileImport::Md5Hash).string().not_null())
 					.col(

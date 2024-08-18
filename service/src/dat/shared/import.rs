@@ -49,13 +49,14 @@ pub async fn parse_and_import_dat_file(
 	let import = update_dat_file_and_insert_dat_file_import(
 		DatFileCreateOrUpdateInput {
 			signature_group_id,
-			file_name: sanitized_file_name,
+			sanitized_file_name: sanitized_file_name,
 			current_version: dat.header.version.clone(),
 			tags,
 			subset: dat.header.subset.clone(),
 			company_id: company.clone().map(|c| c.id),
 			platform_id: platform.id,
 		},
+		file_name,
 		md5_hash,
 		conn,
 	)
@@ -214,11 +215,19 @@ pub async fn insert_or_get_company_and_platform(
 
 pub async fn update_dat_file_and_insert_dat_file_import(
 	input: DatFileCreateOrUpdateInput,
+	original_file_name: &str,
 	md5_hash: &str,
 	conn: &DbConn,
 ) -> anyhow::Result<dat_file_import::Model> {
 	let current_version = input.current_version.clone();
 	let dat_file = create_or_update_dat_file(input, conn).await?;
 
-	Ok(create_dat_file_import(md5_hash, &current_version, dat_file.id, conn).await?)
+	Ok(create_dat_file_import(
+		original_file_name,
+		md5_hash,
+		&current_version,
+		dat_file.id,
+		conn,
+	)
+	.await?)
 }
