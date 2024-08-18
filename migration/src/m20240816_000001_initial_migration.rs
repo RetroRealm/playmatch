@@ -115,7 +115,7 @@ struct MetadataProviderEnum;
 
 #[derive(DeriveIden, EnumIter)]
 pub enum MetadataProvider {
-	IGDB,
+	Igdb,
 }
 
 #[derive(DeriveIden)]

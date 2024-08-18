@@ -34,7 +34,7 @@ pub async fn match_companies_to_igdb_entities(
 		for company_chunk in companies.chunks(4) {
 			let mut results = vec![];
 
-			for company in company_chunk.to_vec() {
+			for company in company_chunk.iter().cloned() {
 				let igdb_client = igdb_client.clone();
 				let db_conn = db_conn.clone();
 				results.push(tokio::spawn(async move {
@@ -78,7 +78,7 @@ pub async fn match_company_to_igdb_entity(
 				},
 				db_conn,
 			)
-			.await?;
+				.await?;
 
 			break;
 		}
@@ -102,7 +102,7 @@ pub async fn match_company_to_igdb_entity(
 			},
 			db_conn,
 		)
-		.await?;
+			.await?;
 	}
 
 	Ok(())
