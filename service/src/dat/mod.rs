@@ -19,9 +19,10 @@ pub mod shared;
 const DATS_PATH: &str = "dats";
 
 pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::Result<()> {
+	info!("Starting to download No-Intro DATs.");
 	download_no_intro_dats(client).await?;
 	info!("Successfully downloaded No-Intro DATs");
-	info!("Starting to download Redump DATs, this may take a while...");
+	info!("Starting to download Redump DATs.");
 	download_redump_dats(client).await?;
 	info!("Successfully downloaded Redump DATs");
 
