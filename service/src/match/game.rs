@@ -8,7 +8,7 @@ use crate::r#match::{clean_name, PAGE_SIZE};
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
-use log::debug;
+use log::{debug, error};
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -52,7 +52,7 @@ pub async fn match_game_to_igdb(
 		.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 		.await
 		.map_err(|e| {
-			debug!(
+			error!(
 				"Failed to search for Game \"{}\" on IGDB: {}",
 				&clean_name, e
 			);
