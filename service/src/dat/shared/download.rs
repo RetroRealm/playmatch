@@ -71,7 +71,7 @@ pub async fn delete_old_and_move_new_files(
 		}
 	}
 
-	debug!("Removing redump tmp dir: {:?}", tmp_dir);
+	debug!("Removing tmp dir: {:?}", tmp_dir);
 	fs::remove_dir_all(&tmp_dir).await?;
 	Ok(())
 }
