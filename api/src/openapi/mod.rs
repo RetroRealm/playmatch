@@ -14,7 +14,8 @@ use service::metadata::igdb::model::{
 	GameCategory, GameStatus, Genre, RatingCategory, RatingEnum,
 };
 use service::model::{
-	ExternalMetadata, FailedMatchReason, GameMatchResult, GameMatchType, ManualMatchMode, MatchType,
+	ExternalMetadata, FailedMatchReason, GameMatchResult, GameMatchType, ManualMatchMode,
+	MatchType, MetadataProvider,
 };
 use utoipa::OpenApi;
 
@@ -65,7 +66,8 @@ use utoipa::OpenApi;
 		ExternalMetadata,
 		MatchType,
 		ManualMatchMode,
-		FailedMatchReason
+		FailedMatchReason,
+		MetadataProvider
 	))
 )]
 pub struct ApiDoc;
