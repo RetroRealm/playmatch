@@ -4,11 +4,11 @@ use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
 };
 use crate::metadata::igdb::IgdbClient;
-use crate::r#match::{clean_name, PAGE_SIZE};
+use crate::r#match::{clean_name, handle_db_pagination_chunked, PAGE_SIZE};
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
-use log::{debug, error};
+use log::{debug, error, info};
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -16,35 +16,28 @@ pub async fn match_games_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	let mut game_paginator = get_unmatched_games_without_clone_of_id(PAGE_SIZE, db_conn);
+	let game_paginator = get_unmatched_games_without_clone_of_id(PAGE_SIZE, db_conn);
 
-	while let Some(games) = game_paginator.fetch_and_next().await? {
-		for game_chunk in games.chunks(4) {
-			let mut results = vec![];
-
-			for game in game_chunk.iter().cloned() {
-				let igdb_client = igdb_client.clone();
-				let db_conn = db_conn.clone();
-				results.push(tokio::spawn(async move {
-					match_game_to_igdb(game, &db_conn, igdb_client.clone()).await
-				}))
-			}
-
-			for result in results {
-				result.await??;
-			}
-		}
-	}
+	handle_db_pagination_chunked(
+		game_paginator,
+		igdb_client,
+		db_conn.clone(),
+		|t, arc, connection| {
+			tokio::spawn(async move { match_game_to_igdb(t, arc, connection).await })
+		},
+	)
+		.await?;
+	info!("Finished matching games without clone_of id to IGDB");
 
 	Ok(())
 }
 
-pub async fn match_game_to_igdb(
+async fn match_game_to_igdb(
 	game: entity::game::Model,
-	db_conn: &DbConn,
 	igdb_client: Arc<IgdbClient>,
+	db_conn: DbConn,
 ) -> anyhow::Result<()> {
-	let platform_igdb_id = get_game_platform_igdb_id(&game, db_conn).await?;
+	let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
 
 	let clean_name = clean_name(&game.name);
 
@@ -81,19 +74,19 @@ pub async fn match_game_to_igdb(
 					failed_match_reason: None,
 					automatic_match_reason: Some(AutomaticMatchReasonEnum::DirectName),
 				},
-				db_conn,
+				&db_conn,
 			)
-			.await?;
+				.await?;
 
 			break;
 		}
 
-		debug!(
-			"Game {} has no direct match, checking alternative names...",
+		if let Some(alternative_names) = search_result.alternative_names {
+			debug!(
+			"Game {} has no direct match but has alternative names, checking alternative names...",
 			&clean_name
 		);
 
-		if let Some(alternative_names) = search_result.alternative_names {
 			let alternative_names_resolved = igdb_client
 				.get_alternative_names_by_id(alternative_names)
 				.await?;
@@ -118,9 +111,9 @@ pub async fn match_game_to_igdb(
 							failed_match_reason: None,
 							automatic_match_reason: Some(AutomaticMatchReasonEnum::AlternativeName),
 						},
-						db_conn,
+						&db_conn,
 					)
-					.await?;
+						.await?;
 
 					break;
 				}
@@ -143,9 +136,9 @@ pub async fn match_game_to_igdb(
 				failed_match_reason: Some(FailedMatchReasonEnum::NoDirectMatch),
 				automatic_match_reason: None,
 			},
-			db_conn,
+			&db_conn,
 		)
-		.await?;
+			.await?;
 	}
 
 	Ok(())

@@ -3,7 +3,7 @@ use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
 };
 use crate::metadata::igdb::IgdbClient;
-use crate::r#match::PAGE_SIZE;
+use crate::r#match::{handle_db_pagination_chunked, PAGE_SIZE};
 use entity::sea_orm_active_enums::{AutomaticMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum};
 use log::debug;
 use sea_orm::DbConn;
@@ -13,33 +13,25 @@ pub async fn match_companies_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	let mut company_paginator = get_companies_unmatched_paginator(PAGE_SIZE, db_conn);
+	let company_paginator = get_companies_unmatched_paginator(PAGE_SIZE, db_conn);
 
-	while let Some(companies) = company_paginator.fetch_and_next().await? {
-		for company_chunk in companies.chunks(4) {
-			let mut results = vec![];
-
-			for company in company_chunk.iter().cloned() {
-				let igdb_client = igdb_client.clone();
-				let db_conn = db_conn.clone();
-				results.push(tokio::spawn(async move {
-					match_company_to_igdb(company, &db_conn, igdb_client.clone()).await
-				}))
-			}
-
-			for result in results {
-				result.await??;
-			}
-		}
-	}
+	handle_db_pagination_chunked(
+		company_paginator,
+		igdb_client,
+		db_conn.clone(),
+		|t, arc, connection| {
+			tokio::spawn(async move { match_company_to_igdb(t, arc, connection).await })
+		},
+	)
+	.await?;
 
 	Ok(())
 }
 
 async fn match_company_to_igdb(
 	company: entity::company::Model,
-	db_conn: &DbConn,
 	igdb_client: Arc<IgdbClient>,
+	db_conn: DbConn,
 ) -> anyhow::Result<()> {
 	let search_results = igdb_client.search_company_by_name(&company.name).await?;
 
@@ -65,7 +57,7 @@ async fn match_company_to_igdb(
 					failed_match_reason: None,
 					automatic_match_reason: Some(AutomaticMatchReasonEnum::DirectName),
 				},
-				db_conn,
+				&db_conn,
 			)
 			.await?;
 
@@ -90,7 +82,7 @@ async fn match_company_to_igdb(
 				),
 				automatic_match_reason: None,
 			},
-			db_conn,
+			&db_conn,
 		)
 		.await?;
 	}
