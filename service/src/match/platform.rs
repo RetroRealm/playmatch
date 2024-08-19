@@ -4,7 +4,7 @@ use crate::db::signature_metadata_mapping::{
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::PAGE_SIZE;
-use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
+use entity::sea_orm_active_enums::{AutomaticMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum};
 use log::debug;
 use sea_orm::DbConn;
 use std::sync::Arc;
@@ -63,6 +63,7 @@ pub async fn match_platform_to_igdb(
 					match_type: MatchTypeEnum::Automatic,
 					manual_match_type: None,
 					failed_match_reason: None,
+					automatic_match_reason: Some(AutomaticMatchReasonEnum::DirectName),
 				},
 				db_conn,
 			)
@@ -87,6 +88,7 @@ pub async fn match_platform_to_igdb(
 				failed_match_reason: Some(
 					entity::sea_orm_active_enums::FailedMatchReasonEnum::NoDirectMatch,
 				),
+				automatic_match_reason: None,
 			},
 			db_conn,
 		)

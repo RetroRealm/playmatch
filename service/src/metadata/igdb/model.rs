@@ -143,114 +143,114 @@ pub enum GameStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Game {
-	id: i32,
-	category: GameCategory,
+	pub id: i32,
+	pub category: GameCategory,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	external_games: Option<Vec<i32>>,
+	pub external_games: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	expanded_games: Option<Vec<i32>>,
+	pub expanded_games: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	expansions: Option<Vec<i32>>,
-	name: String,
-	slug: String,
+	pub expansions: Option<Vec<i32>>,
+	pub name: String,
+	pub slug: String,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
-	url: String,
+	pub url: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	websites: Option<Vec<i32>>,
-	checksum: String,
+	pub websites: Option<Vec<i32>>,
+	pub checksum: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	cover: Option<i32>,
+	pub cover: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	game_modes: Option<Vec<i32>>,
+	pub game_modes: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	genres: Option<Vec<i32>>,
+	pub genres: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	involved_companies: Option<Vec<i32>>,
+	pub involved_companies: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	summary: Option<String>,
+	pub summary: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	language_supports: Option<Vec<i32>>,
+	pub language_supports: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	bundles: Option<Vec<i32>>,
+	pub bundles: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	first_release_date: Option<i32>,
+	pub first_release_date: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	forks: Option<Vec<i32>>,
+	pub forks: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	platforms: Option<Vec<i32>>,
+	pub platforms: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	player_perspectives: Option<Vec<i32>>,
+	pub player_perspectives: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	release_dates: Option<Vec<i32>>,
+	pub release_dates: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	similar_games: Option<Vec<i32>>,
+	pub similar_games: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	tags: Option<Vec<i32>>,
+	pub tags: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	themes: Option<Vec<i32>>,
+	pub themes: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	artworks: Option<Vec<i32>>,
+	pub artworks: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	screenshots: Option<Vec<i32>>,
+	pub screenshots: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	age_ratings: Option<Vec<i32>>,
+	pub age_ratings: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	aggregated_rating: Option<f64>,
+	pub aggregated_rating: Option<f64>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	aggregated_rating_count: Option<i32>,
+	pub aggregated_rating_count: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	total_rating: Option<f64>,
+	pub total_rating: Option<f64>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	total_rating_count: Option<i32>,
+	pub total_rating_count: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	status: Option<GameStatus>,
+	pub status: Option<GameStatus>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	videos: Option<Vec<i32>>,
+	pub videos: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	parent_game: Option<i32>,
+	pub parent_game: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	game_engines: Option<Vec<i32>>,
+	pub game_engines: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	keywords: Option<Vec<i32>>,
+	pub keywords: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	storyline: Option<String>,
+	pub storyline: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	rating: Option<f64>,
+	pub rating: Option<f64>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	rating_count: Option<i32>,
+	pub rating_count: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	alternative_names: Option<Vec<i32>>,
+	pub alternative_names: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	collection: Option<i32>,
+	pub collection: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	collections: Option<Vec<i32>>,
+	pub collections: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	game_localizations: Option<Vec<i32>>,
+	pub game_localizations: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	version_parent: Option<i32>,
+	pub version_parent: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	version_title: Option<String>,
+	pub version_title: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	follows: Option<i32>,
+	pub follows: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	franchises: Option<Vec<i32>>,
+	pub franchises: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	dlcs: Option<Vec<i32>>,
+	pub dlcs: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	hypes: Option<i32>,
+	pub hypes: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	multiplayer_modes: Option<Vec<i32>>,
+	pub multiplayer_modes: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	ports: Option<Vec<i32>>,
+	pub ports: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	remakes: Option<Vec<i32>>,
+	pub remakes: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	remasters: Option<Vec<i32>>,
+	pub remasters: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	standalone_expansions: Option<Vec<i32>>,
+	pub standalone_expansions: Option<Vec<i32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -384,11 +384,12 @@ pub struct Artwork {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AlternativeName {
-	id: i32,
-	checksum: Uuid,
-	comment: String,
-	game: i32,
-	name: String,
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub comment: Option<String>,
+	pub game: i32,
+	pub name: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]

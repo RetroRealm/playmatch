@@ -1,7 +1,7 @@
 use crate::dat::no_intro::download::download_no_intro_dats;
 use crate::dat::redump::download::download_redump_dats;
 use crate::dat::shared::import::parse_and_import_dat_file;
-use crate::db::dat_file_history::is_dat_already_in_history;
+use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
 use crate::fs;
 use crate::fs::calculate_md5;

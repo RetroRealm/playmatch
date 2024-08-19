@@ -1,25 +1,27 @@
-use sea_orm::prelude::Uuid;
-use sea_orm::{
-	sea_query::SimpleExpr, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr,
-	EntityTrait, JoinType, QueryFilter, QuerySelect, RelationTrait,
-};
-
-use crate::dat::shared::model::Game;
+use crate::dat::shared::model;
 use ::entity::{
-	game, game::Entity as GameRelease, game_file, game_file::Entity as GameFile,
+	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
-use entity::{dat_file, dat_file_import};
+use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::{dat_file, dat_file_import, platform};
+use sea_orm::prelude::Uuid;
+use sea_orm::sea_query::{Alias, Expr};
+use sea_orm::{
+	sea_query::SimpleExpr, ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn,
+	DbErr, EntityTrait, JoinType, Paginator, PaginatorTrait, QueryFilter, QuerySelect,
+	RelationTrait, SelectModel,
+};
 
 pub async fn insert_game(
 	dat_file_import_id: Uuid,
-	game: Game,
+	game: model::Game,
 	conn: &DbConn,
 ) -> Result<game::ActiveModel, DbErr> {
 	let original_game_id = match game.cloneofid {
 		None => None,
 		Some(clone_of_id) => {
-			GameRelease::find()
+			Game::find()
 				.filter(game::Column::SignatureGroupInternalId.eq(clone_of_id))
 				.one(conn)
 				.await?
@@ -46,7 +48,7 @@ pub async fn find_game_by_name_and_platform_and_platform_company(
 	platform_id: Uuid,
 	conn: &DbConn,
 ) -> Result<Option<game::Model>, DbErr> {
-	GameRelease::find()
+	Game::find()
 		.filter(game::Column::Name.eq(name))
 		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
 		.join(
@@ -102,7 +104,7 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
 	let game_file = GameFile::find()
 		.filter(input)
-		.find_also_related(GameRelease)
+		.find_also_related(Game)
 		.one(conn)
 		.await?;
 
@@ -117,4 +119,65 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 		}
 		_ => Ok(None),
 	}
+}
+
+pub fn get_unmatched_games_without_clone_of_id(
+	page_size: u64,
+	conn: &DbConn,
+) -> Paginator<DbConn, SelectModel<game::Model>> {
+	get_unmatched_games(true, page_size, conn)
+}
+
+pub fn get_unmatched_games_with_clone_of_id(
+	page_size: u64,
+	conn: &DbConn,
+) -> Paginator<DbConn, SelectModel<game::Model>> {
+	get_unmatched_games(false, page_size, conn)
+}
+
+fn get_unmatched_games(
+	clone_of_null: bool,
+	page_size: u64,
+	conn: &DbConn,
+) -> Paginator<DbConn, SelectModel<game::Model>> {
+	let smm1 = Alias::new("smm1");
+	let smm2 = Alias::new("smm2");
+
+	Game::find()
+		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
+		.join(
+			JoinType::InnerJoin,
+			dat_file_import::Relation::DatFile.def(),
+		)
+		.join(JoinType::InnerJoin, dat_file::Relation::Platform.def())
+		.join_as(
+			JoinType::InnerJoin,
+			platform::Relation::SignatureMetadataMapping.def(),
+			smm1.clone(),
+		)
+		.join_as(
+			JoinType::LeftJoin,
+			game::Relation::SignatureMetadataMapping.def(),
+			smm2.clone(),
+		)
+		.filter(
+			Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType)).is_in(vec![
+				MatchTypeEnum::Automatic.as_enum(),
+				MatchTypeEnum::Manual.as_enum(),
+			]),
+		)
+		.filter(if clone_of_null {
+			game::Column::CloneOf.is_null()
+		} else {
+			game::Column::CloneOf.is_not_null()
+		})
+		.filter(
+			Expr::col((smm2.clone(), signature_metadata_mapping::Column::Id))
+				.is_null()
+				.or(
+					Expr::col((smm2, signature_metadata_mapping::Column::MatchType))
+						.eq(MatchTypeEnum::None.as_enum()),
+				),
+		)
+		.paginate(conn, page_size)
 }

@@ -1,5 +1,6 @@
 use entity::sea_orm_active_enums::{
-	FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum, MetadataProviderEnum,
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
+	MetadataProviderEnum,
 };
 use entity::signature_metadata_mapping;
 use sea_orm::prelude::Uuid;
@@ -17,6 +18,7 @@ pub struct SignatureMetadataMappingInput {
 	pub match_type: MatchTypeEnum,
 	pub manual_match_type: Option<ManualMatchModeEnum>,
 	pub failed_match_reason: Option<FailedMatchReasonEnum>,
+	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
 }
 
 pub async fn create_or_update_signature_metadata_mapping(
@@ -44,6 +46,7 @@ pub async fn create_or_update_signature_metadata_mapping(
 			manual_match_type: Set(input.manual_match_type),
 			failed_match_reason: Set(input.failed_match_reason),
 			comment: Set(input.comment),
+			automatic_match_reason: Set(input.automatic_match_reason),
 			..Default::default()
 		};
 

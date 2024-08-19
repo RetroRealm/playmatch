@@ -76,7 +76,7 @@ impl IgdbClient {
 			Some(&format!("where name =  \"{}\";", name)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	pub async fn search_platforms_by_name(&self, name: &str) -> anyhow::Result<Vec<Platform>> {
@@ -87,7 +87,7 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	pub async fn get_game_by_id(&self, id: i32) -> anyhow::Result<Option<Game>> {
@@ -106,7 +106,7 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	pub async fn search_game_by_name_and_platform(
@@ -119,12 +119,12 @@ impl IgdbClient {
 			IGDB_ROUTE_GAMES,
 			None,
 			Some(&format!(
-				"where platform = ({}); search \"{}\";",
+				"where platforms = ({}); search \"{}\";",
 				platform_id, name
 			)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	pub async fn get_age_rating_by_id(&self, id: i32) -> anyhow::Result<Option<AgeRating>> {
@@ -237,7 +237,7 @@ impl IgdbClient {
 			)),
 			Some(""),
 		)
-			.await
+		.await
 	}
 
 	async fn refresh_token(&self) -> anyhow::Result<()> {
