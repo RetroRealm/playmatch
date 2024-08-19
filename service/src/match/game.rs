@@ -48,8 +48,6 @@ pub async fn match_game_to_igdb(
 
 	let clean_name = clean_name(&game.name);
 
-	debug!("Cleaning Game name \"{}\" to \"{}\"", game.name, clean_name);
-
 	let search_results = igdb_client
 		.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 		.await
