@@ -6,7 +6,7 @@ use crate::metadata::igdb::IgdbClient;
 use crate::r#match::game::match_games_to_igdb;
 use company::match_companies_to_igdb;
 use lazy_static::lazy_static;
-use log::info;
+use log::{error, info};
 use platform::match_platforms_to_igdb;
 use regex::Regex;
 use sea_orm::{DbConn, FromQueryResult, Paginator, SelectModel};
@@ -61,7 +61,9 @@ async fn handle_db_pagination_chunked<T: FromQueryResult + Clone>(
 			}
 
 			for result in results {
-				result.await??;
+				if let Err(e) = result.await? {
+					error!("Error while matching to IGDB: {:?}", e);
+				}
 			}
 		}
 	}

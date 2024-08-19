@@ -44,14 +44,7 @@ async fn match_game_to_igdb(
 
 	let search_results = igdb_client
 		.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
-		.await
-		.map_err(|e| {
-			error!(
-				"Failed to search for Game \"{}\" on IGDB: {}",
-				&clean_name, e
-			);
-			e
-		})?;
+		.await?;
 
 	let mut matched = false;
 
