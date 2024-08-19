@@ -1,7 +1,6 @@
 use crate::extension::postgres::Type;
-use crate::m20240816_000001_initial_migration::FailedMatchReason;
 use crate::sea_orm::{EnumIter, Iterable};
-use sea_orm_migration::{prelude::*, schema::*};
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -62,12 +61,4 @@ impl MigrationTrait for Migration {
 			.drop_type(Type::drop().name(AutomaticMatchReasonEnum).to_owned())
 			.await
 	}
-}
-
-#[derive(DeriveIden)]
-enum Post {
-	Table,
-	Id,
-	Title,
-	Text,
 }

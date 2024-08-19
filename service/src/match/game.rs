@@ -85,7 +85,7 @@ pub async fn match_game_to_igdb(
 				},
 				db_conn,
 			)
-				.await?;
+			.await?;
 
 			break;
 		}
@@ -122,7 +122,7 @@ pub async fn match_game_to_igdb(
 						},
 						db_conn,
 					)
-						.await?;
+					.await?;
 
 					break;
 				}
@@ -147,7 +147,7 @@ pub async fn match_game_to_igdb(
 			},
 			db_conn,
 		)
-			.await?;
+		.await?;
 	}
 
 	Ok(())
