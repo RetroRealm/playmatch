@@ -1,14 +1,19 @@
-use crate::db::game::get_unmatched_games_without_clone_of_id;
+use crate::db::game::{
+	find_game_parent, find_game_signature_metadata_mapping,
+	get_unmatched_games_with_clone_of_id_paginator,
+	get_unmatched_games_without_clone_of_id_paginator,
+};
 use crate::db::platform::{find_platform_of_game, find_related_signature_metadata_mapping};
 use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::{clean_name, handle_db_pagination_chunked, PAGE_SIZE};
+use entity::game;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
-use log::{debug, error, info};
+use log::{debug, info};
 use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
 use std::sync::Arc;
@@ -17,28 +22,108 @@ pub async fn match_games_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	let game_paginator = get_unmatched_games_without_clone_of_id(PAGE_SIZE, db_conn);
+	let game_paginator = get_unmatched_games_without_clone_of_id_paginator(PAGE_SIZE, db_conn);
 
 	handle_db_pagination_chunked(
 		game_paginator,
-		igdb_client,
+		igdb_client.clone(),
 		db_conn.clone(),
 		|t, arc, connection| {
-			tokio::spawn(async move { match_game_to_igdb(t, arc, connection).await })
+			tokio::spawn(async move { match_game_to_igdb(&t, arc, connection).await })
 		},
 	)
 	.await?;
 	info!("Finished matching games without clone_of id to IGDB");
 
+	let game_paginator = get_unmatched_games_with_clone_of_id_paginator(PAGE_SIZE, db_conn);
+
+	handle_db_pagination_chunked(
+		game_paginator,
+		igdb_client.clone(),
+		db_conn.clone(),
+		|t, arc, connection| {
+			tokio::spawn(async move { match_clone_of_game_to_igdb(t, arc, connection).await })
+		},
+	)
+	.await?;
+	info!("Finished matching games with clone_of id to IGDB");
+
+	Ok(())
+}
+
+async fn match_clone_of_game_to_igdb(
+	game: game::Model,
+	igdb_client: Arc<IgdbClient>,
+	db_conn: DbConn,
+) -> anyhow::Result<()> {
+	// Basic idea, first check if parent game is matched to IGDB,
+	// if yes then we match to the same igdb id,
+	// otherwise we try to match the game to igdb, if it succeeds we apply the same igdb to the parent game
+
+	let parent_game = find_game_parent(&game, &db_conn).await?;
+
+	if let Some(parent_game) = parent_game {
+		let parent_game_igdb_mapping =
+			find_game_signature_metadata_mapping(&parent_game, &db_conn).await?;
+
+		if let Some(parent_game_igdb_mapping) = &parent_game_igdb_mapping {
+			if parent_game_igdb_mapping.match_type == MatchTypeEnum::Automatic
+				|| parent_game_igdb_mapping.match_type == MatchTypeEnum::Manual
+			{
+				debug!(
+					"Matched Game \"{}\" to IGDB Game ID {} (Via Parent)",
+					&game.name,
+					parent_game_igdb_mapping.provider_id.clone().unwrap()
+				);
+
+				create_or_update_signature_metadata_mapping_success(
+					parent_game_igdb_mapping.provider_id.clone().unwrap(),
+					game.id,
+					AutomaticMatchReasonEnum::ViaParent,
+					&db_conn,
+				)
+				.await?;
+
+				return Ok(());
+			} else {
+				match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
+			}
+		} else {
+			match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
+		}
+
+		let mapping = find_game_signature_metadata_mapping(&game, &db_conn).await?;
+
+		if let Some(mapping) = mapping {
+			if mapping.match_type == MatchTypeEnum::Automatic
+				|| mapping.match_type == MatchTypeEnum::Manual
+			{
+				debug!("Matched Game with parent which is not matched, overriding parent mapping... (Via Child)");
+
+				create_or_update_signature_metadata_mapping_success(
+					mapping.provider_id.unwrap(),
+					parent_game.id,
+					AutomaticMatchReasonEnum::ViaChild,
+					&db_conn,
+				)
+				.await?;
+
+				return Ok(());
+			}
+		}
+	}
+
+	match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
+
 	Ok(())
 }
 
 async fn match_game_to_igdb(
-	game: entity::game::Model,
+	game: &game::Model,
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
 ) -> anyhow::Result<()> {
-	let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
+	let platform_igdb_id = get_game_platform_igdb_id(game, &db_conn).await?;
 
 	let clean_name = clean_name(&game.name);
 

@@ -83,6 +83,8 @@ pub enum FailedMatchReason {
 pub enum AutomaticMatchReason {
 	AlternativeName,
 	DirectName,
+	ViaChild,
+	ViaParent,
 }
 
 impl From<MetadataProviderEnum> for MetadataProvider {
@@ -128,6 +130,8 @@ impl From<AutomaticMatchReasonEnum> for AutomaticMatchReason {
 		match automatic_match_reason {
 			AutomaticMatchReasonEnum::AlternativeName => AutomaticMatchReason::AlternativeName,
 			AutomaticMatchReasonEnum::DirectName => AutomaticMatchReason::DirectName,
+			AutomaticMatchReasonEnum::ViaChild => AutomaticMatchReason::ViaChild,
+			AutomaticMatchReasonEnum::ViaParent => AutomaticMatchReason::ViaParent,
 		}
 	}
 }

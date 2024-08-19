@@ -121,21 +121,46 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 	}
 }
 
-pub fn get_unmatched_games_without_clone_of_id(
+pub async fn find_game_parent(
+	game: &game::Model,
+	conn: &DbConn,
+) -> Result<Option<game::Model>, DbErr> {
+	match game.clone_of {
+		Some(clone_of_id) => {
+			Game::find()
+				.filter(game::Column::Id.eq(clone_of_id))
+				.one(conn)
+				.await
+		}
+		None => Ok(None),
+	}
+}
+
+pub async fn find_game_signature_metadata_mapping(
+	game: &game::Model,
+	conn: &DbConn,
+) -> Result<Option<signature_metadata_mapping::Model>, DbErr> {
+	signature_metadata_mapping::Entity::find()
+		.filter(signature_metadata_mapping::Column::GameId.eq(game.id))
+		.one(conn)
+		.await
+}
+
+pub fn get_unmatched_games_without_clone_of_id_paginator(
 	page_size: u64,
 	conn: &DbConn,
 ) -> Paginator<DbConn, SelectModel<game::Model>> {
-	get_unmatched_games(true, page_size, conn)
+	get_unmatched_games_pagnoator(true, page_size, conn)
 }
 
-pub fn get_unmatched_games_with_clone_of_id(
+pub fn get_unmatched_games_with_clone_of_id_paginator(
 	page_size: u64,
 	conn: &DbConn,
 ) -> Paginator<DbConn, SelectModel<game::Model>> {
-	get_unmatched_games(false, page_size, conn)
+	get_unmatched_games_pagnoator(false, page_size, conn)
 }
 
-fn get_unmatched_games(
+fn get_unmatched_games_pagnoator(
 	clone_of_null: bool,
 	page_size: u64,
 	conn: &DbConn,
