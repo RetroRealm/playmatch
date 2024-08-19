@@ -11,14 +11,22 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, QueryFilter, T
 #[derive(Debug, Clone, Builder)]
 pub struct SignatureMetadataMappingInput {
 	pub provider: MetadataProviderEnum,
+	#[builder(default)]
 	pub provider_id: Option<String>,
+	#[builder(default)]
 	pub comment: Option<String>,
+	#[builder(default)]
 	pub company_id: Option<Uuid>,
+	#[builder(default)]
 	pub game_id: Option<Uuid>,
+	#[builder(default)]
 	pub platform_id: Option<Uuid>,
 	pub match_type: MatchTypeEnum,
+	#[builder(default)]
 	pub manual_match_type: Option<ManualMatchModeEnum>,
+	#[builder(default)]
 	pub failed_match_reason: Option<FailedMatchReasonEnum>,
+	#[builder(default)]
 	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
 }
 
