@@ -12,7 +12,7 @@ use regex::Regex;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
-const PAGE_SIZE: u64 = 50;
+const PAGE_SIZE: u64 = 100;
 
 lazy_static! {
 	static ref BRACKET_REGEX: Regex = Regex::new(r"\s*\(.*?\)").unwrap();
