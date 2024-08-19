@@ -7,7 +7,6 @@ edition = "2021"
 entity = { path = "../entity" }
 tokio = { version = "^1", features = ["macros", "rt"] }
 reqwest = { version = "^0.12", features = ["rustls-tls", "cookies", "stream"], default-features = false }
-scraper = "^0.20"
 serde = { version = "^1", features = ["derive"] }
 serde-xml-rs = "^0.6"
 serde_repr = "^0.1"
