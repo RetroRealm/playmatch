@@ -108,7 +108,7 @@ async fn match_game_to_igdb(
 		debug!("No match found for Game \"{}\"", &clean_name);
 		create_or_update_signature_metadata_mapping(
 			SignatureMetadataMappingInputBuilder::default()
-				.provider_name(MetadataProviderEnum::Igdb)
+				.provider(MetadataProviderEnum::Igdb)
 				.game_id(Some(game.id))
 				.match_type(MatchTypeEnum::Failed)
 				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
@@ -129,7 +129,7 @@ async fn create_or_update_signature_metadata_mapping_success(
 ) -> anyhow::Result<()> {
 	create_or_update_signature_metadata_mapping(
 		SignatureMetadataMappingInputBuilder::default()
-			.provider_name(MetadataProviderEnum::Igdb)
+			.provider(MetadataProviderEnum::Igdb)
 			.provider_id(Some(provider_id))
 			.game_id(Some(game_id))
 			.match_type(MatchTypeEnum::Automatic)

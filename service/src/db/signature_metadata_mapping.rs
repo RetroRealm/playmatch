@@ -10,7 +10,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, QueryFilter, T
 
 #[derive(Debug, Clone, Builder)]
 pub struct SignatureMetadataMappingInput {
-	pub provider_name: MetadataProviderEnum,
+	pub provider: MetadataProviderEnum,
 	pub provider_id: Option<String>,
 	pub comment: Option<String>,
 	pub company_id: Option<Uuid>,
@@ -30,7 +30,7 @@ pub async fn create_or_update_signature_metadata_mapping(
 		.filter(signature_metadata_mapping::Column::PlatformId.eq(input.platform_id))
 		.filter(signature_metadata_mapping::Column::GameId.eq(input.game_id))
 		.filter(signature_metadata_mapping::Column::CompanyId.eq(input.company_id))
-		.filter(signature_metadata_mapping::Column::ProviderName.eq(input.provider_name.clone()))
+		.filter(signature_metadata_mapping::Column::Provider.eq(input.provider.clone()))
 		.one(db_conn)
 		.await?;
 
@@ -41,7 +41,7 @@ pub async fn create_or_update_signature_metadata_mapping(
 			platform_id: Set(input.platform_id),
 			game_id: Set(input.game_id),
 			company_id: Set(input.company_id),
-			provider_name: Set(input.provider_name),
+			provider: Set(input.provider),
 			provider_id: Set(input.provider_id),
 			match_type: Set(input.match_type),
 			manual_match_type: Set(input.manual_match_type),

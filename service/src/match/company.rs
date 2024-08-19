@@ -48,7 +48,7 @@ async fn match_company_to_igdb(
 			matched = true;
 			create_or_update_signature_metadata_mapping(
 				SignatureMetadataMappingInputBuilder::default()
-					.provider_name(MetadataProviderEnum::Igdb)
+					.provider(MetadataProviderEnum::Igdb)
 					.provider_id(Some(search_result.id.to_string()))
 					.company_id(Some(company.id))
 					.match_type(MatchTypeEnum::Automatic)
@@ -66,7 +66,7 @@ async fn match_company_to_igdb(
 		debug!("No direct match found for Company: \"{}\"", &company.name);
 		create_or_update_signature_metadata_mapping(
 			SignatureMetadataMappingInputBuilder::default()
-				.provider_name(MetadataProviderEnum::Igdb)
+				.provider(MetadataProviderEnum::Igdb)
 				.company_id(Some(company.id))
 				.match_type(MatchTypeEnum::Failed)
 				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))

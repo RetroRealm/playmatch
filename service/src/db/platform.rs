@@ -67,7 +67,7 @@ pub async fn find_related_signature_metadata_mapping(
 ) -> Result<Option<signature_metadata_mapping::Model>, DbErr> {
 	model
 		.find_related(signature_metadata_mapping::Entity)
-		.filter(signature_metadata_mapping::Column::ProviderName.eq(MetadataProviderEnum::Igdb))
+		.filter(signature_metadata_mapping::Column::Provider.eq(MetadataProviderEnum::Igdb))
 		.one(conn)
 		.await
 }

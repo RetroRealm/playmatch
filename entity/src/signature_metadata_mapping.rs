@@ -16,7 +16,7 @@ pub struct Model {
 	pub game_id: Option<Uuid>,
 	pub company_id: Option<Uuid>,
 	pub platform_id: Option<Uuid>,
-	pub provider_name: MetadataProviderEnum,
+	pub provider: MetadataProviderEnum,
 	pub provider_id: Option<String>,
 	pub match_type: MatchTypeEnum,
 	pub manual_match_type: Option<ManualMatchModeEnum>,

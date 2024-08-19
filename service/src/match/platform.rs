@@ -48,7 +48,7 @@ pub async fn match_platform_to_igdb(
 			matched = true;
 			create_or_update_signature_metadata_mapping(
 				SignatureMetadataMappingInputBuilder::default()
-					.provider_name(MetadataProviderEnum::Igdb)
+					.provider(MetadataProviderEnum::Igdb)
 					.provider_id(Some(search_result.id.to_string()))
 					.platform_id(Some(platform.id))
 					.match_type(MatchTypeEnum::Automatic)
@@ -66,7 +66,7 @@ pub async fn match_platform_to_igdb(
 		debug!("No direct match found for Platform: \"{}\"", &platform.name);
 		create_or_update_signature_metadata_mapping(
 			SignatureMetadataMappingInputBuilder::default()
-				.provider_name(MetadataProviderEnum::Igdb)
+				.provider(MetadataProviderEnum::Igdb)
 				.platform_id(Some(platform.id))
 				.match_type(MatchTypeEnum::Failed)
 				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
