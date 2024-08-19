@@ -27,7 +27,7 @@ pub async fn match_games_to_igdb(
 			tokio::spawn(async move { match_game_to_igdb(t, arc, connection).await })
 		},
 	)
-		.await?;
+	.await?;
 	info!("Finished matching games without clone_of id to IGDB");
 
 	Ok(())
@@ -68,7 +68,7 @@ async fn match_game_to_igdb(
 				AutomaticMatchReasonEnum::DirectName,
 				&db_conn,
 			)
-				.await?;
+			.await?;
 
 			break;
 		}
@@ -96,7 +96,7 @@ async fn match_game_to_igdb(
 						AutomaticMatchReasonEnum::AlternativeName,
 						&db_conn,
 					)
-						.await?;
+					.await?;
 
 					break;
 				}
@@ -115,7 +115,7 @@ async fn match_game_to_igdb(
 				.build()?,
 			&db_conn,
 		)
-			.await?;
+		.await?;
 	}
 
 	Ok(())
@@ -135,9 +135,9 @@ async fn create_or_update_signature_metadata_mapping_success(
 			.match_type(MatchTypeEnum::Automatic)
 			.automatic_match_reason(Some(automatic_match_reason))
 			.build()?,
-		&db_conn,
+		db_conn,
 	)
-		.await?;
+	.await?;
 
 	Ok(())
 }

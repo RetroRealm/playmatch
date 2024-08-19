@@ -1,7 +1,6 @@
 use crate::db::company::get_companies_unmatched_paginator;
 use crate::db::signature_metadata_mapping::{
-	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
-	SignatureMetadataMappingInputBuilder,
+	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::{handle_db_pagination_chunked, PAGE_SIZE};
@@ -9,7 +8,6 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use log::debug;
-use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
 use std::sync::Arc;
 

@@ -1,7 +1,6 @@
 use crate::db::platform::get_platforms_unmatched_paginator;
 use crate::db::signature_metadata_mapping::{
-	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
-	SignatureMetadataMappingInputBuilder,
+	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::{handle_db_pagination_chunked, PAGE_SIZE};
@@ -26,7 +25,7 @@ pub async fn match_platforms_to_igdb(
 			tokio::spawn(async move { match_platform_to_igdb(t, arc, connection).await })
 		},
 	)
-		.await?;
+	.await?;
 
 	Ok(())
 }
@@ -57,7 +56,7 @@ pub async fn match_platform_to_igdb(
 					.build()?,
 				&db_conn,
 			)
-				.await?;
+			.await?;
 
 			break;
 		}
@@ -74,7 +73,7 @@ pub async fn match_platform_to_igdb(
 				.build()?,
 			&db_conn,
 		)
-			.await?;
+		.await?;
 	}
 
 	Ok(())
