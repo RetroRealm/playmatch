@@ -40,8 +40,10 @@ pub struct GameMatchResult {
 #[serde(rename_all = "camelCase")]
 pub struct ExternalMetadata {
 	pub provider_name: MetadataProvider,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider_id: Option<String>,
 	pub match_type: MatchType,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub comment: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub manual_match_type: Option<ManualMatchMode>,
