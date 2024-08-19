@@ -1,7 +1,6 @@
 use crate::dat::shared::download::{delete_old_and_move_new_files, download_dat};
 use crate::dat::shared::zip::extract_if_archived;
 use crate::dat::DATS_PATH;
-use anyhow::anyhow;
 use log::error;
 use reqwest::Client;
 use tokio::fs;
