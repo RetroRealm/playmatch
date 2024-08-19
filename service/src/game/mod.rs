@@ -60,7 +60,7 @@ pub async fn match_game_if_possible(
 	Ok(response_body.unwrap_or(GameMatchResult {
 		game_match_type: GameMatchType::NoMatch,
 		playmatch_id: None,
-		external_metadata: vec![],
+		external_metadata: Vec::new(),
 	}))
 }
 
