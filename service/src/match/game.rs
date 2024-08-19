@@ -1,7 +1,7 @@
 use crate::db::game::get_unmatched_games_without_clone_of_id;
 use crate::db::platform::{find_platform_of_game, find_related_signature_metadata_mapping};
 use crate::db::signature_metadata_mapping::{
-	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
+	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::{clean_name, handle_db_pagination_chunked, PAGE_SIZE};
@@ -9,6 +9,7 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use log::{debug, error, info};
+use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -61,19 +62,10 @@ async fn match_game_to_igdb(
 				&clean_name, search_result.id
 			);
 			matched = true;
-			create_or_update_signature_metadata_mapping(
-				SignatureMetadataMappingInput {
-					provider_name: MetadataProviderEnum::Igdb,
-					provider_id: Some(search_result.id.to_string()),
-					comment: None,
-					company_id: None,
-					game_id: Some(game.id),
-					platform_id: None,
-					match_type: MatchTypeEnum::Automatic,
-					manual_match_type: None,
-					failed_match_reason: None,
-					automatic_match_reason: Some(AutomaticMatchReasonEnum::DirectName),
-				},
+			create_or_update_signature_metadata_mapping_success(
+				search_result.id.to_string(),
+				game.id,
+				AutomaticMatchReasonEnum::DirectName,
 				&db_conn,
 			)
 				.await?;
@@ -98,19 +90,10 @@ async fn match_game_to_igdb(
 						&clean_name, search_result.id
 					);
 					matched = true;
-					create_or_update_signature_metadata_mapping(
-						SignatureMetadataMappingInput {
-							provider_name: MetadataProviderEnum::Igdb,
-							provider_id: Some(search_result.id.to_string()),
-							comment: None,
-							company_id: None,
-							game_id: Some(game.id),
-							platform_id: None,
-							match_type: MatchTypeEnum::Automatic,
-							manual_match_type: None,
-							failed_match_reason: None,
-							automatic_match_reason: Some(AutomaticMatchReasonEnum::AlternativeName),
-						},
+					create_or_update_signature_metadata_mapping_success(
+						search_result.id.to_string(),
+						game.id,
+						AutomaticMatchReasonEnum::AlternativeName,
 						&db_conn,
 					)
 						.await?;
@@ -124,22 +107,37 @@ async fn match_game_to_igdb(
 	if !matched {
 		debug!("No match found for Game \"{}\"", &clean_name);
 		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInput {
-				provider_name: MetadataProviderEnum::Igdb,
-				provider_id: None,
-				comment: None,
-				company_id: None,
-				game_id: Some(game.id),
-				platform_id: None,
-				match_type: MatchTypeEnum::Failed,
-				manual_match_type: None,
-				failed_match_reason: Some(FailedMatchReasonEnum::NoDirectMatch),
-				automatic_match_reason: None,
-			},
+			SignatureMetadataMappingInputBuilder::default()
+				.provider_name(MetadataProviderEnum::Igdb)
+				.game_id(Some(game.id))
+				.match_type(MatchTypeEnum::Failed)
+				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
+				.build()?,
 			&db_conn,
 		)
 			.await?;
 	}
+
+	Ok(())
+}
+
+async fn create_or_update_signature_metadata_mapping_success(
+	provider_id: String,
+	game_id: Uuid,
+	automatic_match_reason: AutomaticMatchReasonEnum,
+	db_conn: &DbConn,
+) -> anyhow::Result<()> {
+	create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.provider_name(MetadataProviderEnum::Igdb)
+			.provider_id(Some(provider_id))
+			.game_id(Some(game_id))
+			.match_type(MatchTypeEnum::Automatic)
+			.automatic_match_reason(Some(automatic_match_reason))
+			.build()?,
+		&db_conn,
+	)
+		.await?;
 
 	Ok(())
 }

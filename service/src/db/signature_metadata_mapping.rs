@@ -1,3 +1,4 @@
+use derive_builder::Builder;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
 	MetadataProviderEnum,
@@ -7,7 +8,7 @@ use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, QueryFilter, TryIntoModel};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct SignatureMetadataMappingInput {
 	pub provider_name: MetadataProviderEnum,
 	pub provider_id: Option<String>,

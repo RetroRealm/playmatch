@@ -1,10 +1,13 @@
 use crate::db::platform::get_platforms_unmatched_paginator;
 use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
+	SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::{handle_db_pagination_chunked, PAGE_SIZE};
-use entity::sea_orm_active_enums::{AutomaticMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum};
+use entity::sea_orm_active_enums::{
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
+};
 use log::debug;
 use sea_orm::DbConn;
 use std::sync::Arc;
@@ -23,7 +26,7 @@ pub async fn match_platforms_to_igdb(
 			tokio::spawn(async move { match_platform_to_igdb(t, arc, connection).await })
 		},
 	)
-	.await?;
+		.await?;
 
 	Ok(())
 }
@@ -45,21 +48,16 @@ pub async fn match_platform_to_igdb(
 			);
 			matched = true;
 			create_or_update_signature_metadata_mapping(
-				SignatureMetadataMappingInput {
-					provider_name: MetadataProviderEnum::Igdb,
-					provider_id: Some(search_result.id.to_string()),
-					comment: None,
-					company_id: None,
-					game_id: None,
-					platform_id: Some(platform.id),
-					match_type: MatchTypeEnum::Automatic,
-					manual_match_type: None,
-					failed_match_reason: None,
-					automatic_match_reason: Some(AutomaticMatchReasonEnum::DirectName),
-				},
+				SignatureMetadataMappingInputBuilder::default()
+					.provider_name(MetadataProviderEnum::Igdb)
+					.provider_id(Some(search_result.id.to_string()))
+					.platform_id(Some(platform.id))
+					.match_type(MatchTypeEnum::Automatic)
+					.automatic_match_reason(Some(AutomaticMatchReasonEnum::DirectName))
+					.build()?,
 				&db_conn,
 			)
-			.await?;
+				.await?;
 
 			break;
 		}
@@ -68,23 +66,15 @@ pub async fn match_platform_to_igdb(
 	if !matched {
 		debug!("No direct match found for Platform: \"{}\"", &platform.name);
 		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInput {
-				provider_name: MetadataProviderEnum::Igdb,
-				provider_id: None,
-				comment: None,
-				company_id: None,
-				game_id: None,
-				platform_id: Some(platform.id),
-				match_type: MatchTypeEnum::Failed,
-				manual_match_type: None,
-				failed_match_reason: Some(
-					entity::sea_orm_active_enums::FailedMatchReasonEnum::NoDirectMatch,
-				),
-				automatic_match_reason: None,
-			},
+			SignatureMetadataMappingInputBuilder::default()
+				.provider_name(MetadataProviderEnum::Igdb)
+				.platform_id(Some(platform.id))
+				.match_type(MatchTypeEnum::Failed)
+				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
+				.build()?,
 			&db_conn,
 		)
-		.await?;
+			.await?;
 	}
 
 	Ok(())

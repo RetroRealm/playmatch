@@ -1,11 +1,15 @@
 use crate::db::company::get_companies_unmatched_paginator;
 use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInput,
+	SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
 use crate::r#match::{handle_db_pagination_chunked, PAGE_SIZE};
-use entity::sea_orm_active_enums::{AutomaticMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum};
+use entity::sea_orm_active_enums::{
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
+};
 use log::debug;
+use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -45,18 +49,13 @@ async fn match_company_to_igdb(
 			);
 			matched = true;
 			create_or_update_signature_metadata_mapping(
-				SignatureMetadataMappingInput {
-					provider_name: MetadataProviderEnum::Igdb,
-					provider_id: Some(search_result.id.to_string()),
-					comment: None,
-					company_id: Some(company.id),
-					game_id: None,
-					platform_id: None,
-					match_type: MatchTypeEnum::Automatic,
-					manual_match_type: None,
-					failed_match_reason: None,
-					automatic_match_reason: Some(AutomaticMatchReasonEnum::DirectName),
-				},
+				SignatureMetadataMappingInputBuilder::default()
+					.provider_name(MetadataProviderEnum::Igdb)
+					.provider_id(Some(search_result.id.to_string()))
+					.company_id(Some(company.id))
+					.match_type(MatchTypeEnum::Automatic)
+					.automatic_match_reason(Some(AutomaticMatchReasonEnum::DirectName))
+					.build()?,
 				&db_conn,
 			)
 			.await?;
@@ -68,20 +67,12 @@ async fn match_company_to_igdb(
 	if !matched {
 		debug!("No direct match found for Company: \"{}\"", &company.name);
 		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInput {
-				provider_name: MetadataProviderEnum::Igdb,
-				provider_id: None,
-				comment: None,
-				company_id: Some(company.id),
-				game_id: None,
-				platform_id: None,
-				match_type: MatchTypeEnum::Failed,
-				manual_match_type: None,
-				failed_match_reason: Some(
-					entity::sea_orm_active_enums::FailedMatchReasonEnum::NoDirectMatch,
-				),
-				automatic_match_reason: None,
-			},
+			SignatureMetadataMappingInputBuilder::default()
+				.provider_name(MetadataProviderEnum::Igdb)
+				.company_id(Some(company.id))
+				.match_type(MatchTypeEnum::Failed)
+				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
+				.build()?,
 			&db_conn,
 		)
 		.await?;
