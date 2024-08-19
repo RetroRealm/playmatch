@@ -1,6 +1,7 @@
 use derive_builder::Builder;
 use entity::sea_orm_active_enums::{
-	FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum, MetadataProviderEnum,
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
+	MetadataProviderEnum,
 };
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
@@ -41,10 +42,13 @@ pub struct ExternalMetadata {
 	pub provider_name: MetadataProvider,
 	pub provider_id: Option<String>,
 	pub match_type: MatchType,
+	pub comment: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub manual_match_type: Option<ManualMatchMode>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub failed_match_reason: Option<FailedMatchReason>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub automatic_match_reason: Option<AutomaticMatchReason>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -71,6 +75,12 @@ pub enum ManualMatchMode {
 pub enum FailedMatchReason {
 	NoDirectMatch,
 	TooManyMatches,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum AutomaticMatchReason {
+	AlternativeName,
+	DirectName,
 }
 
 impl From<MetadataProviderEnum> for MetadataProvider {
@@ -107,6 +117,15 @@ impl From<FailedMatchReasonEnum> for FailedMatchReason {
 		match failed_match_reason {
 			FailedMatchReasonEnum::NoDirectMatch => FailedMatchReason::NoDirectMatch,
 			FailedMatchReasonEnum::TooManyMatches => FailedMatchReason::TooManyMatches,
+		}
+	}
+}
+
+impl From<AutomaticMatchReasonEnum> for AutomaticMatchReason {
+	fn from(automatic_match_reason: AutomaticMatchReasonEnum) -> Self {
+		match automatic_match_reason {
+			AutomaticMatchReasonEnum::AlternativeName => AutomaticMatchReason::AlternativeName,
+			AutomaticMatchReasonEnum::DirectName => AutomaticMatchReason::DirectName,
 		}
 	}
 }

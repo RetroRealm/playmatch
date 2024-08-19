@@ -79,8 +79,10 @@ fn build_result(
 					provider_name: mapping.provider_name.into(),
 					provider_id: mapping.provider_id,
 					match_type: mapping.match_type.into(),
+					comment: mapping.comment,
 					manual_match_type: mapping.manual_match_type.map(Into::into),
 					failed_match_reason: mapping.failed_match_reason.map(Into::into),
+					automatic_match_reason: mapping.automatic_match_reason.map(Into::into),
 				})
 				.collect(),
 		)
