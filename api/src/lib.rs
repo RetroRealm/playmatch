@@ -22,6 +22,7 @@ use service::metadata::igdb::IgdbClient;
 use service::r#match::match_db_to_igdb_entities;
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
@@ -60,6 +61,7 @@ async fn start() -> anyhow::Result<()> {
 
 	let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
 	opt.sqlx_logging_level(LevelFilter::Debug);
+	opt.sqlx_slow_statements_logging_settings(LevelFilter::Warn, Duration::from_secs(15));
 
 	let conn = Database::connect(opt).await?;
 	Migrator::up(&conn, None).await?;
