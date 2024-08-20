@@ -22,10 +22,20 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ ubuntu-latest, linux-arm64 ]
+        runners:
+          - runs_on_name: ubuntu-latest
+            platform: linux/amd64
+          - runs_on_name: linux-arm64
+            platform: linux/arm64
+
     name: Build Docker Image
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runners.runs_on_name }}
     steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.runners.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
       - name: Checkout Source code
         uses: actions/checkout@v4
 
@@ -54,11 +64,12 @@ jobs:
         with:
           context: .
           file: Dockerfile
+          platforms: ${{ matrix.runners.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=build-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=build-${{ matrix.platform }}
+          cache-from: type=gha,scope=build-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,scope=build-${{ env.PLATFORM_PAIR }}
 
       - name: Export digest
         run: |
@@ -69,7 +80,7 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.platform }}
+          name: digests-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
