@@ -66,12 +66,12 @@ pub async fn match_game_if_possible(
 
 fn build_result(
 	game_match_type: GameMatchType,
-	game_release: game::Model,
+	game: game::Model,
 	signature_metadata_mappings: Vec<signature_metadata_mapping::Model>,
 ) -> anyhow::Result<GameMatchResult> {
 	let result = GameMatchResultBuilder::default()
 		.game_match_type(game_match_type)
-		.playmatch_id(Some(game_release.id))
+		.playmatch_id(Some(game.id))
 		.external_metadata(
 			signature_metadata_mappings
 				.into_iter()
