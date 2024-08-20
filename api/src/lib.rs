@@ -18,6 +18,7 @@ use migration::{Migrator, MigratorTrait};
 use openapi::ApiDoc;
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
+use service::db::constants::MAX_CONNECTIONS;
 use service::metadata::igdb::IgdbClient;
 use service::r#match::match_db_to_igdb_entities;
 use std::env;
@@ -60,6 +61,7 @@ async fn start() -> anyhow::Result<()> {
 		.unwrap();
 
 	let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
+	opt.max_connections(MAX_CONNECTIONS);
 	opt.sqlx_logging_level(LevelFilter::Debug);
 	opt.sqlx_slow_statements_logging_settings(LevelFilter::Warn, Duration::from_secs(15));
 

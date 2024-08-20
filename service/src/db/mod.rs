@@ -1,4 +1,5 @@
 pub mod company;
+pub mod constants;
 pub mod dat_file;
 pub mod dat_file_import;
 pub mod game;
