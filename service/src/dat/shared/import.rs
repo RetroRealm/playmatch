@@ -4,7 +4,7 @@ use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_import::create_dat_file_import;
 use crate::db::game::{
-	find_game_by_name_and_dat_file_id, find_game_by_signature_group_internal_id, find_game_parent,
+	find_game_by_name_and_dat_file_id, find_game_by_signature_group_internal_id,
 	get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator,
 	insert_game,
 };
