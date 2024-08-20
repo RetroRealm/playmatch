@@ -144,17 +144,17 @@ pub fn get_unmatched_games_without_clone_of_id_paginator(
 	page_size: u64,
 	conn: &DbConn,
 ) -> Paginator<DbConn, SelectModel<game::Model>> {
-	get_unmatched_games_pagnoator(true, page_size, conn)
+	get_unmatched_games_paginator(true, page_size, conn)
 }
 
 pub fn get_unmatched_games_with_clone_of_id_paginator(
 	page_size: u64,
 	conn: &DbConn,
 ) -> Paginator<DbConn, SelectModel<game::Model>> {
-	get_unmatched_games_pagnoator(false, page_size, conn)
+	get_unmatched_games_paginator(false, page_size, conn)
 }
 
-fn get_unmatched_games_pagnoator(
+fn get_unmatched_games_paginator(
 	clone_of_null: bool,
 	page_size: u64,
 	conn: &DbConn,
