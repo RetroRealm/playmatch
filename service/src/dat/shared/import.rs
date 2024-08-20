@@ -3,8 +3,8 @@ use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_import::create_dat_file_import;
-use crate::db::game::{find_game_by_name_and_platform_and_platform_company, insert_game};
-use crate::db::game_file::insert_game_file;
+use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
+use crate::db::game_file::insert_game_file_bulk;
 use crate::db::platform::create_or_find_platform_by_name;
 use entity::{company, dat_file_import, platform};
 use log::info;
@@ -72,17 +72,11 @@ pub async fn parse_and_import_dat_file(
 
 			for game in game_chunk {
 				let conn = conn.clone();
-				let company_id = company.clone().map(|c| c.id);
-				let platform_id = platform.id;
-				let import_id = import.id;
+				let import = import.clone();
 				futures.push(task::spawn(async move {
-					let result = find_game_by_name_and_platform_and_platform_company(
-						&game.name,
-						company_id,
-						platform_id,
-						&conn,
-					)
-					.await?;
+					let result =
+						find_game_by_name_and_dat_file_id(&game.name, import.dat_file_id, &conn)
+							.await?;
 
 					if result.is_some() {
 						return Ok(());
@@ -90,12 +84,9 @@ pub async fn parse_and_import_dat_file(
 
 					let roms = game.rom.clone();
 
-					let game_release = insert_game(import_id, game, &conn).await?;
+					let game_release = insert_game(import.id, game, &conn).await?;
 
-					for rom in roms {
-						let _ =
-							insert_game_file(rom, game_release.id.clone().unwrap(), &conn).await?;
-					}
+					insert_game_file_bulk(roms, game_release.id, &conn).await?;
 
 					Ok(())
 				}));

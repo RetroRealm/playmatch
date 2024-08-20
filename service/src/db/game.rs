@@ -1,23 +1,23 @@
 use crate::dat::shared::model;
+use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::{dat_file, dat_file_import, platform};
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
-use entity::sea_orm_active_enums::MatchTypeEnum;
-use entity::{dat_file, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
 	sea_query::SimpleExpr, ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn,
 	DbErr, EntityTrait, JoinType, Paginator, PaginatorTrait, QueryFilter, QuerySelect,
-	RelationTrait, SelectModel,
+	RelationTrait, SelectModel, TryIntoModel,
 };
 
 pub async fn insert_game(
 	dat_file_import_id: Uuid,
 	game: model::Game,
 	conn: &DbConn,
-) -> Result<game::ActiveModel, DbErr> {
+) -> Result<game::Model, DbErr> {
 	let original_game_id = match game.cloneofid {
 		None => None,
 		Some(clone_of_id) => {
@@ -39,24 +39,18 @@ pub async fn insert_game(
 		..Default::default()
 	};
 
-	game.save(conn).await
+	game.save(conn).await?.try_into_model()
 }
 
-pub async fn find_game_by_name_and_platform_and_platform_company(
+pub async fn find_game_by_name_and_dat_file_id(
 	name: &str,
-	company_id: Option<Uuid>,
-	platform_id: Uuid,
+	dat_file_id: Uuid,
 	conn: &DbConn,
 ) -> Result<Option<game::Model>, DbErr> {
 	Game::find()
 		.filter(game::Column::Name.eq(name))
 		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
-		.join(
-			JoinType::InnerJoin,
-			dat_file_import::Relation::DatFile.def(),
-		)
-		.filter(dat_file::Column::PlatformId.eq(platform_id))
-		.filter(dat_file::Column::CompanyId.eq(company_id))
+		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
 		.one(conn)
 		.await
 }

@@ -1,14 +1,42 @@
 use crate::dat::shared::model::RomElement;
 use entity::game_file;
+use entity::game_file::ActiveModel;
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, DbConn};
+use sea_orm::{ActiveModelTrait, DbConn, EntityTrait};
+
+pub async fn insert_game_file_bulk(
+	game_files: Vec<RomElement>,
+	game_id: Uuid,
+	conn: &DbConn,
+) -> anyhow::Result<()> {
+	let mut to_insert = Vec::new();
+
+	for game_file in game_files {
+		let game_file = get_active_model_from_rom_element(game_id, game_file)?;
+
+		to_insert.push(game_file);
+	}
+
+	game_file::Entity::insert_many(to_insert).exec(conn).await?;
+
+	Ok(())
+}
 
 pub async fn insert_game_file(
 	game_file: RomElement,
 	game_id: Uuid,
 	conn: &DbConn,
 ) -> anyhow::Result<game_file::ActiveModel> {
+	let game_file = get_active_model_from_rom_element(game_id, game_file)?;
+
+	game_file.save(conn).await.map_err(|e| e.into())
+}
+
+fn get_active_model_from_rom_element(
+	game_id: Uuid,
+	game_file: RomElement,
+) -> anyhow::Result<ActiveModel> {
 	let file_size = match game_file.size {
 		None => None,
 		Some(inner) => {
@@ -32,6 +60,5 @@ pub async fn insert_game_file(
 		game_id: Set(game_id),
 		..Default::default()
 	};
-
-	game_file.save(conn).await.map_err(|e| e.into())
+	Ok(game_file)
 }
