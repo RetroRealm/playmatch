@@ -86,7 +86,10 @@ pub async fn parse_and_import_dat_file(
 
 					let game_release = insert_game(import.id, game, &conn).await?;
 
-					insert_game_file_bulk(roms, game_release.id, &conn).await?;
+					// When we insert too many sqlx-postgres panics, so we chunk the inserts
+					for chunk in roms.chunks(25) {
+						insert_game_file_bulk(chunk.to_vec(), game_release.id, &conn).await?;
+					}
 
 					Ok(())
 				}));
