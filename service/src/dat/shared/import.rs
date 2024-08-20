@@ -157,7 +157,12 @@ pub async fn parse_and_import_dat_file(
 fn parse_company_and_platform(
 	dat: &Datafile,
 ) -> anyhow::Result<(Option<String>, String, Vec<String>)> {
-	let split = dat.header.name.split(" - ").collect::<Vec<&str>>();
+	let mut dat_header = dat.header.name.clone();
+
+	// remove Arcade - from the name as its not a company or system
+	dat_header = dat_header.replace("Arcade - ", "");
+
+	let split = dat_header.split(" - ").collect::<Vec<&str>>();
 
 	if split.is_empty() {
 		return Err(anyhow::anyhow!("No company or system found"));
