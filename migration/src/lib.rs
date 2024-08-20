@@ -7,6 +7,7 @@ mod m20240819_001646_add_automatic_match_type_to_signature_metadata_matching;
 mod m20240819_151045_rename_signature_metadata_mapping_provider_name_to_provider;
 mod m20240819_151911_add_signature_metadata_mapping_check_for_relation_id;
 mod m20240819_194749_add_parent_and_sibling_automatic_match_reason;
+mod m20240820_154703_add_signature_group_internal_clone_of_id;
 
 pub struct Migrator;
 
@@ -28,6 +29,9 @@ impl MigratorTrait for Migrator {
 			),
 			Box::new(
 				m20240819_194749_add_parent_and_sibling_automatic_match_reason::Migration,
+			),
+			Box::new(
+				m20240820_154703_add_signature_group_internal_clone_of_id::Migration,
 			),
 		]
 	}

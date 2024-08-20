@@ -3,18 +3,25 @@ use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_import::create_dat_file_import;
-use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
+use crate::db::game::{
+	find_game_by_name_and_dat_file_id, find_game_by_signature_group_internal_id, find_game_parent,
+	get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator,
+	insert_game,
+};
 use crate::db::game_file::insert_game_file_bulk;
 use crate::db::platform::create_or_find_platform_by_name;
 use entity::{company, dat_file_import, platform};
-use log::info;
+use log::{debug, info};
 use sea_orm::prelude::Uuid;
-use sea_orm::DbConn;
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, DbConn, IntoActiveModel};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task;
 use tokio::task::JoinHandle;
+
+const PAGE_SIZE: u64 = 100;
 
 pub async fn parse_and_import_dat_file(
 	path: &Path,
@@ -82,12 +89,10 @@ pub async fn parse_and_import_dat_file(
 						return Ok(());
 					}
 
-					let roms = game.rom.clone();
-
-					let game_release = insert_game(import.id, game, &conn).await?;
+					let game_release = insert_game(import.id, game.clone(), &conn).await?;
 
 					// When we insert too many sqlx-postgres panics, so we chunk the inserts
-					for chunk in roms.chunks(25) {
+					for chunk in game.rom.chunks(25) {
 						insert_game_file_bulk(chunk.to_vec(), game_release.id, &conn).await?;
 					}
 
@@ -99,6 +104,49 @@ pub async fn parse_and_import_dat_file(
 				future.await??;
 			}
 		}
+
+		debug!("Starting to fill clone_of_id for games with internal_clone_of_id");
+
+		let mut paginator =
+			get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator(
+				import.id, PAGE_SIZE, conn,
+			);
+
+		while let Some(games_to_match) = paginator.fetch_and_next().await? {
+			for games_chunk in games_to_match.chunks(25).map(|x| x.to_vec()) {
+				let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
+				for game in games_chunk {
+					let conn = conn.clone();
+					futures.push(task::spawn(async move {
+						if let Some(signature_group_internal_clone_of_id) =
+							&game.signature_group_internal_clone_of_id
+						{
+							let game_parent = find_game_by_signature_group_internal_id(
+								signature_group_internal_clone_of_id.clone(),
+								&conn,
+							)
+							.await?;
+
+							if let Some(game_parent) = game_parent {
+								let mut game_active_model = game.into_active_model();
+
+								game_active_model.clone_of = Set(Some(game_parent.id));
+
+								game_active_model.save(&conn).await?;
+							}
+						}
+
+						Ok(())
+					}));
+				}
+
+				for future in futures {
+					future.await??;
+				}
+			}
+		}
+
+		debug!("Created all clone_of relationships for games with internal_clone_of_id");
 
 		info!("Imported DAT file: {}", path.display());
 	}

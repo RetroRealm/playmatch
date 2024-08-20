@@ -16,6 +16,8 @@ pub struct Model {
 	pub clone_of: Option<Uuid>,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
+	#[sea_orm(column_type = "Text", nullable)]
+	pub signature_group_internal_clone_of_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

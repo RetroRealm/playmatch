@@ -18,28 +18,28 @@ pub async fn insert_game(
 	game: model::Game,
 	conn: &DbConn,
 ) -> Result<game::Model, DbErr> {
-	let original_game_id = match game.cloneofid {
-		None => None,
-		Some(clone_of_id) => {
-			Game::find()
-				.filter(game::Column::SignatureGroupInternalId.eq(clone_of_id))
-				.one(conn)
-				.await?
-		}
-	}
-	.map(|game| game.id);
-
 	let game = game::ActiveModel {
 		dat_file_import_id: Set(dat_file_import_id),
 		signature_group_internal_id: Set(game.id),
+		signature_group_internal_clone_of_id: Set(game.cloneofid),
 		name: Set(game.name),
 		description: Set(game.description),
 		categories: Set(game.category),
-		clone_of: Set(original_game_id),
+		clone_of: Set(None),
 		..Default::default()
 	};
 
 	game.save(conn).await?.try_into_model()
+}
+
+pub async fn find_game_by_signature_group_internal_id(
+	signature_group_internal_id: String,
+	conn: &DbConn,
+) -> Result<Option<game::Model>, DbErr> {
+	Game::find()
+		.filter(game::Column::SignatureGroupInternalId.eq(signature_group_internal_id))
+		.one(conn)
+		.await
 }
 
 pub async fn find_game_by_name_and_dat_file_id(
@@ -138,6 +138,17 @@ pub async fn find_game_signature_metadata_mapping(
 		.filter(signature_metadata_mapping::Column::GameId.eq(game.id))
 		.one(conn)
 		.await
+}
+
+pub fn get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator(
+	dat_file_import_id: Uuid,
+	page_size: u64,
+	conn: &DbConn,
+) -> Paginator<DbConn, SelectModel<game::Model>> {
+	Game::find()
+		.filter(game::Column::DatFileImportId.eq(dat_file_import_id))
+		.filter(game::Column::SignatureGroupInternalCloneOfId.is_not_null())
+		.paginate(conn, page_size)
 }
 
 pub fn get_unmatched_games_without_clone_of_id_paginator(
