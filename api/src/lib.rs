@@ -114,10 +114,10 @@ async fn start() -> anyhow::Result<()> {
 				ApiDoc::openapi(),
 			)]))
 	})
-		.bind(format!("0.0.0.0:{}", port))?
-		.shutdown_timeout(15)
-		.workers(worker_amount)
-		.run();
+	.bind(format!("0.0.0.0:{}", port))?
+	.shutdown_timeout(15)
+	.workers(worker_amount)
+	.run();
 
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
