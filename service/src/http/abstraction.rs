@@ -11,22 +11,20 @@ impl<E> Policy<Request, Response, E> for RetryPolicy {
 	type Future = future::Ready<RetryPolicy>;
 
 	fn retry(&self, _: &Request, result: Result<&Response, &E>) -> Option<Self::Future> {
-		if self.0 <= 0 {
+		if self.0 == 0 {
 			return None;
 		}
 
-		if let Err(_) = result {
+		if result.is_err() {
 			Some(future::ready(RetryPolicy(self.0 - 1)))
-		} else {
-			if let Ok(res) = result {
-				if res.status().is_server_error() {
-					Some(future::ready(RetryPolicy(self.0 - 1)))
-				} else {
-					None
-				}
+		} else if let Ok(res) = result {
+			if res.status().is_server_error() {
+				Some(future::ready(RetryPolicy(self.0 - 1)))
 			} else {
 				None
 			}
+		} else {
+			None
 		}
 	}
 
