@@ -26,6 +26,3 @@ utoipa-swagger-ui = { version = "^7.1", features = ["actix-web"] }
 uuid = "^1.10"
 derive_builder = "^0.20"
 tokio-cron-scheduler = "^0.11"
-
-[build-dependencies]
-built = "^0.7"

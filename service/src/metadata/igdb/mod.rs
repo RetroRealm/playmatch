@@ -1,4 +1,5 @@
-use crate::http::abstraction::{RetryPolicy, USER_AGENT};
+use crate::http::abstraction::RetryPolicy;
+use crate::http::constants::REQWEST_DEFAULT_USER_AGENT;
 use crate::metadata::igdb::constants::{
 	API_URL, IGDB_MAX_RETRIES, IGDB_RATELIMIT_AMOUNT, IGDB_RATELIMIT_DURATION_MS,
 	IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORKS,
@@ -308,7 +309,7 @@ impl IgdbClient {
 		headers.insert("Client-Id", self.client_id.parse()?);
 		// Safety: The User Agent is only mutated on startup and is a constant string
 		unsafe {
-			headers.insert("User-Agent", USER_AGENT.parse()?);
+			headers.insert("User-Agent", REQWEST_DEFAULT_USER_AGENT.parse()?);
 		}
 		let oauth2 = self.oauth2handler.read().await;
 		let access_token = oauth2

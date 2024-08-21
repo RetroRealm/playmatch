@@ -23,8 +23,10 @@ fn main() {
 
 	// Safety: This is only mutated in the main function
 	unsafe {
-		http::abstraction::USER_AGENT =
-			format!("{}/{}", built_info::PKG_NAME, built_info::PKG_VERSION)
+		http::constants::REQWEST_DEFAULT_USER_AGENT =
+			format!("{}/{}", built_info::PKG_NAME, built_info::PKG_VERSION);
+
+		http::constants::X_VERSION_HEADER_API = built_info::PKG_VERSION.to_string();
 	}
 
 	api::main();

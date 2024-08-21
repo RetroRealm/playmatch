@@ -417,7 +417,6 @@ dependencies = [
  "actix-web",
  "actix-web-lab",
  "anyhow",
- "built",
  "chrono",
  "derive_builder",
  "entity",

@@ -17,6 +17,7 @@ use openapi::ApiDoc;
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::db::constants::MAX_CONNECTIONS;
+use service::http::constants::X_VERSION_HEADER_API;
 use service::metadata::igdb::IgdbClient;
 use service::r#match::match_db_to_igdb_entities;
 use std::env;
@@ -31,11 +32,6 @@ pub mod model;
 mod openapi;
 pub mod routes;
 mod util;
-
-pub mod built_info {
-	// The file has been placed there by the build script.
-	include!(concat!(env!("OUT_DIR"), "/built.rs"));
-}
 
 #[actix_web::main]
 async fn start() -> anyhow::Result<()> {
@@ -78,7 +74,8 @@ async fn start() -> anyhow::Result<()> {
 	let client_data = Data::from(client_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
-	let serv = HttpServer::new(move || {
+	// Safety: X_VERSION_HEADER_API is only mutated in the main function
+	let serv = HttpServer::new(move || unsafe {
 		App::new()
 			.wrap(Compress::default())
 			.app_data(conn_data.clone())
@@ -90,7 +87,7 @@ async fn start() -> anyhow::Result<()> {
 					.wrap(Logger::new(
 						"%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T",
 					))
-					.wrap(DefaultHeaders::new().add(("X-Version", built_info::PKG_VERSION)))
+					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API.clone())))
 					.service(identify)
 					.service(get_game_by_id)
 					.service(get_games_by_ids)
@@ -117,10 +114,10 @@ async fn start() -> anyhow::Result<()> {
 				ApiDoc::openapi(),
 			)]))
 	})
-	.bind(format!("0.0.0.0:{}", port))?
-	.shutdown_timeout(15)
-	.workers(worker_amount)
-	.run();
+		.bind(format!("0.0.0.0:{}", port))?
+		.shutdown_timeout(15)
+		.workers(worker_amount)
+		.run();
 
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
