@@ -1,6 +1,7 @@
-use crate::http::abstraction::USER_AGENT;
+use crate::http::abstraction::{RetryPolicy, USER_AGENT};
 use crate::metadata::igdb::constants::{
-	API_URL, IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORKS,
+	API_URL, IGDB_MAX_RETRIES, IGDB_RATELIMIT_AMOUNT, IGDB_RATELIMIT_DURATION_MS,
+	IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORKS,
 	IGDB_ROUTE_COLLECTIONS, IGDB_ROUTE_COMPANIES, IGDB_ROUTE_COVERS, IGDB_ROUTE_EXTERNAL_GAMES,
 	IGDB_ROUTE_FRANCHISES, IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES, IGDB_ROUTE_PLATFORMS,
 };
@@ -20,8 +21,9 @@ use serde::de::DeserializeOwned;
 use std::ops::DerefMut;
 use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
-use tower::limit::RateLimit;
-use tower::{Service, ServiceExt};
+use tower::limit::{RateLimit, RateLimitLayer};
+use tower::retry::Retry;
+use tower::{Service, ServiceBuilder, ServiceExt};
 
 mod constants;
 pub mod model;
@@ -34,15 +36,22 @@ struct OAuth2Handler {
 
 pub struct IgdbClient {
 	client: Client,
-	service: Mutex<RateLimit<Client>>,
+	service: Mutex<RateLimit<Retry<RetryPolicy, Client>>>,
 	oauth2handler: RwLock<OAuth2Handler>,
 	client_id: String,
 }
 
 impl IgdbClient {
 	pub fn new(client_id: String, client_secret: String, client: Client) -> anyhow::Result<Self> {
-		let service = tower::ServiceBuilder::new()
-			.rate_limit(4, Duration::from_secs(1))
+		let rate_limit_layer = RateLimitLayer::new(
+			IGDB_RATELIMIT_AMOUNT,
+			Duration::from_millis(IGDB_RATELIMIT_DURATION_MS),
+		);
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy(IGDB_MAX_RETRIES));
+
+		let service = ServiceBuilder::new()
+			.layer(rate_limit_layer)
+			.layer(retry_layer)
 			.service(client.clone());
 
 		let mut oauth2_client = BasicClient::new(
@@ -76,7 +85,7 @@ impl IgdbClient {
 			Some(&format!("where name =  \"{}\";", name)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	pub async fn search_platforms_by_name(&self, name: &str) -> anyhow::Result<Vec<Platform>> {
@@ -87,7 +96,7 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	pub async fn get_game_by_id(&self, id: i32) -> anyhow::Result<Option<Game>> {
@@ -106,7 +115,7 @@ impl IgdbClient {
 			Some(&format!("search \"{}\";", name)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	pub async fn search_game_by_name_and_platform(
@@ -124,7 +133,7 @@ impl IgdbClient {
 			)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	pub async fn get_age_rating_by_id(&self, id: i32) -> anyhow::Result<Option<AgeRating>> {
@@ -237,7 +246,7 @@ impl IgdbClient {
 			)),
 			Some(""),
 		)
-		.await
+			.await
 	}
 
 	async fn refresh_token(&self) -> anyhow::Result<()> {
