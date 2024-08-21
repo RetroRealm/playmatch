@@ -11,8 +11,6 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
 use actix_web::{App, HttpServer};
-use dotenvy::dotenv;
-use env_logger::Env;
 use log::{debug, error, info, LevelFilter};
 use migration::{Migrator, MigratorTrait};
 use openapi::ApiDoc;
@@ -41,10 +39,6 @@ pub mod built_info {
 
 #[actix_web::main]
 async fn start() -> anyhow::Result<()> {
-	// Load environment variables from .env file, if present but do nothing if it fails
-	let _ = dotenv();
-	env_logger::Builder::from_env(Env::default().default_filter_or("info")).try_init()?;
-
 	let port = env::var("PORT").unwrap_or("8080".to_string());
 	let worker_amount = match env::var("HTTP_WORKERS") {
 		Ok(workers) => workers.parse::<usize>()?,
