@@ -4,9 +4,8 @@ use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_import::create_dat_file_import;
 use crate::db::game::{
-	find_game_by_name_and_dat_file_id, find_game_by_signature_group_internal_id,
-	get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator,
-	insert_game,
+	find_game_by_name_and_dat_file_id, find_game_by_signature_group_internal_id_and_dat_file_id,
+	get_unpopulated_clone_of_games, insert_game,
 };
 use crate::db::game_file::insert_game_file_bulk;
 use crate::db::platform::create_or_find_platform_by_name;
@@ -105,51 +104,56 @@ pub async fn parse_and_import_dat_file(
 			}
 		}
 
-		debug!("Starting to fill clone_of_id for games with internal_clone_of_id");
-
-		let mut paginator =
-			get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator(
-				import.id, PAGE_SIZE, conn,
-			);
-
-		while let Some(games_to_match) = paginator.fetch_and_next().await? {
-			for games_chunk in games_to_match.chunks(25).map(|x| x.to_vec()) {
-				let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
-				for game in games_chunk {
-					let conn = conn.clone();
-					futures.push(task::spawn(async move {
-						if let Some(signature_group_internal_clone_of_id) =
-							&game.signature_group_internal_clone_of_id
-						{
-							let game_parent = find_game_by_signature_group_internal_id(
-								signature_group_internal_clone_of_id.clone(),
-								&conn,
-							)
-							.await?;
-
-							if let Some(game_parent) = game_parent {
-								let mut game_active_model = game.into_active_model();
-
-								game_active_model.clone_of = Set(Some(game_parent.id));
-
-								game_active_model.save(&conn).await?;
-							}
-						}
-
-						Ok(())
-					}));
-				}
-
-				for future in futures {
-					future.await??;
-				}
-			}
+		// We have to run it twice because of a bug in SeaORM with pagination on left joins which somehow misses the last page
+		for _ in 0..2 {
+			populate_clone_of_id(import.dat_file_id, conn).await?;
 		}
-
-		debug!("Created all clone_of relationships for games with internal_clone_of_id");
 
 		info!("Imported DAT file: {}", path.display());
 	}
+
+	Ok(())
+}
+
+async fn populate_clone_of_id(dat_file_id: Uuid, conn: &DbConn) -> anyhow::Result<()> {
+	let mut paginator = get_unpopulated_clone_of_games(dat_file_id, PAGE_SIZE, conn);
+
+	while let Some(games_to_match) = paginator.fetch_and_next().await? {
+		for games_chunk in games_to_match.chunks(25).map(|x| x.to_vec()) {
+			let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
+			for game in games_chunk {
+				let conn = conn.clone();
+				futures.push(task::spawn(async move {
+					if let Some(signature_group_internal_clone_of_id) =
+						&game.signature_group_internal_clone_of_id
+					{
+						let game_parent = find_game_by_signature_group_internal_id_and_dat_file_id(
+							signature_group_internal_clone_of_id.clone(),
+							dat_file_id,
+							&conn,
+						)
+						.await?;
+
+						if let Some(game_parent) = game_parent {
+							let mut game_active_model = game.into_active_model();
+
+							game_active_model.clone_of = Set(Some(game_parent.id));
+
+							game_active_model.save(&conn).await?;
+						}
+					}
+
+					Ok(())
+				}));
+			}
+
+			for future in futures {
+				future.await??;
+			}
+		}
+	}
+
+	debug!("Created all clone_of relationships for games with internal_clone_of_id");
 
 	Ok(())
 }

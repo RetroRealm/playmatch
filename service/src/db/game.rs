@@ -1,10 +1,10 @@
 use crate::dat::shared::model;
+use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::{dat_file, dat_file_import, platform};
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
-use entity::sea_orm_active_enums::MatchTypeEnum;
-use entity::{dat_file, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
@@ -32,12 +32,15 @@ pub async fn insert_game(
 	game.save(conn).await?.try_into_model()
 }
 
-pub async fn find_game_by_signature_group_internal_id(
+pub async fn find_game_by_signature_group_internal_id_and_dat_file_id(
 	signature_group_internal_id: String,
+	dat_file_id: Uuid,
 	conn: &DbConn,
 ) -> Result<Option<game::Model>, DbErr> {
 	Game::find()
 		.filter(game::Column::SignatureGroupInternalId.eq(signature_group_internal_id))
+		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
+		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
 		.one(conn)
 		.await
 }
@@ -140,14 +143,15 @@ pub async fn find_game_signature_metadata_mapping(
 		.await
 }
 
-pub fn get_games_with_signature_group_internal_clone_of_id_by_dat_file_import_id_paginator(
-	dat_file_import_id: Uuid,
+pub fn get_unpopulated_clone_of_games(
+	dat_file_id: Uuid,
 	page_size: u64,
 	conn: &DbConn,
 ) -> Paginator<DbConn, SelectModel<game::Model>> {
 	Game::find()
-		.filter(game::Column::DatFileImportId.eq(dat_file_import_id))
 		.filter(game::Column::SignatureGroupInternalCloneOfId.is_not_null())
+		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
+		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
 		.paginate(conn, page_size)
 }
 
