@@ -48,7 +48,7 @@ online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team
-at [INSERT EMAIL]. All complaints will be reviewed and investigated promptly and fairly.
+at teamretrorealm@gmail.com. All complaints will be reviewed and investigated promptly and fairly.
 
 All project maintainers are obligated to respect the privacy and security of the reporter of any incident.
 
