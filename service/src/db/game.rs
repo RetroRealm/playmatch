@@ -25,7 +25,6 @@ pub async fn insert_game(
 		name: Set(game.name),
 		description: Set(game.description),
 		categories: Set(game.category),
-		clone_of: Set(None),
 		..Default::default()
 	};
 
