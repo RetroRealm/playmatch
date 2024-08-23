@@ -16,6 +16,10 @@ pub struct DatFileCreateOrUpdateInput {
 	pub platform_id: Uuid,
 }
 
+pub async fn find_all_dat_files(conn: &DbConn) -> anyhow::Result<Vec<dat_file::Model>> {
+	Ok(DatFile::find().all(conn).await?)
+}
+
 pub async fn create_or_update_dat_file(
 	input: DatFileCreateOrUpdateInput,
 	conn: &DbConn,

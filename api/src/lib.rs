@@ -6,7 +6,7 @@ use crate::routes::igdb::{
 	get_external_games_by_ids, get_franchise_by_id, get_franchises_by_ids, get_game_by_id,
 	get_games_by_ids, get_genre_by_id, get_genres_by_ids, search_game_by_name,
 };
-use crate::util::download_and_parse_dats_wrapper;
+use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
@@ -19,7 +19,6 @@ use sea_orm::{ConnectOptions, Database};
 use service::db::constants::MAX_CONNECTIONS;
 use service::http::constants::X_VERSION_HEADER_API;
 use service::metadata::igdb::IgdbClient;
-use service::r#match::match_db_to_igdb_entities;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -121,11 +120,16 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn = conn_arc.clone();
 	let client = client_arc.clone();
+	let igdb_client = igdb_client_arc.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
 			let client = client.clone();
-			Box::pin(async move { download_and_parse_dats_wrapper(client, conn).await })
+			let igdb_client = igdb_client.clone();
+			Box::pin(async move {
+				wrap_download_and_parse_dats(client, conn.clone()).await;
+				wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
+			})
 		})?)
 		.await?;
 
@@ -140,15 +144,8 @@ async fn start() -> anyhow::Result<()> {
 
 	if initial_data_init {
 		tokio::spawn(async move {
-			download_and_parse_dats_wrapper(http_client, conn.clone()).await;
-			match match_db_to_igdb_entities(igdb_client, &conn).await {
-				Ok(()) => {
-					info!("Successfully matched database to IGDB entities");
-				}
-				Err(err) => {
-					error!("Failed to match database to IGDB entities: {}", err);
-				}
-			}
+			wrap_download_and_parse_dats(http_client, conn.clone()).await;
+			wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
 		});
 	}
 

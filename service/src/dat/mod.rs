@@ -5,6 +5,7 @@ use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
 use crate::fs;
 use crate::fs::calculate_md5;
+use crate::r#match::clone::populate_all_clone_of_ids;
 use anyhow::anyhow;
 use fs::read_files_recursive;
 use log::{debug, error, info};
@@ -96,6 +97,8 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			}
 		}
 	}
+
+	populate_all_clone_of_ids(conn).await?;
 
 	Ok(())
 }

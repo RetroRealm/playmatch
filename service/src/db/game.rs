@@ -1,10 +1,10 @@
 use crate::dat::shared::model;
-use entity::sea_orm_active_enums::MatchTypeEnum;
-use entity::{dat_file, dat_file_import, platform};
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
+use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::{dat_file, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
@@ -143,6 +143,19 @@ pub async fn find_game_signature_metadata_mapping(
 		.await
 }
 
+pub async fn get_dat_file_id_of_game(game: &game::Model, conn: &DbConn) -> Result<Uuid, DbErr> {
+	let dat_file_import = dat_file_import::Entity::find()
+		.filter(dat_file_import::Column::Id.eq(game.dat_file_import_id))
+		.one(conn)
+		.await?;
+
+	match dat_file_import {
+		Some(dat_file_import) => Ok(dat_file_import.dat_file_id),
+		None => Err(DbErr::RecordNotFound(
+			"Dat file import not found".to_string(),
+		)),
+	}
+}
 pub fn get_unpopulated_clone_of_games(
 	dat_file_id: Uuid,
 	page_size: u64,

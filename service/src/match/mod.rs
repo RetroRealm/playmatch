@@ -1,3 +1,4 @@
+pub mod clone;
 mod company;
 mod game;
 mod platform;
@@ -39,7 +40,10 @@ pub async fn match_db_to_igdb_entities(
 	}
 	info!("Finished matching platforms to IGDB");
 
-	match_games_to_igdb(igdb_client.clone(), db_conn).await?;
+	// same as above
+	for _ in 0..2 {
+		match_games_to_igdb(igdb_client.clone(), db_conn).await?;
+	}
 	info!("Finished matching games to IGDB");
 	Ok(())
 }
