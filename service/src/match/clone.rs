@@ -52,7 +52,7 @@ async fn try_match_parent(game: game::Model, conn: &DbConn) -> anyhow::Result<()
 		let game_parent = find_game_by_signature_group_internal_id_and_dat_file_id(
 			signature_group_internal_clone_of_id.clone(),
 			dat_file_id,
-			&conn,
+			conn,
 		)
 		.await?;
 
