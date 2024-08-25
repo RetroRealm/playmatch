@@ -3,12 +3,16 @@ use crate::metadata::igdb::model::{
 };
 use crate::metadata::igdb::IgdbClient;
 use cached::proc_macro::cached;
-use cached::TimedCache;
+use cached::TimedSizedCache;
+
+const CACHE_SIZE: usize = 20000;
+const CACHE_LIFESPAN: u64 = 86400;
+const REFRESH_ON_RETRIEVE: bool = true;
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<Game>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<Game>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_game_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Result<Option<Game>> {
@@ -17,8 +21,8 @@ pub async fn get_game_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Resu
 
 #[cached(
 	result = true,
-	ty = "TimedCache<String, Vec<Game>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<String, Vec<Game>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ query.clone() }"#
 )]
 pub async fn search_game_by_name_cached(
@@ -30,8 +34,8 @@ pub async fn search_game_by_name_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<AgeRating>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<AgeRating>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_age_rating_by_id_cached(
@@ -43,8 +47,8 @@ pub async fn get_age_rating_by_id_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<AlternativeName>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<AlternativeName>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_alternative_name_by_id_cached(
@@ -56,8 +60,8 @@ pub async fn get_alternative_name_by_id_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<Artwork>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<Artwork>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_artwork_by_id_cached(
@@ -69,8 +73,8 @@ pub async fn get_artwork_by_id_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<Collection>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<Collection>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_collection_by_id_cached(
@@ -82,8 +86,8 @@ pub async fn get_collection_by_id_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<Cover>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<Cover>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_cover_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Result<Option<Cover>> {
@@ -92,8 +96,8 @@ pub async fn get_cover_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Res
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<ExternalGame>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<ExternalGame>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_external_game_by_id_cached(
@@ -105,8 +109,8 @@ pub async fn get_external_game_by_id_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<Franchise>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<Franchise>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_franchise_by_id_cached(
@@ -118,8 +122,8 @@ pub async fn get_franchise_by_id_cached(
 
 #[cached(
 	result = true,
-	ty = "TimedCache<i32, Option<Genre>>",
-	create = "{ TimedCache::with_lifespan(86400) }",
+	ty = "TimedSizedCache<i32, Option<Genre>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ id.clone() }"#
 )]
 pub async fn get_genre_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Result<Option<Genre>> {
