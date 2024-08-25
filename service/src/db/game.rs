@@ -164,7 +164,7 @@ pub fn get_unpopulated_clone_of_games(
 		.filter(game::Column::SignatureGroupInternalCloneOfId.is_not_null())
 		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
 		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
-		.order_by(game::Column::Id)
+		.order_by_asc(game::Column::Id)
 		.paginate(conn, page_size)
 }
 
@@ -226,6 +226,6 @@ fn get_unmatched_games_paginator(
 						.eq(MatchTypeEnum::None.as_enum()),
 				),
 		)
-		.order_by(game::Column::Id)
+		.order_by_asc(game::Column::Id)
 		.paginate(conn, page_size)
 }

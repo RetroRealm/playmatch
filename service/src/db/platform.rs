@@ -45,7 +45,7 @@ pub fn get_platforms_unmatched_paginator(
 				.is_null()
 				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
 		)
-		.order_by(platform::Column::Id)
+		.order_by_asc(platform::Column::Id)
 		.paginate(conn, page_size)
 }
 
