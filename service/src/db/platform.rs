@@ -6,7 +6,7 @@ use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, ModelTrait, Paginator,
-	PaginatorTrait, QueryFilter, QuerySelect, RelationTrait, SelectModel, TryIntoModel,
+	PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, SelectModel, TryIntoModel,
 };
 
 pub async fn create_or_find_platform_by_name(
@@ -45,6 +45,7 @@ pub fn get_platforms_unmatched_paginator(
 				.is_null()
 				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
 		)
+		.order_by(platform::Column::Id)
 		.paginate(conn, page_size)
 }
 

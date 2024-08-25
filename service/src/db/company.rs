@@ -42,6 +42,6 @@ pub fn get_companies_unmatched_paginator(
 				.is_null()
 				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
 		)
-		.order_by_desc(company::Column::CreatedAt)
+		.order_by(company::Column::Id)
 		.paginate(db_conn, page_size)
 }
