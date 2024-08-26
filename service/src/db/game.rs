@@ -91,7 +91,7 @@ pub async fn find_game_and_id_mapping_by_name_and_size(
 			.and(game_file::Column::FileSizeInBytes.eq(size)),
 		conn,
 	)
-		.await
+	.await
 }
 
 async fn find_signature_metadata_mapping_if_exists_by_filter(
