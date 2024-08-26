@@ -91,7 +91,7 @@ pub async fn find_game_and_id_mapping_by_name_and_size(
 			.and(game_file::Column::FileSizeInBytes.eq(size)),
 		conn,
 	)
-	.await
+		.await
 }
 
 async fn find_signature_metadata_mapping_if_exists_by_filter(
@@ -207,17 +207,17 @@ fn get_unmatched_games_paginator(
 			game::Relation::SignatureMetadataMapping.def(),
 			smm2.clone(),
 		)
+		.filter(if clone_of_null {
+			game::Column::CloneOf.is_null()
+		} else {
+			game::Column::CloneOf.is_not_null()
+		})
 		.filter(
 			Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType)).is_in(vec![
 				MatchTypeEnum::Automatic.as_enum(),
 				MatchTypeEnum::Manual.as_enum(),
 			]),
 		)
-		.filter(if clone_of_null {
-			game::Column::CloneOf.is_null()
-		} else {
-			game::Column::CloneOf.is_not_null()
-		})
 		.filter(
 			Expr::col((smm2.clone(), signature_metadata_mapping::Column::Id))
 				.is_null()
