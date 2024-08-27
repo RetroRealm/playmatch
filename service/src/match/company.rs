@@ -37,15 +37,12 @@ async fn match_company_to_igdb(
 ) -> anyhow::Result<()> {
 	let search_results = igdb_client.search_company_by_name(&company.name).await?;
 
-	let mut matched = false;
-
 	for search_result in search_results {
 		if search_result.name.to_lowercase() == company.name.to_lowercase() {
 			debug!(
 				"Matched Company \"{}\" to IGDB Company ID {} (Direct Match)",
 				company.name, search_result.id
 			);
-			matched = true;
 			create_or_update_signature_metadata_mapping(
 				SignatureMetadataMappingInputBuilder::default()
 					.provider(MetadataProviderEnum::Igdb)
@@ -58,23 +55,21 @@ async fn match_company_to_igdb(
 			)
 			.await?;
 
-			break;
+			return Ok(());
 		}
 	}
 
-	if !matched {
-		debug!("No direct match found for Company: \"{}\"", &company.name);
-		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInputBuilder::default()
-				.provider(MetadataProviderEnum::Igdb)
-				.company_id(Some(company.id))
-				.match_type(MatchTypeEnum::Failed)
-				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
-				.build()?,
-			&db_conn,
-		)
-		.await?;
-	}
+	debug!("No direct match found for Company: \"{}\"", &company.name);
+	create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.provider(MetadataProviderEnum::Igdb)
+			.company_id(Some(company.id))
+			.match_type(MatchTypeEnum::Failed)
+			.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
+			.build()?,
+		&db_conn,
+	)
+	.await?;
 
 	Ok(())
 }

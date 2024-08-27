@@ -37,15 +37,12 @@ pub async fn match_platform_to_igdb(
 ) -> anyhow::Result<()> {
 	let search_results = igdb_client.search_platforms_by_name(&platform.name).await?;
 
-	let mut matched = false;
-
 	for search_result in search_results {
 		if search_result.name.to_lowercase() == platform.name.to_lowercase() {
 			debug!(
 				"Matched Platform \"{}\" to IGDB Platform ID {} (Direct Match)",
 				platform.name, search_result.id
 			);
-			matched = true;
 			create_or_update_signature_metadata_mapping(
 				SignatureMetadataMappingInputBuilder::default()
 					.provider(MetadataProviderEnum::Igdb)
@@ -58,23 +55,21 @@ pub async fn match_platform_to_igdb(
 			)
 			.await?;
 
-			break;
+			return Ok(());
 		}
 	}
 
-	if !matched {
-		debug!("No direct match found for Platform: \"{}\"", &platform.name);
-		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInputBuilder::default()
-				.provider(MetadataProviderEnum::Igdb)
-				.platform_id(Some(platform.id))
-				.match_type(MatchTypeEnum::Failed)
-				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
-				.build()?,
-			&db_conn,
-		)
-		.await?;
-	}
+	debug!("No direct match found for Platform: \"{}\"", &platform.name);
+	create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.provider(MetadataProviderEnum::Igdb)
+			.platform_id(Some(platform.id))
+			.match_type(MatchTypeEnum::Failed)
+			.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
+			.build()?,
+		&db_conn,
+	)
+	.await?;
 
 	Ok(())
 }
