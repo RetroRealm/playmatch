@@ -131,15 +131,12 @@ async fn match_game_to_igdb(
 		.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 		.await?;
 
-	let mut matched = false;
-
 	for search_result in search_results {
 		if search_result.name.to_lowercase() == clean_name.to_lowercase() {
 			debug!(
 				"Matched Game \"{}\" to IGDB Game ID {} (Direct Match)",
 				&clean_name, search_result.id
 			);
-			matched = true;
 			create_or_update_signature_metadata_mapping_success(
 				search_result.id.to_string(),
 				game.id,
@@ -148,7 +145,7 @@ async fn match_game_to_igdb(
 			)
 			.await?;
 
-			break;
+			return Ok(());
 		}
 
 		if let Some(alternative_names) = search_result.alternative_names {
@@ -167,7 +164,6 @@ async fn match_game_to_igdb(
 						"Matched Game \"{}\" to IGDB Game ID {} (Alternative Name Match)",
 						&clean_name, search_result.id
 					);
-					matched = true;
 					create_or_update_signature_metadata_mapping_success(
 						search_result.id.to_string(),
 						game.id,
@@ -176,25 +172,23 @@ async fn match_game_to_igdb(
 					)
 					.await?;
 
-					break;
+					return Ok(());
 				}
 			}
 		}
 	}
 
-	if !matched {
-		debug!("No match found for Game \"{}\"", &clean_name);
-		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInputBuilder::default()
-				.provider(MetadataProviderEnum::Igdb)
-				.game_id(Some(game.id))
-				.match_type(MatchTypeEnum::Failed)
-				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
-				.build()?,
-			&db_conn,
-		)
-		.await?;
-	}
+	debug!("No match found for Game \"{}\"", &clean_name);
+	create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.provider(MetadataProviderEnum::Igdb)
+			.game_id(Some(game.id))
+			.match_type(MatchTypeEnum::Failed)
+			.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
+			.build()?,
+		&db_conn,
+	)
+	.await?;
 
 	Ok(())
 }
