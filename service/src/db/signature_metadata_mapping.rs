@@ -6,7 +6,9 @@ use entity::sea_orm_active_enums::{
 use entity::signature_metadata_mapping;
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, QueryFilter, TryIntoModel};
+use sea_orm::{
+	ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, IntoActiveModel, QueryFilter, TryIntoModel,
+};
 
 #[derive(Debug, Clone, Builder)]
 pub struct SignatureMetadataMappingInput {
@@ -42,25 +44,26 @@ pub async fn create_or_update_signature_metadata_mapping(
 		.one(db_conn)
 		.await?;
 
-	if let Some(signature_metadata_mapping) = signature_metadata_mapping {
-		Ok(signature_metadata_mapping)
+	let mut active_model = if let Some(signature_metadata_mapping) = signature_metadata_mapping {
+		signature_metadata_mapping.into_active_model()
 	} else {
-		let mut signature_metadata_mapping = signature_metadata_mapping::ActiveModel {
-			platform_id: Set(input.platform_id),
-			game_id: Set(input.game_id),
-			company_id: Set(input.company_id),
-			provider: Set(input.provider),
-			provider_id: Set(input.provider_id),
-			match_type: Set(input.match_type),
-			manual_match_type: Set(input.manual_match_type),
-			failed_match_reason: Set(input.failed_match_reason),
-			comment: Set(input.comment),
-			automatic_match_reason: Set(input.automatic_match_reason),
+		signature_metadata_mapping::ActiveModel {
 			..Default::default()
-		};
+		}
+	};
 
-		signature_metadata_mapping = signature_metadata_mapping.save(db_conn).await?;
+	active_model.platform_id = Set(input.platform_id);
+	active_model.game_id = Set(input.game_id);
+	active_model.company_id = Set(input.company_id);
+	active_model.provider = Set(input.provider);
+	active_model.provider_id = Set(input.provider_id);
+	active_model.match_type = Set(input.match_type);
+	active_model.manual_match_type = Set(input.manual_match_type);
+	active_model.failed_match_reason = Set(input.failed_match_reason);
+	active_model.comment = Set(input.comment);
+	active_model.automatic_match_reason = Set(input.automatic_match_reason);
 
-		Ok(signature_metadata_mapping.try_into_model()?)
-	}
+	active_model = active_model.save(db_conn).await?;
+
+	Ok(active_model.try_into_model()?)
 }
