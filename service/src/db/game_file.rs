@@ -3,7 +3,7 @@ use entity::game_file;
 use entity::game_file::ActiveModel;
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, DbConn, EntityTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, QueryFilter};
 
 pub async fn insert_game_file_bulk(
 	game_files: Vec<RomElement>,
@@ -27,10 +27,20 @@ pub async fn insert_game_file(
 	game_file: RomElement,
 	game_id: Uuid,
 	conn: &DbConn,
-) -> anyhow::Result<game_file::ActiveModel> {
+) -> anyhow::Result<ActiveModel> {
 	let game_file = get_active_model_from_rom_element(game_id, game_file)?;
 
 	game_file.save(conn).await.map_err(|e| e.into())
+}
+
+pub async fn get_game_files_from_game_id(
+	game_id: Uuid,
+	conn: &DbConn,
+) -> anyhow::Result<Vec<game_file::Model>> {
+	Ok(game_file::Entity::find()
+		.filter(game_file::Column::GameId.eq(game_id))
+		.all(conn)
+		.await?)
 }
 
 fn get_active_model_from_rom_element(
@@ -48,7 +58,7 @@ fn get_active_model_from_rom_element(
 		}
 	};
 
-	let game_file = game_file::ActiveModel {
+	let game_file = ActiveModel {
 		file_name: Set(game_file.name),
 		file_size_in_bytes: Set(file_size),
 		crc: Set(game_file.crc),

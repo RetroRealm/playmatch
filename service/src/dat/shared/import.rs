@@ -4,13 +4,14 @@ use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
 use crate::db::dat_file_import::create_dat_file_import;
 use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
-use crate::db::game_file::insert_game_file_bulk;
+use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
 use crate::db::platform::create_or_find_platform_by_name;
 use entity::{company, dat_file_import, platform};
 use log::info;
 use sea_orm::prelude::Uuid;
+use std::collections::HashSet;
 
-use sea_orm::DbConn;
+use sea_orm::{ActiveModelTrait, DbConn, IntoActiveModel};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -79,7 +80,75 @@ pub async fn parse_and_import_dat_file(
 						find_game_by_name_and_dat_file_id(&game.name, import.dat_file_id, &conn)
 							.await?;
 
-					if result.is_some() {
+					if let Some(existing_game) = result {
+						let existing_files =
+							get_game_files_from_game_id(existing_game.id, &conn).await?;
+						let existing_files_set: HashSet<_> = existing_files
+							.iter()
+							.map(|file| {
+								(
+									&file.file_name,
+									file.file_size_in_bytes,
+									&file.crc,
+									&file.md5,
+									&file.sha1,
+									&file.sha256,
+								)
+							})
+							.collect();
+
+						let new_files_set: HashSet<_> = game
+							.rom
+							.iter()
+							.map(|rom| {
+								(
+									&rom.name,
+									rom.size.as_ref().and_then(|s| s.parse::<i64>().ok()),
+									&rom.crc,
+									&rom.md5,
+									&rom.sha1,
+									&rom.sha256,
+								)
+							})
+							.collect();
+
+						// Delete existing files that are not in the new files
+						for file in existing_files.iter() {
+							let identifier = (
+								&file.file_name,
+								file.file_size_in_bytes,
+								&file.crc,
+								&file.md5,
+								&file.sha1,
+								&file.sha256,
+							);
+							if !new_files_set.contains(&identifier) {
+								file.clone().into_active_model().delete(&conn).await?;
+							}
+						}
+
+						let mut to_insert = vec![];
+
+						// Insert new files that are not in the existing files
+						for rom in game.rom.iter() {
+							let identifier = (
+								&rom.name,
+								rom.size.as_ref().and_then(|s| s.parse::<i64>().ok()),
+								&rom.crc,
+								&rom.md5,
+								&rom.sha1,
+								&rom.sha256,
+							);
+							if !existing_files_set.contains(&identifier) {
+								to_insert.push(rom.clone());
+							}
+						}
+
+						// When we insert too many sqlx-postgres panics, so we chunk the inserts
+						for chunk in to_insert.chunks(25) {
+							insert_game_file_bulk(chunk.to_vec(), existing_game.id, &conn).await?;
+						}
+
 						return Ok(());
 					}
 
