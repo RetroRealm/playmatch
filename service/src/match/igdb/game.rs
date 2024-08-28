@@ -85,12 +85,10 @@ async fn match_clone_of_game_to_igdb(
 				.await?;
 
 				return Ok(());
-			} else {
-				match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
 			}
-		} else {
-			match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
 		}
+
+		match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
 
 		let mapping = find_game_signature_metadata_mapping(&game, &db_conn).await?;
 
@@ -112,8 +110,6 @@ async fn match_clone_of_game_to_igdb(
 			}
 		}
 	}
-
-	match_game_to_igdb(&game, igdb_client.clone(), db_conn.clone()).await?;
 
 	Ok(())
 }
