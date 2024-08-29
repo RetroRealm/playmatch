@@ -1,3 +1,4 @@
+use crate::db::abstraction::ColumnNullTrait;
 use derive_builder::Builder;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
@@ -37,9 +38,9 @@ pub async fn create_or_update_signature_metadata_mapping(
 	db_conn: &DbConn,
 ) -> anyhow::Result<signature_metadata_mapping::Model> {
 	let signature_metadata_mapping = signature_metadata_mapping::Entity::find()
-		.filter(signature_metadata_mapping::Column::PlatformId.eq(input.platform_id))
-		.filter(signature_metadata_mapping::Column::GameId.eq(input.game_id))
-		.filter(signature_metadata_mapping::Column::CompanyId.eq(input.company_id))
+		.filter(signature_metadata_mapping::Column::PlatformId.eq_null(input.platform_id))
+		.filter(signature_metadata_mapping::Column::GameId.eq_null(input.game_id))
+		.filter(signature_metadata_mapping::Column::CompanyId.eq_null(input.company_id))
 		.filter(signature_metadata_mapping::Column::Provider.eq(input.provider.clone()))
 		.one(db_conn)
 		.await?;

@@ -1,3 +1,4 @@
+use crate::db::abstraction::ColumnNullTrait;
 use entity::dat_file;
 use entity::prelude::DatFile;
 use sea_orm::prelude::Uuid;
@@ -27,7 +28,7 @@ pub async fn create_or_update_dat_file(
 	let dat_file = DatFile::find()
 		.filter(dat_file::Column::SignatureGroupId.eq(input.signature_group_id))
 		.filter(dat_file::Column::Name.eq(input.sanitized_file_name.clone()))
-		.filter(dat_file::Column::CompanyId.eq(input.company_id))
+		.filter(dat_file::Column::CompanyId.eq_null(input.company_id))
 		.filter(dat_file::Column::PlatformId.eq(input.platform_id))
 		.one(conn)
 		.await?;
