@@ -7,6 +7,22 @@ use.
 
 The public API is available at [playmatch.retrorealm.dev](https://playmatch.retrorealm.dev/swagger-ui/)
 
+## Features
+
+### Supported
+
+- [x] Supports No-Intro and Redump dat files
+- [x] Automatically daily downloads and updates dat files
+- [x] Hash dat files to skip daily import if nothing changed
+- [x] Support for IGDB as metadata provider
+
+### Planned
+
+- [ ] Support for more dat files sources (TOSEC, MAME, GoodTools, etc)
+- [ ] Support for more metadata providers (MobyGames, etc)
+- [ ] Add all IGDB endpoints to proxy
+- [ ] Support bios and other non-game files which you can also hash and verify this way
+
 ## Getting Started
 
 ### Prerequisites
