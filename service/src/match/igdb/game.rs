@@ -13,7 +13,7 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use log::{debug, error, info};
+use log::{debug, error};
 use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
 use std::pin::Pin;
