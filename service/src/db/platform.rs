@@ -5,8 +5,8 @@ use entity::{dat_file, dat_file_import, game, platform, signature_metadata_mappi
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, ModelTrait, Paginator,
-	PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, SelectModel, TryIntoModel,
+	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, ModelTrait, QueryFilter,
+	QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
 };
 
 pub async fn create_or_find_platform_by_name(
@@ -34,11 +34,11 @@ pub async fn create_or_find_platform_by_name(
 	}
 }
 
-pub fn get_platforms_unmatched_paginator(
-	page_size: u64,
+pub async fn get_unmatched_platforms_with_limit(
+	limit: u64,
 	conn: &DbConn,
-) -> Paginator<DbConn, SelectModel<platform::Model>> {
-	Platform::find()
+) -> anyhow::Result<Option<Vec<platform::Model>>> {
+	let res = Platform::find()
 		.left_join(signature_metadata_mapping::Entity)
 		.filter(
 			signature_metadata_mapping::Column::Id
@@ -46,7 +46,15 @@ pub fn get_platforms_unmatched_paginator(
 				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
 		)
 		.order_by_asc(platform::Column::Id)
-		.paginate(conn, page_size)
+		.limit(limit)
+		.all(conn)
+		.await?;
+
+	if res.is_empty() {
+		Ok(None)
+	} else {
+		Ok(Some(res))
+	}
 }
 
 pub async fn find_platform_of_game(

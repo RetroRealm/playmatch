@@ -1,13 +1,13 @@
-use crate::db::platform::get_platforms_unmatched_paginator;
+use crate::db::platform::get_unmatched_platforms_with_limit;
 use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
 };
 use crate::metadata::igdb::IgdbClient;
-use crate::r#match::igdb::{handle_db_pagination_chunked, PAGE_SIZE};
+use crate::r#match::igdb::{IGDB_CHUNK_SIZE, PAGE_SIZE};
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
-use log::debug;
+use log::{debug, error};
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -15,17 +15,25 @@ pub async fn match_platforms_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	let platform_paginator = get_platforms_unmatched_paginator(PAGE_SIZE, db_conn);
+	while let Some(inner_page) = get_unmatched_platforms_with_limit(PAGE_SIZE, db_conn).await? {
+		for inner_chunk in inner_page.chunks(IGDB_CHUNK_SIZE) {
+			let mut results = vec![];
 
-	handle_db_pagination_chunked(
-		platform_paginator,
-		igdb_client,
-		db_conn.clone(),
-		|t, arc, connection| {
-			tokio::spawn(async move { match_platform_to_igdb(t, arc, connection).await })
-		},
-	)
-	.await?;
+			for inner in inner_chunk.iter().cloned() {
+				let igdb_client = igdb_client.clone();
+				let db_conn = db_conn.clone();
+				results.push(tokio::spawn({
+					match_platform_to_igdb(inner, igdb_client.clone(), db_conn)
+				}));
+			}
+
+			for result in results {
+				if let Err(e) = result.await? {
+					error!("Error while matching platform to IGDB: {:?}", e);
+				}
+			}
+		}
+	}
 
 	Ok(())
 }

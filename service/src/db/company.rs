@@ -4,8 +4,8 @@ use entity::sea_orm_active_enums::MatchTypeEnum;
 use entity::{company, signature_metadata_mapping};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, Paginator, PaginatorTrait,
-	QueryFilter, QueryOrder, SelectModel, TryIntoModel,
+	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter, QueryOrder,
+	QuerySelect, TryIntoModel,
 };
 
 pub async fn create_or_find_company_by_name(
@@ -31,11 +31,11 @@ pub async fn create_or_find_company_by_name(
 	}
 }
 
-pub fn get_companies_unmatched_paginator(
-	page_size: u64,
+pub async fn get_unmatched_companies_with_limit(
+	limit: u64,
 	db_conn: &DbConn,
-) -> Paginator<DbConn, SelectModel<company::Model>> {
-	Company::find()
+) -> anyhow::Result<Option<Vec<company::Model>>> {
+	let found_companies = Company::find()
 		.left_join(signature_metadata_mapping::Entity)
 		.filter(
 			signature_metadata_mapping::Column::Id
@@ -43,5 +43,13 @@ pub fn get_companies_unmatched_paginator(
 				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
 		)
 		.order_by_asc(company::Column::Id)
-		.paginate(db_conn, page_size)
+		.limit(limit)
+		.all(db_conn)
+		.await?;
+
+	if found_companies.is_empty() {
+		Ok(None)
+	} else {
+		Ok(Some(found_companies))
+	}
 }
