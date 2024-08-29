@@ -1,4 +1,3 @@
-pub mod clone;
 mod company;
 mod game;
 mod platform;
@@ -13,7 +12,6 @@ use regex::Regex;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
-const PAGE_SIZE: u64 = 100;
 const IGDB_CHUNK_SIZE: usize = 4;
 
 lazy_static! {
