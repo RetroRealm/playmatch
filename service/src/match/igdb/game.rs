@@ -129,8 +129,8 @@ fn match_clone_of_game_to_igdb<'a>(
 			let mapping = find_game_signature_metadata_mapping(&game, &db_conn).await?;
 
 			if let Some(mapping) = mapping {
-				if mapping.match_type == MatchTypeEnum::Automatic
-					|| mapping.match_type == MatchTypeEnum::Manual
+				if mapping.match_type != MatchTypeEnum::Automatic
+					&& mapping.match_type != MatchTypeEnum::Manual
 				{
 					debug!("Matched Game with parent which is not matched, overriding parent mapping... (Via Child)");
 
