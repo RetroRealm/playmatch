@@ -43,7 +43,7 @@ pub async fn match_games_to_igdb(
 		db_conn,
 	)
 	.await?;
-	info!("Finished matching games without clone_of id to IGDB");
+	debug!("Finished matching games without clone_of id to IGDB");
 
 	match_games_in_batches(
 		get_unmatched_games_with_clone_of_with_limit,
@@ -52,7 +52,7 @@ pub async fn match_games_to_igdb(
 		db_conn,
 	)
 	.await?;
-	info!("Finished matching games with clone_of id to IGDB");
+	debug!("Finished matching games with clone_of id to IGDB");
 
 	Ok(())
 }
