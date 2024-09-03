@@ -59,7 +59,7 @@ pub async fn match_game_if_possible(
 
 	Ok(response_body.unwrap_or(GameMatchResult {
 		game_match_type: GameMatchType::NoMatch,
-		playmatch_id: None,
+		id: None,
 		external_metadata: Vec::new(),
 	}))
 }
@@ -71,7 +71,7 @@ fn build_result(
 ) -> anyhow::Result<GameMatchResult> {
 	let result = GameMatchResultBuilder::default()
 		.game_match_type(game_match_type)
-		.playmatch_id(Some(game.id))
+		.id(Some(game.id))
 		.external_metadata(
 			signature_metadata_mappings
 				.into_iter()

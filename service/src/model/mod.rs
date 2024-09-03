@@ -11,79 +11,146 @@ use utoipa::{IntoParams, ToSchema};
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct GameFileMatchSearch {
+	/// The file name of the game file.
 	pub file_name: String,
+
+	/// The size of the game file in bytes.
 	pub file_size: i64,
+
+	/// Optional MD5 hash of the game file.
 	pub md5: Option<String>,
+
+	/// Optional SHA1 hash of the game file.
 	pub sha1: Option<String>,
+
+	/// Optional SHA256 hash of the game file.
 	pub sha256: Option<String>,
 }
 
+/// Type of match for this game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, ToSchema)]
 pub enum GameMatchType {
+	/// Matched by SHA256 hash.
 	SHA256,
+
+	/// Matched by SHA1 hash.
 	SHA1,
+
+	/// Matched by MD5 hash.
 	MD5,
+
+	/// Matched by file name and size.
 	FileNameAndSize,
+
+	/// No match found.
 	NoMatch,
 }
 
+/// Result of a game match.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameMatchResult {
+	/// The type of match that was found.
 	pub game_match_type: GameMatchType,
-	pub playmatch_id: Option<Uuid>,
+
+	/// If a match was found, the ID of the matched game.
+	pub id: Option<Uuid>,
+
+	/// External metadata for the matched game.
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub external_metadata: Vec<ExternalMetadata>,
 }
 
+/// External metadata for a game.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalMetadata {
+	/// The Name of the metadata provider.
 	pub provider_name: MetadataProvider,
+
+	/// The ID of the game for this provider.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider_id: Option<String>,
+
+	/// Type of how this game was matched to this Provider
 	pub match_type: MatchType,
+
+	/// Optional Comment about the match.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub comment: Option<String>,
+
+	/// Optional Type of manual match
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub manual_match_type: Option<ManualMatchMode>,
+
+	/// Optional Reason why the match failed
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub failed_match_reason: Option<FailedMatchReason>,
+
+	/// Optional Reason for automatic match
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub automatic_match_reason: Option<AutomaticMatchReason>,
 }
 
+/// Metadata provider for games.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum MetadataProvider {
+	/// IGDB (https://www.igdb.com/)
 	IGDB,
 }
 
+/// Match types for a game
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum MatchType {
+	/// The game was automatically matched.
 	Automatic,
+
+	/// Automatic game matching failed and no manual match was done.
 	Failed,
+
+	/// The game was manually matched
 	Manual,
+
+	/// No match was done.
 	None,
 }
 
+/// How a game was manually matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum ManualMatchMode {
+	/// Game was manually matched by an Admin, which is the most trusted match.
 	Admin,
+
+	/// Game was manually matched by the community, via Discord.
 	Community,
+
+	/// Game was manually matched by a trusted user
 	Trusted,
 }
 
+/// Reason why an automatic match failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum FailedMatchReason {
+	/// No direct match was found.
 	NoDirectMatch,
+
+	/// Too many direct matches were found.
 	TooManyMatches,
 }
 
+/// Reason why a game was automatically matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum AutomaticMatchReason {
+	/// Matched by an alternative name which was exactly matching the title.
 	AlternativeName,
+
+	/// Matched by the direct name which was exactly matching the title.
 	DirectName,
+
+	/// A Game which is a clone of this game (a different version) was matched.
 	ViaChild,
+
+	/// A Game which this game is a clone of (a different version) was matched.
 	ViaParent,
 }
 
