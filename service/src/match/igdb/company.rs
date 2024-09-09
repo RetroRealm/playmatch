@@ -23,9 +23,11 @@ pub async fn match_companies_to_igdb(
 			for inner in inner_chunk.iter().cloned() {
 				let igdb_client = igdb_client.clone();
 				let db_conn = db_conn.clone();
-				results.push(tokio::spawn({
-					match_company_to_igdb(inner, igdb_client.clone(), db_conn)
-				}));
+				results.push(tokio::spawn(match_company_to_igdb(
+					inner,
+					igdb_client.clone(),
+					db_conn,
+				)));
 			}
 
 			for result in results {

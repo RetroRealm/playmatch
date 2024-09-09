@@ -71,9 +71,7 @@ pub async fn match_games_in_batches(
 			for game in page_chunks.iter().cloned() {
 				let igdb_client = igdb_client.clone();
 				let db_conn = db_conn.clone();
-				results.push(tokio::spawn({
-					match_fn(game, igdb_client.clone(), db_conn)
-				}));
+				results.push(tokio::spawn(match_fn(game, igdb_client.clone(), db_conn)));
 			}
 
 			for result in results {
