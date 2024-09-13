@@ -1,3 +1,4 @@
+use crate::routes::health::{__path_health, __path_ready};
 use crate::routes::identify::__path_identify;
 use crate::routes::igdb::{
 	__path_get_age_rating_by_id, __path_get_age_ratings_by_ids, __path_get_alternative_name_by_id,
@@ -22,6 +23,8 @@ use utoipa::OpenApi;
 #[derive(OpenApi)]
 #[openapi(
 	paths(
+		health,
+		ready,
 		identify,
 		get_game_by_id,
 		get_games_by_ids,

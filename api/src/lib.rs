@@ -1,3 +1,4 @@
+use crate::routes::health::{health, ready};
 use crate::routes::identify::identify;
 use crate::routes::igdb::{
 	get_age_rating_by_id, get_age_ratings_by_ids, get_alternative_name_by_id,
@@ -86,6 +87,8 @@ async fn start() -> anyhow::Result<()> {
 						"%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T",
 					))
 					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API.clone())))
+					.service(health)
+					.service(ready)
 					.service(identify)
 					.service(get_game_by_id)
 					.service(get_games_by_ids)
