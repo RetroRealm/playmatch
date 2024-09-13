@@ -37,7 +37,7 @@ async fn start() -> anyhow::Result<()> {
 	let port = env::var("PORT").unwrap_or("8080".to_string());
 	let worker_amount = match env::var("HTTP_WORKERS") {
 		Ok(workers) => workers.parse::<usize>()?,
-		Err(_) => *service::constants::PARALLELISM,
+		Err(_) => *service::constants::CPU_COUNT,
 	};
 
 	// Allow bursts with up to 20 requests per IP address
