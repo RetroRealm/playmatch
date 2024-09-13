@@ -1,7 +1,6 @@
 use dotenvy::dotenv;
 use env_logger::Env;
 use log::info;
-use service::http;
 
 pub mod built_info {
 	// The file has been placed there by the build script.
@@ -21,13 +20,11 @@ fn main() {
 		built_info::BUILT_TIME_UTC
 	);
 
-	// Safety: This is only mutated in the main function
-	unsafe {
-		http::constants::REQWEST_DEFAULT_USER_AGENT =
-			format!("{}/{}", built_info::PKG_NAME, built_info::PKG_VERSION);
-
-		http::constants::X_VERSION_HEADER_API = built_info::PKG_VERSION.to_string();
-	}
+	std::env::set_var(
+		"REQWEST_DEFAULT_USER_AGENT",
+		format!("{}/{}", built_info::PKG_NAME, built_info::PKG_VERSION),
+	);
+	std::env::set_var("X_VERSION_HEADER_API", built_info::PKG_VERSION);
 
 	api::main();
 }

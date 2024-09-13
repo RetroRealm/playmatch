@@ -16,8 +16,8 @@ use migration::{Migrator, MigratorTrait};
 use openapi::ApiDoc;
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
+use service::constants::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
-use service::http::constants::X_VERSION_HEADER_API;
 use service::metadata::igdb::IgdbClient;
 use std::env;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ async fn start() -> anyhow::Result<()> {
 	let port = env::var("PORT").unwrap_or("8080".to_string());
 	let worker_amount = match env::var("HTTP_WORKERS") {
 		Ok(workers) => workers.parse::<usize>()?,
-		Err(_) => num_cpus::get(),
+		Err(_) => *service::constants::PARALLELISM,
 	};
 
 	// Allow bursts with up to 20 requests per IP address
@@ -74,7 +74,7 @@ async fn start() -> anyhow::Result<()> {
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
 	// Safety: X_VERSION_HEADER_API is only mutated in the main function
-	let serv = HttpServer::new(move || unsafe {
+	let serv = HttpServer::new(move || {
 		App::new()
 			.wrap(Compress::default())
 			.app_data(conn_data.clone())

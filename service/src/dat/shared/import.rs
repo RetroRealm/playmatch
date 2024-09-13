@@ -11,6 +11,7 @@ use log::info;
 use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
 
+use crate::constants::PARALLELISM;
 use sea_orm::{ActiveModelTrait, DbConn, IntoActiveModel};
 use std::path::Path;
 use tokio::fs::File;
@@ -65,7 +66,7 @@ pub async fn parse_and_import_dat_file(
 
 	if let Some(games) = dat.game {
 		let games_chunked = games
-			.chunks(64)
+			.chunks(*PARALLELISM)
 			.map(|x: &[Game]| x.to_vec())
 			.collect::<Vec<Vec<Game>>>();
 
@@ -145,7 +146,7 @@ pub async fn parse_and_import_dat_file(
 						}
 
 						// When we insert too many sqlx-postgres panics, so we chunk the inserts
-						for chunk in to_insert.chunks(25) {
+						for chunk in to_insert.chunks(*PARALLELISM) {
 							insert_game_file_bulk(chunk.to_vec(), existing_game.id, &conn).await?;
 						}
 
@@ -155,7 +156,7 @@ pub async fn parse_and_import_dat_file(
 					let game_release = insert_game(import.id, game.clone(), &conn).await?;
 
 					// When we insert too many sqlx-postgres panics, so we chunk the inserts
-					for chunk in game.rom.chunks(25) {
+					for chunk in game.rom.chunks(*PARALLELISM) {
 						insert_game_file_bulk(chunk.to_vec(), game_release.id, &conn).await?;
 					}
 

@@ -19,7 +19,6 @@ serde_repr = "^0.1"
 anyhow = "^1.0"
 thiserror = "^1"
 log = "^0.4"
-num_cpus = "^1.16"
 actix-governor = "^0.5"
 utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono"] }
 utoipa-swagger-ui = { version = "^7.1", features = ["actix-web"] }

@@ -1,3 +1,4 @@
+use crate::constants::PARALLELISM;
 use crate::db::dat_file::find_all_dat_files;
 use crate::db::game::{
 	find_game_by_signature_group_internal_id_and_dat_file_id, get_dat_file_id_of_game,
@@ -25,13 +26,12 @@ pub async fn populate_clone_of_id(dat_file_id: Uuid, conn: &DbConn) -> anyhow::R
 	let mut paginator = get_unpopulated_clone_of_games(dat_file_id, PAGE_SIZE, conn);
 
 	while let Some(games_to_match) = paginator.fetch_and_next().await? {
-		for games_chunk in games_to_match.chunks(25).map(|x| x.to_vec()) {
+		for games_chunk in games_to_match.chunks(*PARALLELISM) {
 			let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
-			for game in games_chunk {
+
+			for game in games_chunk.iter() {
 				let conn = conn.clone();
-				futures.push(tokio::spawn(
-					async move { try_match_parent(game, &conn).await },
-				));
+				futures.push(tokio::spawn(try_match_parent(game.clone(), conn)));
 			}
 
 			for future in futures {
@@ -45,14 +45,14 @@ pub async fn populate_clone_of_id(dat_file_id: Uuid, conn: &DbConn) -> anyhow::R
 	Ok(())
 }
 
-async fn try_match_parent(game: game::Model, conn: &DbConn) -> anyhow::Result<()> {
+async fn try_match_parent(game: game::Model, conn: DbConn) -> anyhow::Result<()> {
 	if let Some(signature_group_internal_clone_of_id) = &game.signature_group_internal_clone_of_id {
-		let dat_file_id = get_dat_file_id_of_game(&game, conn).await?;
+		let dat_file_id = get_dat_file_id_of_game(&game, &conn).await?;
 
 		let game_parent = find_game_by_signature_group_internal_id_and_dat_file_id(
 			signature_group_internal_clone_of_id.clone(),
 			dat_file_id,
-			conn,
+			&conn,
 		)
 		.await?;
 
@@ -61,7 +61,7 @@ async fn try_match_parent(game: game::Model, conn: &DbConn) -> anyhow::Result<()
 
 			game_active_model.clone_of = Set(Some(game_parent.id));
 
-			game_active_model.save(conn).await?;
+			game_active_model.save(&conn).await?;
 		}
 	}
 
