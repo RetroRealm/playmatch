@@ -10,7 +10,7 @@ impl<E> Policy<Request, Response, E> for RetryPolicy {
 	type Future = future::Ready<()>;
 
 	fn retry(&mut self, _: &mut Request, result: &mut Result<Response, E>) -> Option<Self::Future> {
-		if self.0 <= 0 {
+		if self.0 == 0 {
 			return None;
 		}
 
