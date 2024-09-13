@@ -1,3 +1,4 @@
+use crate::constants::PARALLELISM;
 use crate::dat::no_intro::download::download_no_intro_dats;
 use crate::dat::redump::download::download_redump_dats;
 use crate::dat::shared::import::parse_and_import_dat_file;
@@ -29,7 +30,28 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 
 	let files = read_files_recursive(&PathBuf::from(DATS_PATH)).await?;
 
-	for file in files {
+	let mut file_hashes = Vec::with_capacity(files.len());
+
+	for file_chunk in files.chunks(*PARALLELISM) {
+		let mut futures = vec![];
+
+		for file in file_chunk {
+			let file = file.to_owned();
+			futures.push(tokio::spawn(async move {
+				let md5_hash = calculate_md5(&file).await?;
+
+				Ok::<(String, PathBuf), anyhow::Error>((md5_hash, file))
+			}));
+		}
+
+		for future in futures {
+			let output = future.await??;
+
+			file_hashes.push((output.0, output.1));
+		}
+	}
+
+	for (hash, file) in file_hashes {
 		let file_name = file
 			.file_name()
 			.unwrap_or_default()
@@ -41,6 +63,21 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			.unwrap_or_default()
 			.to_str()
 			.unwrap_or_default();
+
+		if extension != "dat" || file_name.contains("BIOS") {
+			debug!(
+				"Skipping file: {:?}, either has no .dat file extension or contains BIOS",
+				file_name
+			);
+			continue;
+		}
+
+		let already_imported = is_dat_already_in_history(&hash, conn).await?;
+
+		if already_imported {
+			debug!("Dat file already imported: {:?}", file);
+			continue;
+		}
 
 		let path_canonical = file.canonicalize()?;
 
@@ -80,25 +117,8 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			}
 		};
 
-		if extension != "dat" || file_name.contains("BIOS") {
-			debug!(
-				"Skipping file: {:?}, either has no .dat file extension or contains BIOS",
-				file_name
-			);
-			continue;
-		}
-
-		let md5_hash = calculate_md5(&file).await?;
-
-		let already_imported = is_dat_already_in_history(&md5_hash, conn).await?;
-
-		if already_imported {
-			debug!("Dat file already imported: {:?}", file);
-			continue;
-		}
-
 		if let Err(e) =
-			parse_and_import_dat_file(&file, signature_group_entity.id, &md5_hash, conn).await
+			parse_and_import_dat_file(&file, signature_group_entity.id, &hash, conn).await
 		{
 			error!("Failed to parse and import dat file: {:?}, {}", file, e);
 		}
