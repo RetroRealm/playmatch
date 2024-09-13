@@ -73,7 +73,6 @@ async fn start() -> anyhow::Result<()> {
 	let client_data = Data::from(client_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
-	// Safety: X_VERSION_HEADER_API is only mutated in the main function
 	let serv = HttpServer::new(move || {
 		App::new()
 			.wrap(Compress::default())
