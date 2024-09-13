@@ -40,6 +40,8 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			futures.push(tokio::spawn(async move {
 				let md5_hash = calculate_md5(&file).await?;
 
+				debug!("Calculated MD5 hash for file: {:?}", file);
+
 				Ok::<(String, PathBuf), anyhow::Error>((md5_hash, file))
 			}));
 		}
