@@ -7,18 +7,20 @@ use tower::retry::Policy;
 pub struct RetryPolicy(pub usize);
 
 impl<E> Policy<Request, Response, E> for RetryPolicy {
-	type Future = future::Ready<RetryPolicy>;
+	type Future = future::Ready<()>;
 
-	fn retry(&self, _: &Request, result: Result<&Response, &E>) -> Option<Self::Future> {
-		if self.0 == 0 {
+	fn retry(&mut self, _: &mut Request, result: &mut Result<Response, E>) -> Option<Self::Future> {
+		if self.0 <= 0 {
 			return None;
 		}
 
 		if result.is_err() {
-			Some(future::ready(RetryPolicy(self.0 - 1)))
+			self.0 -= 1;
+			Some(future::ready(()))
 		} else if let Ok(res) = result {
 			if res.status().is_server_error() {
-				Some(future::ready(RetryPolicy(self.0 - 1)))
+				self.0 -= 1;
+				Some(future::ready(()))
 			} else {
 				None
 			}
@@ -27,7 +29,7 @@ impl<E> Policy<Request, Response, E> for RetryPolicy {
 		}
 	}
 
-	fn clone_request(&self, req: &Request) -> Option<Request> {
+	fn clone_request(&mut self, req: &Request) -> Option<Request> {
 		req.try_clone()
 	}
 }
