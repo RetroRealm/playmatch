@@ -80,21 +80,23 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			}
 		};
 
-		if extension == "dat" && !file_name.contains("BIOS") {
-			let md5_hash = calculate_md5(&file).await?;
+		if extension != "dat" || file_name.contains("BIOS") {
+			continue;
+		}
 
-			let already_imported = is_dat_already_in_history(&md5_hash, conn).await?;
+		let md5_hash = calculate_md5(&file).await?;
 
-			if already_imported {
-				debug!("Dat file already imported: {:?}", file);
-				continue;
-			}
+		let already_imported = is_dat_already_in_history(&md5_hash, conn).await?;
 
-			if let Err(e) =
-				parse_and_import_dat_file(&file, signature_group_entity.id, &md5_hash, conn).await
-			{
-				error!("Failed to parse and import dat file: {:?}, {}", file, e);
-			}
+		if already_imported {
+			debug!("Dat file already imported: {:?}", file);
+			continue;
+		}
+
+		if let Err(e) =
+			parse_and_import_dat_file(&file, signature_group_entity.id, &md5_hash, conn).await
+		{
+			error!("Failed to parse and import dat file: {:?}, {}", file, e);
 		}
 	}
 
