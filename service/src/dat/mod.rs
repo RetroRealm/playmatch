@@ -81,6 +81,10 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 		};
 
 		if extension != "dat" || file_name.contains("BIOS") {
+			debug!(
+				"Skipping file: {:?}, either has no .dat file extension or contains BIOS",
+				file_name
+			);
 			continue;
 		}
 
