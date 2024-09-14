@@ -32,6 +32,7 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 
 	let mut file_hashes = Vec::with_capacity(files.len());
 
+	info!("Calculating MD5 hashes for DAT files, this may take a bit");
 	for file_chunk in files.chunks(*PARALLELISM) {
 		let mut futures = vec![];
 
@@ -52,6 +53,7 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			file_hashes.push((output.0, output.1));
 		}
 	}
+	info!("Finished calculating MD5 hashes for DAT files");
 
 	for (hash, file) in file_hashes {
 		let file_name = file
@@ -125,8 +127,10 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			error!("Failed to parse and import dat file: {:?}, {}", file, e);
 		}
 	}
+	info!("Finished importing all DAT files");
 
 	populate_all_clone_of_ids(conn).await?;
+	info!("Finished populating all clone_of relationships");
 
 	Ok(())
 }
