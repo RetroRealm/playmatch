@@ -1,1 +1,1 @@
-pub(crate) mod igdb;
+pub mod igdb;
