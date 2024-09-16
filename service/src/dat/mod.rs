@@ -19,14 +19,21 @@ mod redump;
 pub mod shared;
 
 const DATS_PATH: &str = "dats";
+const TMP_PATH: &str = "tmp";
 
 pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::Result<()> {
+	let current_dir = std::env::current_dir()?;
+	let tmp_dir = current_dir.join(DATS_PATH).join(TMP_PATH);
+	tokio::fs::create_dir_all(&tmp_dir).await?;
+
 	info!("Starting to download No-Intro DATs.");
 	download_no_intro_dats(client).await?;
 	info!("Successfully downloaded No-Intro DATs");
 	info!("Starting to download Redump DATs.");
 	download_redump_dats(client).await?;
 	info!("Successfully downloaded Redump DATs");
+
+	tokio::fs::remove_dir_all(&tmp_dir).await?;
 
 	let files = read_files_recursive(&PathBuf::from(DATS_PATH)).await?;
 

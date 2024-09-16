@@ -1,6 +1,6 @@
 use crate::dat::shared::download::{delete_old_and_move_new_files, download_dat};
 use crate::dat::shared::zip::extract_if_archived;
-use crate::dat::DATS_PATH;
+use crate::dat::{DATS_PATH, TMP_PATH};
 use log::error;
 use reqwest::Client;
 use tokio::fs;
@@ -10,8 +10,9 @@ const DOWNLOAD_URL: &str = "https://dats.retrorealm.dev/redump/daily";
 
 pub async fn download_redump_dats(client: &Client) -> anyhow::Result<()> {
 	let current_dir = std::env::current_dir()?;
-	let redump_dir = current_dir.join(DATS_PATH).join(REDUMP_NAME);
-	let redump_tmp_dir = redump_dir.join("tmp");
+	let dat_dir = current_dir.join(DATS_PATH);
+	let redump_tmp_dir = dat_dir.join(TMP_PATH).join(REDUMP_NAME);
+	let redump_dir = dat_dir.join(REDUMP_NAME);
 	fs::create_dir_all(&redump_tmp_dir).await?;
 
 	let path = download_dat(client, DOWNLOAD_URL, &redump_tmp_dir).await?;

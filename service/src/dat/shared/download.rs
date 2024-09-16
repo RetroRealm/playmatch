@@ -1,4 +1,4 @@
-use crate::fs::{read_files, read_files_recursive};
+use crate::fs::{read_files_recursive, read_folders};
 use crate::http::download::{download_file, DownloadFileNameResult};
 use log::debug;
 use reqwest::Client;
@@ -33,11 +33,24 @@ pub async fn delete_old_and_move_new_files(
 	tmp_dir: &Path,
 	should_keep_subfolders: bool,
 ) -> anyhow::Result<()> {
+	tokio::fs::create_dir_all(main_dir).await?;
 	let main_dir = main_dir.canonicalize()?;
-	let old_files = read_files(&main_dir).await?;
 
-	for old_file in &old_files {
-		fs::remove_file(old_file).await?
+	let main_dir_exists = tokio::fs::try_exists(&main_dir).await.unwrap_or(false);
+
+	if main_dir_exists {
+		debug!("Deleting old files and folders in: {:?}", main_dir);
+		let old_folders = read_folders(&main_dir).await?;
+
+		for old_folder in &old_folders {
+			fs::remove_dir_all(old_folder).await?
+		}
+
+		let old_files = read_files_recursive(&main_dir).await?;
+
+		for old_file in &old_files {
+			fs::remove_file(old_file).await?
+		}
 	}
 
 	let tmp_files = read_files_recursive(tmp_dir).await?;
