@@ -128,11 +128,13 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 			}
 		};
 
+		debug!("Importing DAT file: {:?}", file);
 		if let Err(e) =
 			parse_and_import_dat_file(&file, signature_group_entity.id, &hash, conn).await
 		{
 			error!("Failed to parse and import dat file: {:?}, {}", file, e);
 		}
+		info!("Imported DAT file: {}", file.display());
 	}
 	info!("Finished importing all DAT files");
 

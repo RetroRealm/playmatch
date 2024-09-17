@@ -170,8 +170,6 @@ pub async fn parse_and_import_dat_file(
 		}
 	}
 
-	info!("Imported DAT file: {}", path.display());
-
 	Ok(())
 }
 
