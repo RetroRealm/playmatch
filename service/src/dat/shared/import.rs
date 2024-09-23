@@ -7,7 +7,6 @@ use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
 use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
 use crate::db::platform::create_or_find_platform_by_name;
 use entity::{company, dat_file_import, platform};
-use log::info;
 use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
 
