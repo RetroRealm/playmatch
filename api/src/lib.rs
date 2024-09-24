@@ -47,7 +47,7 @@ async fn start() -> anyhow::Result<()> {
 	// and replenishes four element every seconds
 	let governor_conf = GovernorConfigBuilder::default()
 		.use_headers()
-		.per_millisecond(250)
+		.milliseconds_per_request(250)
 		.burst_size(20)
 		.finish()
 		.unwrap();
