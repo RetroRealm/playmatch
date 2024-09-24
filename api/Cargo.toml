@@ -20,7 +20,7 @@ anyhow = "^1.0"
 thiserror = "^1"
 log = "^0.4"
 actix-governor = "^0.5"
-utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono"] }
+utoipa = { version = "^4.2", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
 utoipa-swagger-ui = { version = "^7.1", features = ["actix-web"] }
 uuid = "^1.10"
 derive_builder = "^0.20"
