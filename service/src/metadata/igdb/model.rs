@@ -1178,6 +1178,7 @@ pub struct PopularityPrimitive {
 	pub popularity_type: i32,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
+	#[schema(value_type = String)]
 	pub value: BigDecimal,
 }
 
