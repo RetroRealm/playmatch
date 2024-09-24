@@ -1,4 +1,4 @@
-use crate::routes::company::__path_get_all_companies;
+use crate::routes::company::{__path_get_all_companies, __path_get_company_by_id};
 use crate::routes::health::{__path_health, __path_ready};
 use crate::routes::identify::__path_identify;
 use crate::routes::igdb::{
@@ -10,7 +10,7 @@ use crate::routes::igdb::{
 	__path_get_games_by_ids, __path_get_genre_by_id, __path_get_genres_by_ids,
 	__path_search_game_by_name,
 };
-use crate::routes::platform::__path_get_all_platforms;
+use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
 	AgeRatingEnum, AlternativeName, Artwork, Character, CharacterGender, CharacterSpecies,
@@ -60,7 +60,9 @@ use utoipa::OpenApi;
 		get_genre_by_id,
 		get_genres_by_ids,
 		get_all_companies,
-		get_all_platforms
+		get_company_by_id,
+		get_all_platforms,
+		get_platform_by_id
 	),
 	components(schemas(
 		GameMatchResult,

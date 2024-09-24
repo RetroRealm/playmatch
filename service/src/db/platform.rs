@@ -9,6 +9,36 @@ use sea_orm::{
 	QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
 };
 
+pub async fn get_by_id_and_join_company_and_signature_metadata_mappings(
+	id: Uuid,
+	conn: &DbConn,
+) -> Result<
+	Option<(
+		platform::Model,
+		Option<company::Model>,
+		Vec<signature_metadata_mapping::Model>,
+	)>,
+	DbErr,
+> {
+	let platform = Platform::find()
+		.filter(platform::Column::Id.eq(id))
+		.one(conn)
+		.await?;
+
+	if let Some(platform) = platform {
+		let company = platform.find_related(company::Entity).one(conn).await?;
+
+		let signature_metadata_mappings = platform
+			.find_related(signature_metadata_mapping::Entity)
+			.all(conn)
+			.await?;
+
+		Ok(Some((platform, company, signature_metadata_mappings)))
+	} else {
+		Ok(None)
+	}
+}
+
 pub async fn find_all_and_join_company_and_signature_metadata_mappings(
 	conn: &DbConn,
 ) -> Result<
