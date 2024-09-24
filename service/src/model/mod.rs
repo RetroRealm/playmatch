@@ -61,7 +61,45 @@ pub struct GameMatchResult {
 	pub external_metadata: Vec<ExternalMetadata>,
 }
 
-/// External metadata for a game.
+/// Response for a company including external metadata.
+#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanyResponse {
+	/// The ID of the company.
+	pub id: Uuid,
+
+	/// The name of the company.
+	pub name: String,
+
+	/// External metadata for the company.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
+}
+
+/// Response for a platform including external metadata.
+#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformResponse {
+	/// The ID of the platform.
+	pub id: Uuid,
+
+	/// The name of the platform.
+	pub name: String,
+
+	/// Optional name of the company that made the platform.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub company_name: Option<String>,
+
+	/// Optional ID of the company that made the platform.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub company_id: Option<Uuid>,
+
+	/// External metadata for the platform.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
+}
+
+/// External metadata for a game/platform/company.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalMetadata {
@@ -92,7 +130,7 @@ pub struct ExternalMetadata {
 	pub automatic_match_reason: Option<AutomaticMatchReason>,
 }
 
-/// Metadata provider for games.
+/// Metadata provider for game/platform/company.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum MetadataProvider {
 	/// IGDB (https://www.igdb.com/)
@@ -152,6 +190,20 @@ pub enum AutomaticMatchReason {
 
 	/// A Game which this game is a clone of (a different version) was matched.
 	ViaParent,
+}
+
+impl From<entity::signature_metadata_mapping::Model> for ExternalMetadata {
+	fn from(value: entity::signature_metadata_mapping::Model) -> Self {
+		ExternalMetadata {
+			provider_name: value.provider.into(),
+			provider_id: value.provider_id,
+			match_type: value.match_type.into(),
+			comment: value.comment,
+			manual_match_type: value.manual_match_type.map(Into::into),
+			failed_match_reason: value.failed_match_reason.map(Into::into),
+			automatic_match_reason: value.automatic_match_reason.map(Into::into),
+		}
+	}
 }
 
 impl From<MetadataProviderEnum> for MetadataProvider {

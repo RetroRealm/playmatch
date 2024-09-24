@@ -8,6 +8,17 @@ use sea_orm::{
 	QuerySelect, TryIntoModel,
 };
 
+pub async fn find_all_and_join_signature_metadata_mapping(
+	conn: &DbConn,
+) -> Result<Vec<(company::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	let companies_with_mappings = company::Entity::find()
+		.find_with_related(signature_metadata_mapping::Entity)
+		.all(conn)
+		.await?;
+
+	Ok(companies_with_mappings)
+}
+
 pub async fn create_or_find_company_by_name(
 	name: &str,
 	conn: &DbConn,

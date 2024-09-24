@@ -1,3 +1,4 @@
+use crate::routes::company::get_all_companies;
 use crate::routes::health::{health, ready};
 use crate::routes::identify::identify;
 use crate::routes::igdb::{
@@ -7,6 +8,7 @@ use crate::routes::igdb::{
 	get_external_games_by_ids, get_franchise_by_id, get_franchises_by_ids, get_game_by_id,
 	get_games_by_ids, get_genre_by_id, get_genres_by_ids, search_game_by_name,
 };
+use crate::routes::platform::get_all_platforms;
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
@@ -89,6 +91,8 @@ async fn start() -> anyhow::Result<()> {
 					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API.clone())))
 					.service(health)
 					.service(ready)
+					.service(get_all_companies)
+					.service(get_all_platforms)
 					.service(identify)
 					.service(get_game_by_id)
 					.service(get_games_by_ids)

@@ -1,3 +1,4 @@
+use crate::routes::company::__path_get_all_companies;
 use crate::routes::health::{__path_health, __path_ready};
 use crate::routes::identify::__path_identify;
 use crate::routes::igdb::{
@@ -9,6 +10,7 @@ use crate::routes::igdb::{
 	__path_get_games_by_ids, __path_get_genre_by_id, __path_get_genres_by_ids,
 	__path_search_game_by_name,
 };
+use crate::routes::platform::__path_get_all_platforms;
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
 	AgeRatingEnum, AlternativeName, Artwork, Character, CharacterGender, CharacterSpecies,
@@ -27,8 +29,8 @@ use service::metadata::igdb::model::{
 	ReleaseDateCategory, ReleaseDateRegion, ReleaseDateStatus, Screenshot, Theme, WebsiteCategory,
 };
 use service::model::{
-	AutomaticMatchReason, ExternalMetadata, FailedMatchReason, GameMatchResult, GameMatchType,
-	ManualMatchMode, MatchType, MetadataProvider,
+	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
+	GameMatchType, ManualMatchMode, MatchType, MetadataProvider, PlatformResponse,
 };
 use utoipa::OpenApi;
 
@@ -56,10 +58,14 @@ use utoipa::OpenApi;
 		get_franchise_by_id,
 		get_franchises_by_ids,
 		get_genre_by_id,
-		get_genres_by_ids
+		get_genres_by_ids,
+		get_all_companies,
+		get_all_platforms
 	),
 	components(schemas(
 		GameMatchResult,
+		CompanyResponse,
+		PlatformResponse,
 		GameMatchType,
 		ExternalMetadata,
 		MatchType,

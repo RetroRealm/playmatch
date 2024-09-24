@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod company;
 pub mod constants;
 pub mod dat;
 pub mod db;
@@ -8,5 +9,6 @@ pub mod http;
 pub mod r#match;
 pub mod metadata;
 pub mod model;
+pub mod platform;
 mod util;
 mod zip;

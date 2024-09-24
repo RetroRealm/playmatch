@@ -2,9 +2,7 @@ use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
 	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
 };
-use crate::model::{
-	ExternalMetadata, GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType,
-};
+use crate::model::{GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType};
 use entity::{game, signature_metadata_mapping};
 use sea_orm::DbConn;
 use strum::IntoEnumIterator;
@@ -75,15 +73,7 @@ fn build_result(
 		.external_metadata(
 			signature_metadata_mappings
 				.into_iter()
-				.map(|mapping| ExternalMetadata {
-					provider_name: mapping.provider.into(),
-					provider_id: mapping.provider_id,
-					match_type: mapping.match_type.into(),
-					comment: mapping.comment,
-					manual_match_type: mapping.manual_match_type.map(Into::into),
-					failed_match_reason: mapping.failed_match_reason.map(Into::into),
-					automatic_match_reason: mapping.automatic_match_reason.map(Into::into),
-				})
+				.map(Into::into)
 				.collect(),
 		)
 		.build()?;

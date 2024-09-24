@@ -1,13 +1,67 @@
 use entity::platform::ActiveModel;
 use entity::prelude::Platform;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
-use entity::{dat_file, dat_file_import, game, platform, signature_metadata_mapping};
+use entity::{company, dat_file, dat_file_import, game, platform, signature_metadata_mapping};
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, ModelTrait, QueryFilter,
-	QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
+	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, LoaderTrait, ModelTrait,
+	QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
 };
+
+pub async fn find_all_and_join_company_and_signature_metadata_mappings(
+	conn: &DbConn,
+) -> Result<
+	Vec<(
+		platform::Model,
+		Option<company::Model>,
+		Vec<signature_metadata_mapping::Model>,
+	)>,
+	DbErr,
+> {
+	let platforms = Platform::find().all(conn).await?;
+
+	let companies = platforms.load_one(company::Entity, conn).await?;
+	let signature_metadata_mappings = platforms
+		.load_many(signature_metadata_mapping::Entity, conn)
+		.await?;
+
+	let companies = companies
+		.into_iter()
+		.flatten()
+		.collect::<Vec<company::Model>>();
+
+	Ok(platforms
+		.into_iter()
+		.map(|platform| {
+			let company = companies
+				.iter()
+				.find(|company| {
+					if let Some(company_id) = platform.company_id {
+						company.id == company_id
+					} else {
+						false
+					}
+				})
+				.cloned();
+
+			let mappings = signature_metadata_mappings
+				.iter()
+				.find(|mappings| {
+					mappings.iter().any(|mapping| {
+						if let Some(platform_id) = mapping.platform_id {
+							platform_id == platform.id
+						} else {
+							false
+						}
+					})
+				})
+				.cloned()
+				.unwrap_or(Vec::new());
+			(platform, company, mappings)
+		})
+		.collect())
+}
 
 pub async fn create_or_find_platform_by_name(
 	name: &str,
