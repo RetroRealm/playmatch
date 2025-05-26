@@ -1,4 +1,5 @@
 use crate::dat::shared::model;
+use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
@@ -62,23 +63,33 @@ pub async fn find_game_and_id_mapping_by_md5(
 	md5: &str,
 	conn: &DbConn,
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
-	find_signature_metadata_mapping_if_exists_by_filter(game_file::Column::Md5.eq(md5), conn).await
+	find_signature_metadata_mapping_if_exists_by_filter(
+		game_file::Column::Md5.eq_ignore_case(md5),
+		conn,
+	)
+	.await
 }
 
 pub async fn find_game_and_id_mapping_by_sha1(
 	sha1: &str,
 	conn: &DbConn,
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
-	find_signature_metadata_mapping_if_exists_by_filter(game_file::Column::Sha1.eq(sha1), conn)
-		.await
+	find_signature_metadata_mapping_if_exists_by_filter(
+		game_file::Column::Sha1.eq_ignore_case(sha1),
+		conn,
+	)
+	.await
 }
 
 pub async fn find_game_and_id_mapping_by_sha256(
 	sha256: &str,
 	conn: &DbConn,
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
-	find_signature_metadata_mapping_if_exists_by_filter(game_file::Column::Sha256.eq(sha256), conn)
-		.await
+	find_signature_metadata_mapping_if_exists_by_filter(
+		game_file::Column::Sha256.eq_ignore_case(sha256),
+		conn,
+	)
+	.await
 }
 
 pub async fn find_game_and_id_mapping_by_name_and_size(
@@ -88,7 +99,7 @@ pub async fn find_game_and_id_mapping_by_name_and_size(
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
 	find_signature_metadata_mapping_if_exists_by_filter(
 		game_file::Column::FileName
-			.eq(name)
+			.eq_ignore_case(name)
 			.and(game_file::Column::FileSizeInBytes.eq(size)),
 		conn,
 	)
