@@ -12,10 +12,15 @@ use crate::metadata::igdb::model::{
 };
 use chrono::{DateTime, Utc};
 use log::debug;
-use oauth2::basic::{BasicClient, BasicTokenResponse};
-use oauth2::reqwest::async_http_client;
+use oauth2::basic::{
+	BasicClient, BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
+	BasicTokenResponse,
+};
 use oauth2::AuthType::RequestBody;
-use oauth2::{AuthUrl, ClientId, ClientSecret, TokenResponse, TokenUrl};
+use oauth2::{
+	AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, StandardRevocableToken,
+	TokenResponse, TokenUrl,
+};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, Url};
 use serde::de::DeserializeOwned;
@@ -30,7 +35,18 @@ mod constants;
 pub mod model;
 
 struct OAuth2Handler {
-	oauth2: BasicClient,
+	oauth2: oauth2::Client<
+		BasicErrorResponse,
+		BasicTokenResponse,
+		BasicTokenIntrospectionResponse,
+		StandardRevocableToken,
+		BasicRevocationErrorResponse,
+		EndpointSet,
+		EndpointNotSet,
+		EndpointNotSet,
+		EndpointNotSet,
+		EndpointSet,
+	>,
 	token_response: Option<BasicTokenResponse>,
 	last_token_request: Option<DateTime<Utc>>,
 }
@@ -55,14 +71,14 @@ impl IgdbClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
-		let mut oauth2_client = BasicClient::new(
-			ClientId::new(client_id.clone()),
-			Some(ClientSecret::new(client_secret.clone())),
-			AuthUrl::new("https://id.twitch.tv/oauth2/token".to_string())?,
-			Some(TokenUrl::new(
+		let mut oauth2_client = BasicClient::new(ClientId::new(client_id.clone()))
+			.set_client_secret(ClientSecret::new(client_secret.clone()))
+			.set_auth_uri(AuthUrl::new(
 				"https://id.twitch.tv/oauth2/token".to_string(),
-			)?),
-		);
+			)?)
+			.set_token_uri(TokenUrl::new(
+				"https://id.twitch.tv/oauth2/token".to_string(),
+			)?);
 
 		oauth2_client = oauth2_client.set_auth_type(RequestBody);
 
@@ -257,7 +273,7 @@ impl IgdbClient {
 		let token_result = handler_ref
 			.oauth2
 			.exchange_client_credentials()
-			.request_async(async_http_client)
+			.request_async(&self.client)
 			.await?;
 
 		debug!("Token result: {:?}", token_result);

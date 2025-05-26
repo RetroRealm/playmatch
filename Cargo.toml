@@ -17,4 +17,4 @@ log = "^0.4"
 dotenvy = "^0.15"
 
 [build-dependencies]
-built = { version = "^0.7", features = ["chrono", "semver", "git2"] }
+built = { version = "^0.8", features = ["chrono", "semver", "git2"] }
