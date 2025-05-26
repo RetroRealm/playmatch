@@ -351,7 +351,7 @@ pub enum CompanyStartDateCategory {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Company {
 	pub id: i32,
-	pub change_date: i64,
+	pub change_date: Option<i64>,
 	pub change_date_category: CompanyChangeDateCategory,
 	pub changed_company_id: i32,
 	pub checksum: Uuid,
