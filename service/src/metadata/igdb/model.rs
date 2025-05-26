@@ -353,7 +353,7 @@ pub struct Company {
 	pub id: i32,
 	pub change_date: Option<i64>,
 	pub change_date_category: CompanyChangeDateCategory,
-	pub changed_company_id: i32,
+	pub changed_company_id: Option<i32>,
 	pub checksum: Uuid,
 	pub country: i32,
 	#[serde(with = "ts_seconds")]
@@ -362,10 +362,10 @@ pub struct Company {
 	pub developed: Vec<i32>,
 	pub logo: i32,
 	pub name: String,
-	pub parent: i32,
+	pub parent: Option<i32>,
 	pub published: Vec<i32>,
 	pub slug: String,
-	pub start_date: i64,
+	pub start_date: Option<i64>,
 	pub start_date_category: CompanyStartDateCategory,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
