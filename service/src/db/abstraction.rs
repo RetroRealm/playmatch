@@ -22,12 +22,12 @@ where
 	}
 }
 
-impl<T: ColumnTrait, E> ColumnEqIgnoreCaseTrait<E> for T
+impl<T: ColumnTrait> ColumnEqIgnoreCaseTrait<&str> for T
 where
-	Value: From<E>,
+	Value: for<'a> From<&'a str>,
 {
-	fn eq_ignore_case(self, value: E) -> SimpleExpr {
+	fn eq_ignore_case(self, value: &str) -> SimpleExpr {
 		// LOWER(value) = LOWER($1)
-		Expr::expr(Func::lower(Expr::col(self))).eq(Expr::value(value))
+		Expr::expr(Func::lower(Expr::col(self))).eq(Expr::value(value.to_lowercase()))
 	}
 }
