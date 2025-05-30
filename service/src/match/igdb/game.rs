@@ -182,10 +182,7 @@ fn match_game_to_igdb<'a>(
 			}
 
 			if let Some(alternative_names) = search_result.alternative_names {
-				debug!(
-			"Game {} has no direct match but has alternative names, checking alternative names...",
-			&clean_name
-		);
+				debug!("Game {} has no direct match but has alternative names, checking alternative names...",&clean_name);
 
 				let alternative_names_resolved = igdb_client
 					.get_alternative_names_by_id(alternative_names)
