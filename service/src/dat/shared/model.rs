@@ -16,10 +16,13 @@ pub struct Game {
 
 	pub rom: Vec<RomElement>,
 
+	#[serde(rename = "@name")]
 	pub name: String,
 
+	#[serde(rename = "@id")]
 	pub id: Option<String>,
 
+	#[serde(rename = "@cloneof")]
 	pub cloneofid: Option<String>,
 
 	pub category: Option<Vec<String>>,
@@ -27,8 +30,10 @@ pub struct Game {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RomElement {
+	#[serde(rename = "@name")]
 	pub name: String,
 
+	#[serde(rename = "@size")]
 	pub size: Option<String>,
 
 	pub crc: Option<String>,
@@ -52,7 +57,7 @@ pub struct Header {
 
 	pub name: String,
 
-	pub description: String,
+	pub description: Option<String>,
 
 	pub version: String,
 
@@ -60,9 +65,9 @@ pub struct Header {
 
 	pub author: Option<String>,
 
-	pub homepage: String,
+	pub homepage: Option<String>,
 
-	pub url: String,
+	pub url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
