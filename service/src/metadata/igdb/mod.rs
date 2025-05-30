@@ -11,7 +11,7 @@ use crate::metadata::igdb::model::{
 	Genre, Platform,
 };
 use chrono::{DateTime, Utc};
-use log::{debug, info};
+use log::debug;
 use oauth2::basic::{
 	BasicClient, BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
 	BasicTokenResponse,
