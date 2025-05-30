@@ -1,5 +1,5 @@
 use crate::error;
-use crate::model::igdb::{IdQuery, IdsQuery, SearchQuery};
+use crate::model::igdb::{IdQuery, IdsQuery, SearchQuery, SlugIdQuery};
 use crate::util::igdb_route_mutli_id_helper;
 use actix_web::web::Data;
 use actix_web::{get, HttpResponse, Responder};
@@ -7,20 +7,20 @@ use actix_web_lab::extract::Query;
 use service::cache::igdb::{
 	get_age_rating_by_id_cached, get_alternative_name_by_id_cached, get_artwork_by_id_cached,
 	get_collection_by_id_cached, get_cover_by_id_cached, get_external_game_by_id_cached,
-	get_franchise_by_id_cached, get_game_by_id_cached, get_genre_by_id_cached,
-	search_game_by_name_cached,
+	get_franchise_by_id_cached, get_game_by_id_cached, get_game_by_slug_cached,
+	get_genre_by_id_cached, search_game_by_name_cached,
 };
 use service::metadata::igdb::model::{
 	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
 };
 use service::metadata::igdb::IgdbClient;
 
-/// Queries the IGDB API for a game by its Id
+/// Queries the IGDB API for a game by its Id or Slug
 #[utoipa::path(
 	get,
 	context_path = "/api",
 	tag = "IGDB",
-	params(IdQuery),
+	params(SlugIdQuery),
 	responses(
 		(status = 200, description = "Returns IGDB metadata about an game", body = Game),
 		(status = 404, description = "Game not found")
@@ -28,16 +28,24 @@ use service::metadata::igdb::IgdbClient;
 )]
 #[get("/igdb/game")]
 pub async fn get_game_by_id(
-	query: Query<IdQuery>,
+	query: Query<SlugIdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_game_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let query = query.into_inner();
 
-	if response.is_none() {
-		return Ok(HttpResponse::NotFound().finish());
+	let response = if let Some(id) = query.id {
+		get_game_by_id_cached(igdb_client.as_ref(), id).await?
+	} else if let Some(slug) = query.slug {
+		get_game_by_slug_cached(igdb_client.as_ref(), slug).await?
+	} else {
+		return Ok(HttpResponse::BadRequest().body("Either slug or id must be provided"));
+	};
+
+	if let Some(game) = response {
+		Ok(HttpResponse::Ok().json(game))
+	} else {
+		Ok(HttpResponse::NotFound().finish())
 	}
-
-	Ok(HttpResponse::Ok().json(response))
 }
 
 /// Queries the IGDB API for games by its Ids

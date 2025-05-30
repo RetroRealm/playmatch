@@ -21,6 +21,19 @@ pub async fn get_game_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Resu
 
 #[cached(
 	result = true,
+	ty = "TimedSizedCache<String, Option<Game>>",
+	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
+	convert = r#"{ slug.clone() }"#
+)]
+pub async fn get_game_by_slug_cached(
+	client: &IgdbClient,
+	slug: String,
+) -> anyhow::Result<Option<Game>> {
+	client.get_game_by_slug(&slug).await
+}
+
+#[cached(
+	result = true,
 	ty = "TimedSizedCache<String, Vec<Game>>",
 	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
 	convert = r#"{ query.clone() }"#

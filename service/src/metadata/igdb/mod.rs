@@ -11,7 +11,7 @@ use crate::metadata::igdb::model::{
 	Genre, Platform,
 };
 use chrono::{DateTime, Utc};
-use log::debug;
+use log::{debug, info};
 use oauth2::basic::{
 	BasicClient, BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
 	BasicTokenResponse,
@@ -99,7 +99,7 @@ impl IgdbClient {
 			Method::POST,
 			IGDB_ROUTE_COMPANIES,
 			None,
-			Some(&format!("where name =  \"{}\";", name)),
+			Some(&format!("where name = \"{}\";", name)),
 			Some(""),
 		)
 		.await
@@ -118,6 +118,20 @@ impl IgdbClient {
 
 	pub async fn get_game_by_id(&self, id: i32) -> anyhow::Result<Option<Game>> {
 		self.get_single_by_id(IGDB_ROUTE_GAMES, id).await
+	}
+
+	pub async fn get_game_by_slug(&self, slug: &str) -> anyhow::Result<Option<Game>> {
+		let mut res = self
+			.do_request_parsed::<Vec<Game>>(
+				Method::POST,
+				IGDB_ROUTE_GAMES,
+				None,
+				Some(&format!("where slug = \"{}\";", slug)),
+				Some("limit 1;"),
+			)
+			.await?;
+
+		Ok(res.pop())
 	}
 
 	pub async fn get_games_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Game>> {

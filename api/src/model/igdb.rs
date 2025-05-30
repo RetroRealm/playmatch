@@ -7,6 +7,12 @@ pub struct IdQuery {
 }
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
+pub struct SlugIdQuery {
+	pub slug: Option<String>,
+	pub id: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct IdsQuery {
 	pub ids: Vec<i32>,
 }
