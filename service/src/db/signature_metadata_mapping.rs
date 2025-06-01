@@ -5,10 +5,12 @@ use entity::sea_orm_active_enums::{
 	MetadataProviderEnum,
 };
 use entity::signature_metadata_mapping;
+use entity::signature_metadata_mapping::Model;
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, IntoActiveModel, QueryFilter, TryIntoModel,
+	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, IntoActiveModel, QueryFilter,
+	TryIntoModel,
 };
 
 #[derive(Debug, Clone, Builder)]
@@ -33,16 +35,34 @@ pub struct SignatureMetadataMappingInput {
 	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
 }
 
+pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provider(
+	platform_id: Option<Uuid>,
+	game_id: Option<Uuid>,
+	company_id: Option<Uuid>,
+	provider: MetadataProviderEnum,
+	db_conn: &DbConn,
+) -> Result<Option<Model>, DbErr> {
+	signature_metadata_mapping::Entity::find()
+		.filter(signature_metadata_mapping::Column::PlatformId.eq_null(platform_id))
+		.filter(signature_metadata_mapping::Column::GameId.eq_null(game_id))
+		.filter(signature_metadata_mapping::Column::CompanyId.eq_null(company_id))
+		.filter(signature_metadata_mapping::Column::Provider.eq(provider))
+		.one(db_conn)
+		.await
+}
+
 pub async fn create_or_update_signature_metadata_mapping(
 	input: SignatureMetadataMappingInput,
 	db_conn: &DbConn,
 ) -> anyhow::Result<signature_metadata_mapping::Model> {
-	let signature_metadata_mapping = signature_metadata_mapping::Entity::find()
-		.filter(signature_metadata_mapping::Column::PlatformId.eq_null(input.platform_id))
-		.filter(signature_metadata_mapping::Column::GameId.eq_null(input.game_id))
-		.filter(signature_metadata_mapping::Column::CompanyId.eq_null(input.company_id))
-		.filter(signature_metadata_mapping::Column::Provider.eq(input.provider.clone()))
-		.one(db_conn)
+	let signature_metadata_mapping =
+		find_signature_metadata_mapping_by_platform_game_company_and_provider(
+			input.platform_id,
+			input.game_id,
+			input.company_id,
+			input.provider.clone(),
+			db_conn,
+		)
 		.await?;
 
 	let mut active_model = if let Some(signature_metadata_mapping) = signature_metadata_mapping {

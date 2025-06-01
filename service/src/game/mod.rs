@@ -2,12 +2,54 @@ use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
 	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
 };
-use crate::model::{GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType};
+use crate::db::signature_metadata_mapping::{
+	create_or_update_signature_metadata_mapping,
+	find_signature_metadata_mapping_by_platform_game_company_and_provider,
+	SignatureMetadataMappingInputBuilder,
+};
+use crate::model::{
+	GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType, MatchRequest,
+};
+use entity::sea_orm_active_enums::MatchTypeEnum;
 use entity::{game, signature_metadata_mapping};
 use sea_orm::DbConn;
 use strum::IntoEnumIterator;
 
-pub async fn match_game_if_possible(
+pub async fn apply_manual_game_match(r#match: MatchRequest, conn: &DbConn) -> anyhow::Result<()> {
+	let mapping = find_signature_metadata_mapping_by_platform_game_company_and_provider(
+		None,
+		Some(game_id),
+		None,
+		r#match.provider.into(),
+		conn,
+	)
+	.await?;
+
+	if let Some(mapping) = mapping {
+		if mapping.match_type != MatchTypeEnum::Failed || mapping.match_type != MatchTypeEnum::None
+		{
+			// TODO: decide how to notify the user that this entry is already matched
+		}
+	}
+
+	create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.game_id(Some(game_id))
+			.provider(r#match.provider.into())
+			.provider_id(Some(r#match.provider_id))
+			.match_type(MatchTypeEnum::Manual)
+			.manual_match_type(Some(r#match.manual_match_type.into()))
+			.failed_match_reason(None)
+			.automatic_match_reason(None)
+			.build()?,
+		conn,
+	)
+	.await?;
+
+	Ok(())
+}
+
+pub async fn identify_game(
 	search: GameFileMatchSearch,
 	conn: &DbConn,
 ) -> anyhow::Result<GameMatchResult> {

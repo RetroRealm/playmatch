@@ -8,6 +8,30 @@ use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 use utoipa::{IntoParams, ToSchema};
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct MatchRequest {
+	/// MD5 hash of the game file.
+	pub md5: Option<String>,
+
+	/// SHA1 hash of the game file.
+	pub sha1: Option<String>,
+
+	/// SHA256 hash of the game file.
+	pub sha256: Option<String>,
+
+	/// File name of the game file.
+	pub file_name: Option<String>,
+
+	/// Metadata provider to match for.
+	pub provider: MetadataProvider,
+
+	/// ID of the game file in the metadata provider.
+	pub provider_id: String,
+
+	/// The type of manual match
+	pub manual_match_type: ManualMatchMode,
+}
+
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct GameFileMatchSearch {
@@ -159,7 +183,7 @@ pub enum ManualMatchMode {
 	/// Game was manually matched by an Admin, which is the most trusted match.
 	Admin,
 
-	/// Game was manually matched by the community, via Discord.
+	/// Game was manually matched by the community (via Discord as example).
 	Community,
 
 	/// Game was manually matched by a trusted user
@@ -206,10 +230,28 @@ impl From<entity::signature_metadata_mapping::Model> for ExternalMetadata {
 	}
 }
 
+impl From<ManualMatchMode> for ManualMatchModeEnum {
+	fn from(value: ManualMatchMode) -> Self {
+		match value {
+			ManualMatchMode::Admin => ManualMatchModeEnum::Admin,
+			ManualMatchMode::Community => ManualMatchModeEnum::Community,
+			ManualMatchMode::Trusted => ManualMatchModeEnum::Trusted,
+		}
+	}
+}
+
 impl From<MetadataProviderEnum> for MetadataProvider {
 	fn from(metadata_provider: MetadataProviderEnum) -> Self {
 		match metadata_provider {
 			MetadataProviderEnum::Igdb => MetadataProvider::IGDB,
+		}
+	}
+}
+
+impl From<MetadataProvider> for MetadataProviderEnum {
+	fn from(metadata_provider: MetadataProvider) -> Self {
+		match metadata_provider {
+			MetadataProvider::IGDB => MetadataProviderEnum::Igdb,
 		}
 	}
 }
@@ -221,6 +263,17 @@ impl From<MatchTypeEnum> for MatchType {
 			MatchTypeEnum::Failed => MatchType::Failed,
 			MatchTypeEnum::Manual => MatchType::Manual,
 			MatchTypeEnum::None => MatchType::None,
+		}
+	}
+}
+
+impl From<MatchType> for MatchTypeEnum {
+	fn from(match_type: MatchType) -> Self {
+		match match_type {
+			MatchType::Automatic => MatchTypeEnum::Automatic,
+			MatchType::Failed => MatchTypeEnum::Failed,
+			MatchType::Manual => MatchTypeEnum::Manual,
+			MatchType::None => MatchTypeEnum::None,
 		}
 	}
 }

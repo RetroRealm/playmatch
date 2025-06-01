@@ -3,7 +3,7 @@ use actix_web::web::Data;
 use actix_web::{get, web, HttpResponse, Responder};
 use log::debug;
 use sea_orm::DatabaseConnection;
-use service::game::match_game_if_possible;
+use service::game::identify_game;
 use service::model::{GameFileMatchSearch, GameMatchResult};
 use web::Query;
 
@@ -24,7 +24,7 @@ pub async fn identify(
 ) -> error::Result<impl Responder> {
 	debug!("Received request: {:?}", query);
 
-	let response = match_game_if_possible(query.into_inner(), db_conn.get_ref()).await?;
+	let response = identify_game(query.into_inner(), db_conn.get_ref()).await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }

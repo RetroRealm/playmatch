@@ -1,11 +1,11 @@
 use crate::dat::shared::model;
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
+use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::{dat_file, dat_file_import, platform};
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
-use entity::sea_orm_active_enums::MatchTypeEnum;
-use entity::{dat_file, dat_file_import, platform};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
@@ -104,6 +104,31 @@ pub async fn find_game_and_id_mapping_by_name_and_size(
 		conn,
 	)
 	.await
+}
+
+pub async fn find_game_by_name_or_game_file_name(
+	name: &str,
+	conn: &DbConn,
+) -> Result<Option<game::Model>, DbErr> {
+	let game_file = GameFile::find()
+		.filter(game_file::Column::FileName.eq(name))
+		.find_also_related(Game)
+		.one(conn)
+		.await?;
+
+	if let Some((_, Some(game))) = game_file {
+		return Ok(Some(game));
+	}
+
+	let game = Game::find()
+		.filter(game::Column::Name.eq(name))
+		.one(conn)
+		.await?;
+
+	match game {
+		None => Ok(None),
+		Some(game) => Ok(Some(game)),
+	}
 }
 
 async fn find_signature_metadata_mapping_if_exists_by_filter(
