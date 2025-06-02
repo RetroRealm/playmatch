@@ -32,6 +32,7 @@ use service::metadata::igdb::model::{
 use service::model::{
 	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
 	GameMatchType, ManualMatchMode, MatchRequest, MatchType, MetadataProvider, PlatformResponse,
+	UpdatedMatchResult,
 };
 use utoipa::OpenApi;
 
@@ -151,6 +152,7 @@ use utoipa::OpenApi;
 		ReleaseDateStatus,
 		Screenshot,
 		Theme,
+		UpdatedMatchResult,
 		WebsiteCategory
 	))
 )]
