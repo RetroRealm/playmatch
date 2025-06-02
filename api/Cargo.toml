@@ -21,8 +21,8 @@ anyhow = "^1.0"
 thiserror = "^2"
 log = "^0.4"
 actix-governor = "^0.8"
-utoipa = { version = "^5.3", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
-utoipa-swagger-ui = { version = "^9.0.2", features = ["actix-web"] }
+utoipa = { version = "~4", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
+utoipa-swagger-ui = { version = "~7", features = ["actix-web"] }
 uuid = "^1.10"
 derive_builder = "^0.20"
 tokio-cron-scheduler = "^0.14"
