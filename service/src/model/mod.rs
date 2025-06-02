@@ -35,7 +35,7 @@ pub struct MatchRequest {
 	pub manual_match_type: ManualMatchMode,
 }
 
-#[derive(Debug, Serialize, Deserialize, IntoParams)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct GameFileMatchSearch {
 	/// The file name of the game file.
