@@ -12,7 +12,7 @@ use std::env;
 	context_path = "/api",
 	tag = "Match",
 	responses(
-		(status = 200, description = "Successfully Matched", body = GameMatchResult),
+		(status = 200, description = "Successfully Matched", body = Vec<GameMatchResult>),
 		(status = 404, description = "Game not found")
 	)
 )]
