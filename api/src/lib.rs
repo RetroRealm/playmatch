@@ -45,7 +45,7 @@ async fn start() -> anyhow::Result<()> {
 	};
 
 	// Allow bursts with up to 20 requests per IP address
-	// and replenishes four element every seconds
+	// and replenishes four elements every second
 	let governor_conf = GovernorConfigBuilder::default()
 		.use_headers()
 		.milliseconds_per_request(250)

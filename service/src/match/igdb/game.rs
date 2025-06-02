@@ -90,9 +90,9 @@ fn match_clone_of_game_to_igdb<'a>(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<()>> {
-	// Basic idea, first check if parent game is matched to IGDB,
-	// if yes then we match to the same igdb id,
-	// otherwise we try to match the game to igdb, if it succeeds we apply the same igdb to the parent game
+	// Basic idea, first check if the parent game is matched to IGDB,
+	// if yes, then we match to the same igdb id,
+	// otherwise we try to match the game to igdb, if it succeeds, we apply the same igdb to the parent game
 
 	Box::pin(async move {
 		let parent_game = find_game_parent(&game, &db_conn).await?;

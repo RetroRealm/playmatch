@@ -196,6 +196,16 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 	}
 }
 
+pub async fn find_all_children_of_game(
+	game: &game::Model,
+	conn: &DbConn,
+) -> Result<Vec<game::Model>, DbErr> {
+	Game::find()
+		.filter(game::Column::CloneOf.eq(game.id))
+		.all(conn)
+		.await
+}
+
 pub async fn find_game_parent(
 	game: &game::Model,
 	conn: &DbConn,

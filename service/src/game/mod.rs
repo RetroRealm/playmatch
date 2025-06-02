@@ -1,8 +1,8 @@
 use crate::db::game::{
-	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
-	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
-	find_game_by_name_or_game_file_name, find_game_signature_metadata_mapping,
-	find_games_by_name_and_platform_id,
+	find_all_children_of_game, find_game_and_id_mapping_by_md5,
+	find_game_and_id_mapping_by_name_and_size, find_game_and_id_mapping_by_sha1,
+	find_game_and_id_mapping_by_sha256, find_game_by_name_or_game_file_name, find_game_parent,
+	find_game_signature_metadata_mapping, find_games_by_name_and_platform_id,
 };
 use crate::db::platform::find_platform_of_game;
 use crate::db::signature_metadata_mapping::{
@@ -44,15 +44,42 @@ pub async fn apply_manual_game_match(
 	let game = found_game.ok_or(ServiceError::GameNotFound)?;
 	let platform = find_platform_of_game(game.id, conn).await?;
 
+	// Find all games that match the name and have the same platform (this is useful for platforms having multiple dat sets for encrypted and decrypted versions)
 	let games = if let Some(platform) = platform {
 		find_games_by_name_and_platform_id(&game.name, platform.id, conn).await?
 	} else {
 		vec![game]
 	};
 
+	let mut games_to_update = vec![];
+
+	// Find all parents and children of the same game
+	for game in games {
+		if let Some(parent) = find_game_parent(&game, conn).await? {
+			debug!("Found parent game: {}", parent.id);
+
+			let children = find_all_children_of_game(&parent, conn).await?;
+			debug!(
+				"Found {} children for parent game: {}",
+				children.len(),
+				parent.id
+			);
+
+			games_to_update.push(parent);
+			games_to_update.extend(children);
+		} else {
+			debug!("No parent game found for game: {}", game.id);
+			let children = find_all_children_of_game(&game, conn).await?;
+			debug!("Found {} children for game: {}", children.len(), game.id);
+			games_to_update.extend(children);
+		}
+	}
+
 	let mut results = vec![];
 
-	for game in games {
+	for game in games_to_update {
+		debug!("Updating game: {}", game.name);
+
 		let mapping = find_game_signature_metadata_mapping(&game, conn).await?;
 
 		if let Some(mapping) = mapping {
@@ -86,6 +113,8 @@ pub async fn apply_manual_game_match(
 				.build()?,
 		)
 	}
+
+	debug!("Updated {} games", results.len());
 
 	Ok(results)
 }
