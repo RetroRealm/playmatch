@@ -5,7 +5,6 @@ use sea_orm::DatabaseConnection;
 use service::company::{
 	find_all_companies_and_external_metadata, get_company_by_id_and_external_metadata,
 };
-use service::model::CompanyResponse;
 use uuid::Uuid;
 
 /// Returns all companies and its external metadata mappings.

@@ -3,7 +3,7 @@ pub mod company;
 pub mod constants;
 pub mod dat;
 pub mod db;
-mod error;
+pub mod error;
 mod fs;
 pub mod game;
 pub mod http;

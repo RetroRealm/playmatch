@@ -54,7 +54,7 @@ pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provid
 pub async fn create_or_update_signature_metadata_mapping(
 	input: SignatureMetadataMappingInput,
 	db_conn: &DbConn,
-) -> anyhow::Result<signature_metadata_mapping::Model> {
+) -> Result<Model, DbErr> {
 	let signature_metadata_mapping =
 		find_signature_metadata_mapping_by_platform_game_company_and_provider(
 			input.platform_id,

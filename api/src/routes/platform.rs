@@ -2,7 +2,6 @@ use crate::error;
 use actix_web::web::{Data, Path};
 use actix_web::{get, HttpResponse, Responder};
 use sea_orm::DatabaseConnection;
-use service::model::PlatformResponse;
 use service::platform::{
 	find_all_and_related_company_and_signature_metadata_mapping,
 	get_platform_by_id_and_related_company_and_signature_metadata_mapping,

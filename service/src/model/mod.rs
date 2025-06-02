@@ -19,8 +19,11 @@ pub struct MatchRequest {
 	/// SHA256 hash of the game file.
 	pub sha256: Option<String>,
 
-	/// File name of the game file.
-	pub file_name: Option<String>,
+	/// Name of game or file.
+	pub name: Option<String>,
+
+	/// Optional comment about the match.
+	pub comment: Option<String>,
 
 	/// Metadata provider to match for.
 	pub provider: MetadataProvider,
@@ -68,6 +71,18 @@ pub enum GameMatchType {
 
 	/// No match found.
 	NoMatch,
+}
+
+/// Result of a manual game match.
+#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatedMatchResult {
+	/// ID of the game.
+	pub id: Uuid,
+
+	/// External metadata for the matched game.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
 }
 
 /// Result of a game match.

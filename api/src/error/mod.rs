@@ -1,5 +1,6 @@
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
+use service::error::ServiceError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -8,6 +9,9 @@ pub enum Error {
 
 	#[error("a database error occurred: {0}")]
 	DbError(#[from] sea_orm::DbErr),
+
+	#[error(transparent)]
+	ServiceError(#[from] ServiceError),
 }
 
 impl ResponseError for Error {
@@ -15,6 +19,16 @@ impl ResponseError for Error {
 		match &self {
 			Self::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			Self::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+			Error::ServiceError(err) => match err {
+				ServiceError::GameNotFound => StatusCode::BAD_REQUEST,
+				ServiceError::SignatureMetadataMappingInputBuilderError(_) => {
+					StatusCode::INTERNAL_SERVER_ERROR
+				}
+				ServiceError::UpdatedMatchResultBuilderError(_) => {
+					StatusCode::INTERNAL_SERVER_ERROR
+				}
+				ServiceError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+			},
 		}
 	}
 

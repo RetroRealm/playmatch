@@ -11,6 +11,7 @@ use crate::routes::igdb::{
 	__path_search_game_by_name,
 };
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
+use crate::routes::r#match::__path_match_game;
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
 	AgeRatingEnum, AlternativeName, Artwork, Character, CharacterGender, CharacterSpecies,
@@ -30,7 +31,7 @@ use service::metadata::igdb::model::{
 };
 use service::model::{
 	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
-	GameMatchType, ManualMatchMode, MatchType, MetadataProvider, PlatformResponse,
+	GameMatchType, ManualMatchMode, MatchRequest, MatchType, MetadataProvider, PlatformResponse,
 };
 use utoipa::OpenApi;
 
@@ -40,6 +41,7 @@ use utoipa::OpenApi;
 		health,
 		ready,
 		identify,
+		match_game,
 		get_game_by_id,
 		get_games_by_ids,
 		search_game_by_name,
@@ -125,6 +127,7 @@ use utoipa::OpenApi;
 		LanguageSupport,
 		LanguageSupportType,
 		MultiplayerMode,
+		MatchRequest,
 		NetworkType,
 		Platform,
 		PlatformCategory,

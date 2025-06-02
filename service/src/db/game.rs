@@ -1,11 +1,11 @@
 use crate::dat::shared::model;
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
-use entity::sea_orm_active_enums::MatchTypeEnum;
-use entity::{dat_file, dat_file_import, platform};
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
+use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::{dat_file, dat_file_import, platform};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
@@ -59,6 +59,27 @@ pub async fn find_game_by_name_and_dat_file_id(
 		.await
 }
 
+pub async fn find_game_and_id_mapping_by_game_id(
+	game_id: Uuid,
+	conn: &DbConn,
+) -> Result<Option<(game::Model, Option<signature_metadata_mapping::Model>)>, DbErr> {
+	let game = Game::find()
+		.filter(game::Column::Id.eq(game_id))
+		.one(conn)
+		.await?;
+
+	let mapping = signature_metadata_mapping::Entity::find()
+		.filter(signature_metadata_mapping::Column::GameId.eq(game_id))
+		.one(conn)
+		.await?;
+
+	if let Some(game) = game {
+		Ok(Some((game, mapping)))
+	} else {
+		Ok(None)
+	}
+}
+
 pub async fn find_game_and_id_mapping_by_md5(
 	md5: &str,
 	conn: &DbConn,
@@ -104,6 +125,27 @@ pub async fn find_game_and_id_mapping_by_name_and_size(
 		conn,
 	)
 	.await
+}
+
+pub async fn find_games_by_name_and_platform_id(
+	name: &str,
+	platform_id: Uuid,
+	conn: &DbConn,
+) -> Result<Vec<game::Model>, DbErr> {
+	Game::find()
+		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
+		.join(
+			JoinType::InnerJoin,
+			dat_file_import::Relation::DatFile.def(),
+		)
+		.join(JoinType::InnerJoin, dat_file::Relation::Platform.def())
+		.filter(
+			game::Column::Name
+				.eq(name)
+				.and(platform::Column::Id.eq(platform_id)),
+		)
+		.all(conn)
+		.await
 }
 
 pub async fn find_game_by_name_or_game_file_name(
