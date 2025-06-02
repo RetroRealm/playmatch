@@ -1,1 +1,1 @@
-pub const MAX_CONNECTIONS: u32 = 25;
+pub const MAX_CONNECTIONS: u32 = 100;

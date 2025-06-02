@@ -54,7 +54,11 @@ async fn start() -> anyhow::Result<()> {
 		.unwrap();
 
 	let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
-	opt.max_connections(MAX_CONNECTIONS);
+	opt.max_connections(
+		env::var("DATABASE_MAX_CONNECTIONS")
+			.unwrap_or(MAX_CONNECTIONS.to_string())
+			.parse::<u32>()?,
+	);
 	opt.sqlx_logging_level(LevelFilter::Debug);
 	opt.sqlx_slow_statements_logging_settings(LevelFilter::Warn, Duration::from_secs(15));
 
