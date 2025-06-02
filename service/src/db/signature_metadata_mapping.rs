@@ -86,5 +86,5 @@ pub async fn create_or_update_signature_metadata_mapping(
 
 	active_model = active_model.save(db_conn).await?;
 
-	Ok(active_model.try_into_model()?)
+	active_model.try_into_model()
 }

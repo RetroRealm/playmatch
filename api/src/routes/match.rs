@@ -25,8 +25,7 @@ pub async fn match_game(
 	let auth_header = req
 		.headers()
 		.get("Authorization")
-		.map(|h| h.to_str().ok())
-		.flatten();
+		.and_then(|h| h.to_str().ok());
 
 	if auth_header.is_none() {
 		return Ok(HttpResponse::Unauthorized().body("Authorization header is required."));

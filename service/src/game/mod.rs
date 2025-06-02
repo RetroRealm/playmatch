@@ -26,15 +26,15 @@ pub async fn apply_manual_game_match(
 	let found_game = if let Some(sha256) = &r#match.sha256 {
 		find_game_and_id_mapping_by_sha256(sha256, conn)
 			.await?
-			.and_then(|(game, _)| Some(game))
+			.map(|(game, _)| game)
 	} else if let Some(sha1) = &r#match.sha1 {
 		find_game_and_id_mapping_by_sha1(sha1, conn)
 			.await?
-			.and_then(|(game, _)| Some(game))
+			.map(|(game, _)| game)
 	} else if let Some(md5) = &r#match.md5 {
 		find_game_and_id_mapping_by_md5(md5, conn)
 			.await?
-			.and_then(|(game, _)| Some(game))
+			.map(|(game, _)| game)
 	} else if let Some(file_name) = &r#match.name {
 		find_game_by_name_or_game_file_name(file_name, conn).await?
 	} else {
