@@ -89,6 +89,15 @@ pub async fn apply_manual_game_match(
 				debug!("Overwriting existing mapping for game: {}", game.id);
 				// TODO: decide how to notify the user that this entry is already matched
 			}
+
+			if let Some(provider_id) = &mapping.provider_id {
+				if provider_id == &r#match.provider_id
+					&& mapping.provider == r#match.provider.into()
+				{
+					debug!("No update needed for game: {}", game.id);
+					continue;
+				}
+			}
 		}
 
 		let updated = create_or_update_signature_metadata_mapping(
