@@ -1,9 +1,14 @@
+use crate::cache::identify::{
+	find_game_and_id_mapping_by_md5_cached, find_game_and_id_mapping_by_sha1_cached,
+	find_game_and_id_mapping_by_sha256_cached,
+};
 use crate::db::game::{
 	find_all_children_of_game, find_game_and_id_mapping_by_md5,
 	find_game_and_id_mapping_by_name_and_size, find_game_and_id_mapping_by_sha1,
 	find_game_and_id_mapping_by_sha256, find_game_by_name_or_game_file_name, find_game_parent,
 	find_game_signature_metadata_mapping, find_games_by_name_and_platform_id,
 };
+use crate::db::game_file::get_game_files_from_game_id;
 use crate::db::platform::find_platform_of_game;
 use crate::db::signature_metadata_mapping::{
 	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
@@ -13,6 +18,7 @@ use crate::model::{
 	GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType, MatchRequest,
 	UpdatedMatchResult, UpdatedMatchResultBuilder,
 };
+use cached::Cached;
 use entity::sea_orm_active_enums::MatchTypeEnum;
 use entity::{game, signature_metadata_mapping};
 use log::debug;
@@ -116,6 +122,30 @@ pub async fn apply_manual_game_match(
 		)
 		.await?;
 
+		let mut sha256_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA256_CACHED
+			.lock()
+			.await;
+		let mut sha1_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA1_CACHED
+			.lock()
+			.await;
+		let mut md5_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_MD5_CACHED
+			.lock()
+			.await;
+
+		let game_files = get_game_files_from_game_id(game.id, conn).await?;
+
+		for game_file in game_files {
+			if let Some(sha256) = &game_file.sha256 {
+				sha256_lock.cache_remove(sha256);
+			}
+			if let Some(sha1) = &game_file.sha1 {
+				sha1_lock.cache_remove(sha1);
+			}
+			if let Some(md5) = &game_file.md5 {
+				md5_lock.cache_remove(md5);
+			}
+		}
+
 		results.push(
 			UpdatedMatchResultBuilder::default()
 				.id(game.id)
@@ -143,21 +173,21 @@ pub async fn identify_game(
 		if let Some((game_release, game_release_id_mappings)) = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
-					find_game_and_id_mapping_by_sha256(sha256, conn).await?
+					find_game_and_id_mapping_by_sha256_cached(sha256, conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::SHA1 => {
 				if let Some(sha1) = &search.sha1 {
-					find_game_and_id_mapping_by_sha1(sha1, conn).await?
+					find_game_and_id_mapping_by_sha1_cached(sha1, conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::MD5 => {
 				if let Some(md5) = &search.md5 {
-					find_game_and_id_mapping_by_md5(md5, conn).await?
+					find_game_and_id_mapping_by_md5_cached(md5, conn).await?
 				} else {
 					None
 				}

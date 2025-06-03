@@ -3,7 +3,7 @@ use entity::game_file;
 use entity::game_file::ActiveModel;
 use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter};
 
 pub async fn insert_game_file_bulk(
 	game_files: Vec<RomElement>,
@@ -36,7 +36,7 @@ pub async fn insert_game_file(
 pub async fn get_game_files_from_game_id(
 	game_id: Uuid,
 	conn: &DbConn,
-) -> anyhow::Result<Vec<game_file::Model>> {
+) -> Result<Vec<game_file::Model>, DbErr> {
 	Ok(game_file::Entity::find()
 		.filter(game_file::Column::GameId.eq(game_id))
 		.all(conn)
