@@ -71,6 +71,7 @@ pub async fn apply_manual_game_match(
 			debug!("No parent game found for game: {}", game.id);
 			let children = find_all_children_of_game(&game, conn).await?;
 			debug!("Found {} children for game: {}", children.len(), game.id);
+			games_to_update.push(game);
 			games_to_update.extend(children);
 		}
 	}
