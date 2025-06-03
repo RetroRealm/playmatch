@@ -37,10 +37,10 @@ pub async fn get_game_files_from_game_id(
 	game_id: Uuid,
 	conn: &DbConn,
 ) -> Result<Vec<game_file::Model>, DbErr> {
-	Ok(game_file::Entity::find()
+	game_file::Entity::find()
 		.filter(game_file::Column::GameId.eq(game_id))
 		.all(conn)
-		.await?)
+		.await
 }
 
 fn get_active_model_from_rom_element(
