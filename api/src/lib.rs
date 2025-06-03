@@ -11,7 +11,7 @@ use crate::routes::igdb::{
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::r#match::match_game;
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
-use actix_governor::{Governor, GovernorConfigBuilder, KeyExtractor, SimpleKeyExtractionError};
+use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
 use actix_web::{App, HttpServer};

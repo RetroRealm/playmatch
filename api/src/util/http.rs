@@ -15,7 +15,7 @@ impl KeyExtractor for ReverProxyExtractor {
 		let mut ip = req
 			.connection_info()
 			.realip_remote_addr()
-			.map(|str| IpAddr::from_str(str))
+			.map(IpAddr::from_str)
 			.ok_or_else(|| {
 				SimpleKeyExtractionError::new("Could not extract peer IP address from request")
 			})?
