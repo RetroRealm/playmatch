@@ -11,7 +11,7 @@ use crate::routes::igdb::{
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::r#match::match_game;
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
-use actix_governor::{Governor, GovernorConfigBuilder};
+use actix_governor::{Governor, GovernorConfigBuilder, KeyExtractor, SimpleKeyExtractionError};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{scope, Data};
 use actix_web::{App, HttpServer};
@@ -27,6 +27,7 @@ use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
+use util::http::ReverProxyExtractor;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
@@ -49,6 +50,7 @@ async fn start() -> anyhow::Result<()> {
 	let governor_conf = GovernorConfigBuilder::default()
 		.use_headers()
 		.milliseconds_per_request(250)
+		.key_extractor(ReverProxyExtractor)
 		.burst_size(20)
 		.finish()
 		.unwrap();

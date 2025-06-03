@@ -1,3 +1,5 @@
+pub mod http;
+
 use log::{error, info};
 use reqwest::Client;
 use sea_orm::DbConn;
