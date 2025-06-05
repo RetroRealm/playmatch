@@ -122,28 +122,10 @@ pub async fn apply_manual_game_match(
 		)
 		.await?;
 
-		let mut sha256_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA256_CACHED
-			.lock()
-			.await;
-		let mut sha1_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA1_CACHED
-			.lock()
-			.await;
-		let mut md5_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_MD5_CACHED
-			.lock()
-			.await;
-
+		// Bust the cache for the hashes of the game files associated with this game so that the next time it is queried, it will return the updated mapping
 		let game_files = get_game_files_from_game_id(game.id, conn).await?;
-
 		for game_file in game_files {
-			if let Some(sha256) = &game_file.sha256 {
-				sha256_lock.cache_remove(sha256);
-			}
-			if let Some(sha1) = &game_file.sha1 {
-				sha1_lock.cache_remove(sha1);
-			}
-			if let Some(md5) = &game_file.md5 {
-				md5_lock.cache_remove(md5);
-			}
+			bust_cache_for_hashes(game_file.sha256, game_file.sha1, game_file.md5).await
 		}
 
 		results.push(
@@ -212,6 +194,28 @@ pub async fn identify_game(
 		id: None,
 		external_metadata: Vec::new(),
 	}))
+}
+
+async fn bust_cache_for_hashes(sha256: Option<String>, sha1: Option<String>, md5: Option<String>) {
+	let mut sha256_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA256_CACHED
+		.lock()
+		.await;
+	let mut sha1_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA1_CACHED
+		.lock()
+		.await;
+	let mut md5_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_MD5_CACHED
+		.lock()
+		.await;
+
+	if let Some(sha256) = &sha256 {
+		sha256_lock.cache_remove(sha256);
+	}
+	if let Some(sha1) = &sha1 {
+		sha1_lock.cache_remove(sha1);
+	}
+	if let Some(md5) = &md5 {
+		md5_lock.cache_remove(md5);
+	}
 }
 
 fn build_result(
