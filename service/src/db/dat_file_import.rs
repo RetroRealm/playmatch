@@ -9,7 +9,7 @@ use sea_orm::{
 
 pub async fn is_dat_already_in_history(md5_hash: &str, conn: &DbConn) -> Result<bool, DbErr> {
 	DatFileImport::find()
-		.filter(dat_file_import::Column::Md5Hash.eq(md5_hash))
+		.filter(dat_file_import::Column::Md5.eq(md5_hash))
 		.count(conn)
 		.await
 		.map(|count| count > 0)
@@ -26,7 +26,7 @@ pub async fn create_dat_file_import(
 		dat_file_id: Set(dat_file_id),
 		name: Set(file_name.to_string()),
 		version: Set(version.to_string()),
-		md5_hash: Set(md5_hash.to_string()),
+		md5: Set(md5_hash.to_string()),
 		..Default::default()
 	};
 
