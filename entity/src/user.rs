@@ -4,38 +4,25 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "game_file")]
+#[sea_orm(table_name = "user")]
 pub struct Model {
 	#[sea_orm(primary_key, auto_increment = false)]
 	pub id: Uuid,
-	pub game_id: Uuid,
-	pub file_name: String,
-	pub file_size_in_bytes: Option<i64>,
-	pub crc: Option<String>,
-	pub md5: Option<String>,
-	pub sha1: Option<String>,
-	pub sha256: Option<String>,
-	pub status: Option<String>,
-	pub serial: Option<String>,
+	pub name: String,
+	pub discord_id: String,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-	#[sea_orm(
-		belongs_to = "super::game::Entity",
-		from = "Column::GameId",
-		to = "super::game::Column::Id",
-		on_update = "NoAction",
-		on_delete = "Cascade"
-	)]
-	Game,
+	#[sea_orm(has_many = "super::signature_metadata_mapping::Entity")]
+	SignatureMetadataMapping,
 }
 
-impl Related<super::game::Entity> for Entity {
+impl Related<super::signature_metadata_mapping::Entity> for Entity {
 	fn to() -> RelationDef {
-		Relation::Game.def()
+		Relation::SignatureMetadataMapping.def()
 	}
 }
 
