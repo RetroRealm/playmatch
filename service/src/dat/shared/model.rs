@@ -36,18 +36,25 @@ pub struct RomElement {
 	#[serde(rename = "@size")]
 	pub size: Option<String>,
 
+	#[serde(rename = "@crc")]
 	pub crc: Option<String>,
 
+	#[serde(rename = "@md5")]
 	pub md5: Option<String>,
 
+	#[serde(rename = "@sha1")]
 	pub sha1: Option<String>,
 
+	#[serde(rename = "@sha256")]
 	pub sha256: Option<String>,
 
+	#[serde(rename = "@serial")]
 	pub serial: Option<String>,
 
+	#[serde(rename = "@status")]
 	pub status: Option<Status>,
 
+	#[serde(rename = "@mia")]
 	pub mia: Option<String>,
 }
 

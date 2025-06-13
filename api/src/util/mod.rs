@@ -10,8 +10,12 @@ use service::r#match::igdb::match_db_to_igdb_entities;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
-pub async fn wrap_download_and_parse_dats(client: Arc<Client>, conn: Arc<DbConn>) {
-	match download_and_parse_dats(client.as_ref(), conn.as_ref()).await {
+pub async fn wrap_download_and_parse_dats(
+	client: Arc<Client>,
+	conn: Arc<DbConn>,
+	force_import: bool,
+) {
+	match download_and_parse_dats(client.as_ref(), conn.as_ref(), force_import).await {
 		Ok(_) => {
 			info!("Successfully downloaded and imported latest DATs");
 		}

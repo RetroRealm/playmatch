@@ -143,7 +143,7 @@ async fn start() -> anyhow::Result<()> {
 			let client = client.clone();
 			let igdb_client = igdb_client.clone();
 			Box::pin(async move {
-				wrap_download_and_parse_dats(client, conn.clone()).await;
+				wrap_download_and_parse_dats(client, conn.clone(), false).await;
 				wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
 			})
 		})?)
@@ -158,9 +158,14 @@ async fn start() -> anyhow::Result<()> {
 		.to_lowercase()
 		== "true";
 
+	let force_initial_data_init = env::var("FORCE_INITIAL_DATA_INIT")
+		.unwrap_or("false".to_string())
+		.to_lowercase()
+		== "true";
+
 	if initial_data_init {
 		tokio::spawn(async move {
-			wrap_download_and_parse_dats(http_client, conn.clone()).await;
+			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
 			wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
 		});
 	}
