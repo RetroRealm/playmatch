@@ -21,7 +21,11 @@ pub mod shared;
 const DATS_PATH: &str = "dats";
 const TMP_PATH: &str = "tmp";
 
-pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::Result<()> {
+pub async fn download_and_parse_dats(
+	client: &Client,
+	conn: &DbConn,
+	force_import: bool,
+) -> anyhow::Result<()> {
 	let current_dir = std::env::current_dir()?;
 	let tmp_dir = current_dir.join(DATS_PATH).join(TMP_PATH);
 	tokio::fs::create_dir_all(&tmp_dir).await?;
@@ -85,7 +89,7 @@ pub async fn download_and_parse_dats(client: &Client, conn: &DbConn) -> anyhow::
 
 		let already_imported = is_dat_already_in_history(&hash, conn).await?;
 
-		if already_imported {
+		if already_imported && !force_import {
 			debug!("Dat file already imported: {:?}", file);
 			continue;
 		}
