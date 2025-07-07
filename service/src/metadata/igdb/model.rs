@@ -360,7 +360,7 @@ pub struct Company {
 	pub created_at: DateTime<Utc>,
 	pub description: Option<String>,
 	pub developed: Vec<i32>,
-	pub logo: i32,
+	pub logo: Option<i32>,
 	pub name: String,
 	pub parent: Option<i32>,
 	pub published: Vec<i32>,
@@ -369,7 +369,7 @@ pub struct Company {
 	pub start_date_category: Option<CompanyStartDateCategory>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
-	pub url: String,
+	pub url: Option<String>,
 	pub websites: Vec<i32>,
 }
 
