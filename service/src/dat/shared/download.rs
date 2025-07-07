@@ -1,5 +1,5 @@
 use crate::fs::{read_files_recursive, read_folders};
-use crate::http::download::{download_file, DownloadFileNameResult};
+use crate::http::download::{DownloadFileNameResult, download_file};
 use log::debug;
 use reqwest::Client;
 use std::path::{Path, PathBuf};

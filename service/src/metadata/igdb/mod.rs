@@ -12,11 +12,11 @@ use crate::metadata::igdb::model::{
 };
 use chrono::{DateTime, Utc};
 use log::debug;
+use oauth2::AuthType::RequestBody;
 use oauth2::basic::{
 	BasicClient, BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
 	BasicTokenResponse,
 };
-use oauth2::AuthType::RequestBody;
 use oauth2::{
 	AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, StandardRevocableToken,
 	TokenResponse, TokenUrl,

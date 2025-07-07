@@ -8,14 +8,14 @@ use crate::routes::igdb::{
 	get_external_games_by_ids, get_franchise_by_id, get_franchises_by_ids, get_game_by_id,
 	get_games_by_ids, get_genre_by_id, get_genres_by_ids, search_game_by_name,
 };
-use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::r#match::match_game;
+use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
-use actix_web::web::{scope, Data};
+use actix_web::web::{Data, scope};
 use actix_web::{App, HttpServer};
-use log::{debug, error, info, LevelFilter};
+use log::{LevelFilter, debug, error, info};
 use migration::{Migrator, MigratorTrait};
 use openapi::ApiDoc;
 use reqwest::Client;

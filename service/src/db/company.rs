@@ -2,8 +2,8 @@ use entity::company::ActiveModel;
 use entity::prelude::Company;
 use entity::sea_orm_active_enums::MatchTypeEnum;
 use entity::{company, signature_metadata_mapping};
-use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
+use sea_orm::prelude::Uuid;
 use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
 	QuerySelect, TryIntoModel,

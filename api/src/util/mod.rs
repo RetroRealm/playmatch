@@ -5,8 +5,8 @@ use reqwest::Client;
 use sea_orm::DbConn;
 use serde::de::DeserializeOwned;
 use service::dat::download_and_parse_dats;
-use service::metadata::igdb::IgdbClient;
 use service::r#match::igdb::match_db_to_igdb_entities;
+use service::metadata::igdb::IgdbClient;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 

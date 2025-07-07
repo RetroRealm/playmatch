@@ -1,6 +1,6 @@
 use crate::error;
 use actix_web::web::{Data, Json};
-use actix_web::{post, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, post};
 use sea_orm::DatabaseConnection;
 use service::game::apply_manual_game_match;
 use service::model::MatchRequest;

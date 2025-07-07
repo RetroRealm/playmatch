@@ -10,8 +10,8 @@ use crate::routes::igdb::{
 	__path_get_games_by_ids, __path_get_genre_by_id, __path_get_genres_by_ids,
 	__path_search_game_by_name,
 };
-use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
 use crate::routes::r#match::__path_match_game;
+use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
 	AgeRatingEnum, AlternativeName, Artwork, Character, CharacterGender, CharacterSpecies,

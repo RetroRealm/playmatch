@@ -2,8 +2,8 @@ use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
 	find_game_and_id_mapping_by_sha256,
 };
-use cached::proc_macro::cached;
 use cached::TimedSizedCache;
+use cached::proc_macro::cached;
 use entity::{game, signature_metadata_mapping};
 use sea_orm::{DbConn, DbErr};
 

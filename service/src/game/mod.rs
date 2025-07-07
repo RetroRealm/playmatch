@@ -11,7 +11,7 @@ use crate::db::game::{
 use crate::db::game_file::get_game_files_from_game_id;
 use crate::db::platform::find_platform_of_game;
 use crate::db::signature_metadata_mapping::{
-	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
+	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
 use crate::model::{
