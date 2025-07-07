@@ -358,7 +358,7 @@ pub struct Company {
 	pub country: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
-	pub description: String,
+	pub description: Option<String>,
 	pub developed: Vec<i32>,
 	pub logo: i32,
 	pub name: String,
