@@ -129,7 +129,7 @@ async fn start() -> anyhow::Result<()> {
 				ApiDoc::openapi(),
 			)]))
 	})
-	.bind(format!("0.0.0.0:{}", port))?
+	.bind(format!("0.0.0.0:{port}"))?
 	.shutdown_timeout(15)
 	.workers(worker_amount)
 	.run();
@@ -173,7 +173,7 @@ async fn start() -> anyhow::Result<()> {
 	sched.start().await?;
 	debug!("Scheduler started");
 
-	info!("Starting server on port {}", port);
+	info!("Starting server on port {port}");
 	serv.await?;
 
 	Ok(())

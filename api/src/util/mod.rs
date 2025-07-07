@@ -20,7 +20,7 @@ pub async fn wrap_download_and_parse_dats(
 			info!("Successfully downloaded and imported latest DATs");
 		}
 		Err(e) => {
-			error!("Failed to download and imported DATs: {}", e);
+			error!("Failed to download and imported DATs: {e}");
 		}
 	}
 }
@@ -31,7 +31,7 @@ pub async fn wrap_match_db_to_igdb_entities(igdb_client: Arc<IgdbClient>, conn: 
 			info!("Successfully matched database to IGDB entities");
 		}
 		Err(err) => {
-			error!("Failed to match database to IGDB entities: {}", err);
+			error!("Failed to match database to IGDB entities: {err}");
 		}
 	}
 }

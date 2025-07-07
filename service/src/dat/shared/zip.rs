@@ -9,7 +9,7 @@ pub async fn extract_if_archived(path: &PathBuf) -> anyhow::Result<()> {
 		if file_extension == "zip" {
 			debug!("Found zip file, extracting...");
 			extract_zip_in_same_path(path).await?;
-			debug!("Removing zip file: {:?}", path);
+			debug!("Removing zip file: {path:?}");
 			fs::remove_file(path).await?;
 			debug!("Removed zip file");
 		}

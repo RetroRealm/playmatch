@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 
 pub async fn download_dat(client: &Client, url: &str, path: &Path) -> anyhow::Result<PathBuf> {
-	debug!("Downloading DAT from: {}", url);
+	debug!("Downloading DAT from: {url}");
 
 	let (name_source, path) = match download_file(client, url, path).await? {
 		DownloadFileNameResult::FromContentDisposition(path) => {
@@ -39,7 +39,7 @@ pub async fn delete_old_and_move_new_files(
 	let main_dir_exists = tokio::fs::try_exists(&main_dir).await.unwrap_or(false);
 
 	if main_dir_exists {
-		debug!("Deleting old files and folders in: {:?}", main_dir);
+		debug!("Deleting old files and folders in: {main_dir:?}");
 		let old_folders = read_folders(&main_dir).await?;
 
 		for old_folder in &old_folders {
@@ -70,7 +70,7 @@ pub async fn delete_old_and_move_new_files(
 			.unwrap_or_default();
 
 		if extension == "dat" {
-			debug!("Moving DAT file: {:?}", tmp_file);
+			debug!("Moving DAT file: {tmp_file:?}");
 
 			let out = if should_keep_subfolders {
 				let out = main_dir.join(tmp_file.strip_prefix(tmp_dir)?);
@@ -84,7 +84,7 @@ pub async fn delete_old_and_move_new_files(
 		}
 	}
 
-	debug!("Removing tmp dir: {:?}", tmp_dir);
+	debug!("Removing tmp dir: {tmp_dir:?}");
 	fs::remove_dir_all(&tmp_dir).await?;
 	Ok(())
 }

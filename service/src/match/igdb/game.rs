@@ -76,7 +76,7 @@ pub async fn match_games_in_batches(
 
 			for result in results {
 				if let Err(e) = result.await? {
-					error!("Error while matching to IGDB: {:?}", e);
+					error!("Error while matching to IGDB: {e:?}");
 				}
 			}
 		}

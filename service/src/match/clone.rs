@@ -40,7 +40,7 @@ pub async fn populate_clone_of_id(dat_file_id: Uuid, conn: &DbConn) -> anyhow::R
 		}
 	}
 
-	debug!("Created all clone_of relationships for games with internal_clone_of_id for dat_file_id: {}", dat_file_id);
+	debug!("Created all clone_of relationships for games with internal_clone_of_id for dat_file_id: {dat_file_id}");
 
 	Ok(())
 }

@@ -32,7 +32,7 @@ pub async fn match_platforms_to_igdb(
 
 			for result in results {
 				if let Err(e) = result.await? {
-					error!("Error while matching platform to IGDB: {:?}", e);
+					error!("Error while matching platform to IGDB: {e:?}");
 				}
 			}
 		}

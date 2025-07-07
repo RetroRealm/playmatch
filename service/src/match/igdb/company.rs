@@ -32,7 +32,7 @@ pub async fn match_companies_to_igdb(
 
 			for result in results {
 				if let Err(e) = result.await? {
-					error!("Error while matching company to IGDB: {:?}", e);
+					error!("Error while matching company to IGDB: {e:?}");
 				}
 			}
 		}

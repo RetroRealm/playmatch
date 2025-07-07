@@ -22,7 +22,7 @@ pub async fn identify(
 	query: Query<GameFileMatchSearch>,
 	db_conn: Data<DatabaseConnection>,
 ) -> error::Result<impl Responder> {
-	debug!("Received request: {:?}", query);
+	debug!("Received request: {query:?}");
 
 	let response = identify_game(query.into_inner(), db_conn.get_ref()).await?;
 
