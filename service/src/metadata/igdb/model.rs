@@ -352,10 +352,10 @@ pub enum CompanyStartDateCategory {
 pub struct Company {
 	pub id: i32,
 	pub change_date: Option<i64>,
-	pub change_date_category: CompanyChangeDateCategory,
+	pub change_date_category: Option<CompanyChangeDateCategory>,
 	pub changed_company_id: Option<i32>,
 	pub checksum: Uuid,
-	pub country: i32,
+	pub country: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
@@ -366,7 +366,7 @@ pub struct Company {
 	pub published: Vec<i32>,
 	pub slug: String,
 	pub start_date: Option<i64>,
-	pub start_date_category: CompanyStartDateCategory,
+	pub start_date_category: Option<CompanyStartDateCategory>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
