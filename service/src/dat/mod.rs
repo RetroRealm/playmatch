@@ -52,7 +52,7 @@ pub async fn download_and_parse_dats(
 			futures.push(tokio::spawn(async move {
 				let md5_hash = calculate_md5(&file).await?;
 
-				debug!("Calculated MD5 hash for file: {:?}", file);
+				debug!("Calculated MD5 hash for file: {file:?}");
 
 				Ok::<(String, PathBuf), anyhow::Error>((md5_hash, file))
 			}));
@@ -81,8 +81,7 @@ pub async fn download_and_parse_dats(
 
 		if extension != "dat" || file_name.contains("BIOS") {
 			debug!(
-				"Skipping file: {:?}, either has no .dat file extension or contains BIOS",
-				file_name
+				"Skipping file: {file_name:?}, either has no .dat file extension or contains BIOS"
 			);
 			continue;
 		}
@@ -90,7 +89,7 @@ pub async fn download_and_parse_dats(
 		let already_imported = is_dat_already_in_history(&hash, conn).await?;
 
 		if already_imported && !force_import {
-			debug!("Dat file already imported: {:?}", file);
+			debug!("Dat file already imported: {file:?}");
 			continue;
 		}
 
@@ -132,10 +131,10 @@ pub async fn download_and_parse_dats(
 			}
 		};
 
-		debug!("Importing DAT file: {:?}", file);
+		debug!("Importing DAT file: {file:?}");
 		match parse_and_import_dat_file(&file, signature_group_entity.id, &hash, conn).await {
 			Ok(_) => info!("Imported DAT file: {}", file.display()),
-			Err(e) => error!("Failed to parse and import dat file: {:?}, {}", file, e),
+			Err(e) => error!("Failed to parse and import dat file: {file:?}, {e}"),
 		}
 	}
 	info!("Finished importing all DAT files");

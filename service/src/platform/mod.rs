@@ -3,8 +3,8 @@ use crate::db::platform::{
 	get_by_id_and_join_company_and_signature_metadata_mappings,
 };
 use crate::model::PlatformResponse;
-use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
+use sea_orm::prelude::Uuid;
 
 pub async fn get_platform_by_id_and_related_company_and_signature_metadata_mapping(
 	id: Uuid,

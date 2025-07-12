@@ -1,7 +1,7 @@
 use crate::dat::shared::model::{Datafile, Game};
 use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
-use crate::db::dat_file::{create_or_update_dat_file, DatFileCreateOrUpdateInput};
+use crate::db::dat_file::{DatFileCreateOrUpdateInput, create_or_update_dat_file};
 use crate::db::dat_file_import::create_dat_file_import;
 use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
 use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
@@ -217,12 +217,12 @@ fn parse_company_and_platform(
 	}
 
 	// replace version out of name as that's not needed for tags
-	platform = platform.replace(format!(" ({})", version).as_str(), "");
+	platform = platform.replace(format!(" ({version})").as_str(), "");
 
 	for tag in DAT_TAG_REGEX.captures_iter(&platform.clone()) {
 		let tag = tag.get(1).map(|x| x.as_str()).unwrap_or_default();
 		tags.push(tag.to_owned());
-		platform = platform.replace(&format!(" ({})", tag), "");
+		platform = platform.replace(&format!(" ({tag})"), "");
 	}
 
 	Ok((
@@ -237,14 +237,14 @@ fn parse_company_and_platform(
 }
 
 pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version: &str) -> String {
-	file_name = file_name.replace(format!(" ({})", version).as_str(), "");
+	file_name = file_name.replace(format!(" ({version})").as_str(), "");
 
 	for tag in DAT_NUMBER_REGEX.captures_iter(&file_name.clone()) {
 		let tag = tag.get(0).map(|x| x.as_str()).unwrap_or_default();
-		file_name = file_name.replace(&format!(" {}", tag), "");
+		file_name = file_name.replace(&format!(" {tag}"), "");
 	}
 
-	file_name = file_name.replace(format!(".{}", file_extension).as_str(), "");
+	file_name = file_name.replace(format!(".{file_extension}").as_str(), "");
 
 	file_name
 }

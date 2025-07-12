@@ -1,8 +1,8 @@
 use crate::dat::shared::model::RomElement;
 use entity::game_file;
 use entity::game_file::ActiveModel;
-use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
+use sea_orm::prelude::Uuid;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter};
 
 pub async fn insert_game_file_bulk(

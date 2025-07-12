@@ -2,8 +2,8 @@ use entity::platform::ActiveModel;
 use entity::prelude::Platform;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
 use entity::{company, dat_file, dat_file_import, game, platform, signature_metadata_mapping};
-use sea_orm::prelude::Uuid;
 use sea_orm::ActiveValue::Set;
+use sea_orm::prelude::Uuid;
 use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, LoaderTrait, ModelTrait,
 	QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,

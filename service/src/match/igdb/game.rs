@@ -4,19 +4,19 @@ use crate::db::game::{
 };
 use crate::db::platform::{find_platform_of_game, find_related_signature_metadata_mapping};
 use crate::db::signature_metadata_mapping::{
-	create_or_update_signature_metadata_mapping, SignatureMetadataMappingInputBuilder,
+	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
-use crate::metadata::igdb::IgdbClient;
-use crate::r#match::igdb::{clean_name, IGDB_CHUNK_SIZE};
 use crate::r#match::PAGE_SIZE;
+use crate::r#match::igdb::{IGDB_CHUNK_SIZE, clean_name};
+use crate::metadata::igdb::IgdbClient;
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
 use log::{debug, error};
-use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
+use sea_orm::prelude::Uuid;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -76,7 +76,7 @@ pub async fn match_games_in_batches(
 
 			for result in results {
 				if let Err(e) = result.await? {
-					error!("Error while matching to IGDB: {:?}", e);
+					error!("Error while matching to IGDB: {e:?}");
 				}
 			}
 		}
@@ -131,7 +131,9 @@ fn match_clone_of_game_to_igdb<'a>(
 				if mapping.match_type == MatchTypeEnum::Automatic
 					|| mapping.match_type == MatchTypeEnum::Manual
 				{
-					debug!("Matched Game with parent which is not matched, overriding parent mapping... (Via Child)");
+					debug!(
+						"Matched Game with parent which is not matched, overriding parent mapping... (Via Child)"
+					);
 
 					create_or_update_signature_metadata_mapping_success(
 						mapping.provider_id.unwrap(),
@@ -182,7 +184,10 @@ fn match_game_to_igdb<'a>(
 			}
 
 			if let Some(alternative_names) = search_result.alternative_names {
-				debug!("Game {} has no direct match but has alternative names, checking alternative names...",&clean_name);
+				debug!(
+					"Game {} has no direct match but has alternative names, checking alternative names...",
+					&clean_name
+				);
 
 				let alternative_names_resolved = igdb_client
 					.get_alternative_names_by_id(alternative_names)

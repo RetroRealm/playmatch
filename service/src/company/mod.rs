@@ -2,8 +2,8 @@ use crate::db::company::{
 	find_all_and_join_signature_metadata_mapping, get_by_id_and_join_signature_metadata_mappings,
 };
 use crate::model::CompanyResponse;
-use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
+use sea_orm::prelude::Uuid;
 
 pub async fn get_company_by_id_and_external_metadata(
 	company_id: Uuid,

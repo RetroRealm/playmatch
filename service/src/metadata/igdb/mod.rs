@@ -12,11 +12,11 @@ use crate::metadata::igdb::model::{
 };
 use chrono::{DateTime, Utc};
 use log::debug;
+use oauth2::AuthType::RequestBody;
 use oauth2::basic::{
 	BasicClient, BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
 	BasicTokenResponse,
 };
-use oauth2::AuthType::RequestBody;
 use oauth2::{
 	AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, StandardRevocableToken,
 	TokenResponse, TokenUrl,
@@ -99,7 +99,7 @@ impl IgdbClient {
 			Method::POST,
 			IGDB_ROUTE_COMPANIES,
 			None,
-			Some(&format!("where name = \"{}\";", name)),
+			Some(&format!("where name = \"{name}\";")),
 			Some(""),
 		)
 		.await
@@ -110,7 +110,7 @@ impl IgdbClient {
 			Method::POST,
 			IGDB_ROUTE_PLATFORMS,
 			None,
-			Some(&format!("search \"{}\";", name)),
+			Some(&format!("search \"{name}\";")),
 			Some(""),
 		)
 		.await
@@ -126,7 +126,7 @@ impl IgdbClient {
 				Method::POST,
 				IGDB_ROUTE_GAMES,
 				None,
-				Some(&format!("where slug = \"{}\";", slug)),
+				Some(&format!("where slug = \"{slug}\";")),
 				Some("limit 1;"),
 			)
 			.await?;
@@ -143,7 +143,7 @@ impl IgdbClient {
 			Method::POST,
 			IGDB_ROUTE_GAMES,
 			None,
-			Some(&format!("search \"{}\";", name)),
+			Some(&format!("search \"{name}\";")),
 			Some(""),
 		)
 		.await
@@ -159,8 +159,7 @@ impl IgdbClient {
 			IGDB_ROUTE_GAMES,
 			None,
 			Some(&format!(
-				"where platforms = ({}); search \"{}\";",
-				platform_id, name
+				"where platforms = ({platform_id}); search \"{name}\";"
 			)),
 			Some(""),
 		)
@@ -251,7 +250,7 @@ impl IgdbClient {
 				Method::POST,
 				endpoint,
 				None,
-				Some(&format!("where id = {};", id)),
+				Some(&format!("where id = {id};")),
 				Some("limit 1;"),
 			)
 			.await?;
@@ -290,7 +289,7 @@ impl IgdbClient {
 			.request_async(&self.client)
 			.await?;
 
-		debug!("Token result: {:?}", token_result);
+		debug!("Token result: {token_result:?}");
 
 		handler_ref.last_token_request = Some(Utc::now());
 		handler_ref.token_response = Some(token_result);
@@ -346,15 +345,12 @@ impl IgdbClient {
 			.access_token()
 			.secret();
 
-		headers.insert("Authorization", format!("Bearer {}", access_token).parse()?);
+		headers.insert("Authorization", format!("Bearer {access_token}").parse()?);
 		drop(oauth2);
 
 		let req = self
 			.client
-			.request(
-				method,
-				Url::parse(format!("{}/{}", API_URL, path).as_str())?,
-			)
+			.request(method, Url::parse(format!("{API_URL}/{path}").as_str())?)
 			.headers(headers)
 			.body(format!(
 				"{}{}{}",
@@ -364,7 +360,7 @@ impl IgdbClient {
 			))
 			.build()?;
 
-		debug!("Request: {:?}", req);
+		debug!("Request: {req:?}");
 		if let Some(body) = req.body() {
 			if let Some(bytes) = body.as_bytes() {
 				debug!("Request body: {:?}", std::str::from_utf8(bytes)?);
@@ -376,7 +372,7 @@ impl IgdbClient {
 		let res = rate_limited_future.await?;
 
 		let body = res.text().await?;
-		debug!("Response: {}", body);
+		debug!("Response: {body}");
 
 		Ok(serde_json::from_str(&body)?)
 	}

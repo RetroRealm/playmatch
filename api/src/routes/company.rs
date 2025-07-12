@@ -1,6 +1,6 @@
 use crate::error;
 use actix_web::web::{Data, Path};
-use actix_web::{get, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, get};
 use sea_orm::DatabaseConnection;
 use service::company::{
 	find_all_companies_and_external_metadata, get_company_by_id_and_external_metadata,

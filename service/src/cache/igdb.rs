@@ -1,9 +1,9 @@
+use crate::metadata::igdb::IgdbClient;
 use crate::metadata::igdb::model::{
 	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
 };
-use crate::metadata::igdb::IgdbClient;
-use cached::proc_macro::cached;
 use cached::TimedSizedCache;
+use cached::proc_macro::cached;
 
 const CACHE_SIZE: usize = 20000;
 const CACHE_LIFESPAN: u64 = 86400;

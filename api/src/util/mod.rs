@@ -5,8 +5,8 @@ use reqwest::Client;
 use sea_orm::DbConn;
 use serde::de::DeserializeOwned;
 use service::dat::download_and_parse_dats;
-use service::metadata::igdb::IgdbClient;
 use service::r#match::igdb::match_db_to_igdb_entities;
+use service::metadata::igdb::IgdbClient;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
@@ -20,7 +20,7 @@ pub async fn wrap_download_and_parse_dats(
 			info!("Successfully downloaded and imported latest DATs");
 		}
 		Err(e) => {
-			error!("Failed to download and imported DATs: {}", e);
+			error!("Failed to download and imported DATs: {e}");
 		}
 	}
 }
@@ -31,7 +31,7 @@ pub async fn wrap_match_db_to_igdb_entities(igdb_client: Arc<IgdbClient>, conn: 
 			info!("Successfully matched database to IGDB entities");
 		}
 		Err(err) => {
-			error!("Failed to match database to IGDB entities: {}", err);
+			error!("Failed to match database to IGDB entities: {err}");
 		}
 	}
 }
