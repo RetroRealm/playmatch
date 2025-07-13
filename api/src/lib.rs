@@ -12,6 +12,10 @@ use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
 };
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
+use crate::routes::suggestion::{
+	approve_suggestion, create_company_suggestion, create_game_suggestion,
+	create_platform_suggestion, delete_suggestion, get_all_suggestions,
+};
 use crate::routes::user::{get_user, get_user_by_discord_id, update_user_permission_level};
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
@@ -139,6 +143,12 @@ async fn start() -> anyhow::Result<()> {
 					.service(manually_match_game)
 					.service(manually_match_platform)
 					.service(manually_match_company)
+					.service(get_all_suggestions)
+					.service(create_game_suggestion)
+					.service(create_company_suggestion)
+					.service(create_platform_suggestion)
+					.service(approve_suggestion)
+					.service(delete_suggestion)
 					.service(get_user_by_discord_id)
 					.service(get_user)
 					.service(update_user_permission_level)

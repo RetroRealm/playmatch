@@ -12,7 +12,7 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
-use crate::model::matching::{CompanyMatchRequest, GameMatchRequest, PlatformMatchRequest};
+use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
 use crate::model::{
 	GameMatchResult, GameMatchResultBuilder, GameMatchType, UpdatedMatchResult,
 	UpdatedMatchResultBuilder,
@@ -24,7 +24,7 @@ use log::debug;
 use sea_orm::DbConn;
 
 pub async fn apply_manual_company_match(
-	r#match: CompanyMatchRequest,
+	r#match: CompanyOrPlatformMatchRequest,
 	user: entity::user::Model,
 	conn: &DbConn,
 ) -> ServiceResult<UpdatedMatchResult> {
@@ -75,7 +75,7 @@ pub async fn apply_manual_company_match(
 }
 
 pub async fn apply_manual_platform_match(
-	r#match: PlatformMatchRequest,
+	r#match: CompanyOrPlatformMatchRequest,
 	user: entity::user::Model,
 	conn: &DbConn,
 ) -> ServiceResult<UpdatedMatchResult> {

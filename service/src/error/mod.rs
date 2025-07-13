@@ -14,6 +14,14 @@ pub enum ServiceError {
 	#[error("The user couldn't be found by the given ID")]
 	UserNotFound,
 
+	#[error(
+		"A suggestion for this Game/Platform/Company with the same provider and provider ID already exists"
+	)]
+	SuggestionAlreadyExists,
+
+	#[error("The suggestion with the given ID couldn't be found")]
+	SuggestionNotFound,
+
 	#[error(transparent)]
 	SignatureMetadataMappingInputBuilderError(#[from] SignatureMetadataMappingInputBuilderError),
 

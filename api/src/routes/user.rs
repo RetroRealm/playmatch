@@ -8,8 +8,8 @@ use sea_orm::DatabaseConnection;
 use service::user;
 use uuid::Uuid;
 
-/// This Endpoint requires Credentials of a User with at least Automation level.
 /// Find a User by their Discord ID.
+/// This Endpoint requires Credentials of a User with at least Automation level.
 #[utoipa::path(
 	get,
 	context_path = "/api",
@@ -20,6 +20,8 @@ use uuid::Uuid;
 	),
 	responses(
 		(status = 200, description = "Successfully found user", body = User),
+		(status = 401, description = "Unauthorized, you need to be logged in to get a user by discord id"),
+		(status = 403, description = "Forbidden, you do not have permission to get a user by discord id"),
 		(status = 404, description = "Could not find User with the provided discord id")
 	)
 )]
@@ -35,8 +37,8 @@ pub async fn get_user_by_discord_id(
 		.json(user::get_user_by_discord_id(query.discord_id, db_conn.get_ref()).await?))
 }
 
-/// This Endpoint requires Credentials of a User with at least Automation level.
 /// Find a User by their ID.
+/// This Endpoint requires Credentials of a User with at least Automation level.
 #[utoipa::path(
 	get,
 	context_path = "/api",
@@ -46,6 +48,8 @@ pub async fn get_user_by_discord_id(
 	),
 	responses(
 		(status = 200, description = "Successfully found user", body = User),
+		(status = 401, description = "Unauthorized, you need to be logged in to get a user by id"),
+		(status = 403, description = "Forbidden, you do not have permission to get a user by id"),
 		(status = 404, description = "Could not find User with the provided id")
 	)
 )]
@@ -60,8 +64,8 @@ pub async fn get_user(
 	Ok(HttpResponse::Ok().json(user::get_user_by_id(id.into_inner(), db_conn.get_ref()).await?))
 }
 
+/// Update a user's Permission Level.
 /// This Endpoint requires Credentials of a User with at least Automation level.
-/// Find a User by their ID.
 #[utoipa::path(
 	patch,
 	context_path = "/api",
@@ -71,7 +75,9 @@ pub async fn get_user(
 	),
 	params(UpdateUserPermissionsQuery),
 	responses(
-		(status = 200, description = "Successfully update user permission level", body = User),
+		(status = 200, description = "Successfully updated user permission level", body = User),
+		(status = 401, description = "Unauthorized, you need to be logged in to update a user permission level"),
+		(status = 403, description = "Forbidden, you do not have permission to update a user permission level"),
 		(status = 404, description = "Could not find User with the provided id")
 	)
 )]

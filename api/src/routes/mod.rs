@@ -1,5 +1,5 @@
 use crate::error;
-use crate::error::Error::InvalidAuth;
+use crate::error::Error::{InvalidAuth, InvalidAuthPermission};
 use actix_web::HttpRequest;
 use actix_web::web::Data;
 use entity::sea_orm_active_enums::UserPermissionsEnum;
@@ -12,7 +12,7 @@ pub mod identify;
 pub mod igdb;
 pub mod r#match;
 pub mod platform;
-mod suggestion;
+pub mod suggestion;
 pub mod user;
 
 async fn handle_auth_and_permissions(
@@ -68,9 +68,7 @@ async fn handle_auth_and_permissions(
 			UserPermissionsEnum::Admin if user.permissions == UserPermissionsEnum::Admin => {
 				Ok(user)
 			}
-			_ => Err(InvalidAuth(
-				"User does not have the required permissions.".to_string(),
-			)),
+			_ => Err(InvalidAuthPermission),
 		}
 	} else {
 		Err(InvalidAuth("Invalid API token.".to_string()))

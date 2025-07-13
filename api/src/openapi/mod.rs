@@ -14,6 +14,10 @@ use crate::routes::r#match::{
 	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
 };
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
+use crate::routes::suggestion::{
+	__path_approve_suggestion, __path_create_company_suggestion, __path_create_game_suggestion,
+	__path_create_platform_suggestion, __path_delete_suggestion, __path_get_all_suggestions,
+};
 use crate::routes::user::{
 	__path_get_user, __path_get_user_by_discord_id, __path_update_user_permission_level,
 };
@@ -34,7 +38,10 @@ use service::metadata::igdb::model::{
 	PopularityPrimitive, PopularitySource, PopularityType, Region, ReleaseDate,
 	ReleaseDateCategory, ReleaseDateRegion, ReleaseDateStatus, Screenshot, Theme, WebsiteCategory,
 };
-use service::model::matching::{CompanyMatchRequest, GameMatchRequest, PlatformMatchRequest};
+use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
+use service::model::suggestion::{
+	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
+};
 use service::model::user::{User, UserPermissions};
 use service::model::{
 	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
@@ -52,6 +59,12 @@ use utoipa::OpenApi;
 		manually_match_game,
 		manually_match_company,
 		manually_match_platform,
+		get_all_suggestions,
+		create_game_suggestion,
+		create_company_suggestion,
+		create_platform_suggestion,
+		approve_suggestion,
+		delete_suggestion,
 		get_user_by_discord_id,
 		get_user,
 		get_game_by_id,
@@ -143,8 +156,10 @@ use utoipa::OpenApi;
 		LanguageSupportType,
 		MultiplayerMode,
 		GameMatchRequest,
-		CompanyMatchRequest,
-		PlatformMatchRequest,
+		CompanyOrPlatformMatchRequest,
+		GameSuggestionRequest,
+		CompanyOrPlatformSuggestionRequest,
+		Suggestion,
 		User,
 		UserPermissions,
 		NetworkType,

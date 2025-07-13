@@ -8,12 +8,10 @@ use service::manual_match::{
 	apply_manual_company_match, apply_manual_game_match, apply_manual_platform_match,
 };
 use service::model::ManualMatchMode;
-use service::model::matching::{
-	CompanyMatchRequest, GameMatchRequest, MatchRequest, PlatformMatchRequest,
-};
+use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest, MatchRequest};
 
-/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
 /// Manually match a Game by its file hashes, filename or Game name, returning the matched game ExternalMetadata.
+/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
 #[utoipa::path(
 	post,
 	context_path = "/api",
@@ -24,6 +22,8 @@ use service::model::matching::{
 	responses(
 		(status = 200, description = "Successfully Matched Game", body = Vec<UpdatedMatchResult>),
 		(status = 400, description = "At least one of file_name, md5, sha1 or sha256 must be provided."),
+		(status = 401, description = "Unauthorized, you need to be logged in to manually match a game"),
+		(status = 403, description = "Forbidden, you do not have permission to manually match a game"),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -56,8 +56,8 @@ pub async fn manually_match_game(
 	Ok(HttpResponse::Ok().json(updated))
 }
 
-/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
 /// Manually match a Platform by its name, returning the matched ExternalMetadata.
+/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
 #[utoipa::path(
 	post,
 	context_path = "/api",
@@ -67,12 +67,14 @@ pub async fn manually_match_game(
 	),
 	responses(
 		(status = 200, description = "Successfully Matched Platform", body = UpdatedMatchResult),
+		(status = 401, description = "Unauthorized, you need to be logged in to manually match a platform"),
+		(status = 403, description = "Forbidden, you do not have permission to manually match a platform"),
 		(status = 404, description = "Platform not found")
 	)
 )]
 #[post("/match/manual/platform")]
 pub async fn manually_match_platform(
-	match_request: Json<PlatformMatchRequest>,
+	match_request: Json<CompanyOrPlatformMatchRequest>,
 	db_conn: Data<DatabaseConnection>,
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
@@ -90,8 +92,8 @@ pub async fn manually_match_platform(
 	Ok(HttpResponse::Ok().json(updated))
 }
 
-/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
 /// Manually match a Company by its name, returning the matched ExternalMetadata.
+/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
 #[utoipa::path(
 	post,
 	context_path = "/api",
@@ -101,12 +103,14 @@ pub async fn manually_match_platform(
 	),
 	responses(
 		(status = 200, description = "Successfully Matched Company", body = UpdatedMatchResult),
+		(status = 401, description = "Unauthorized, you need to be logged in to manually match a company"),
+		(status = 403, description = "Forbidden, you do not have permission to manually match a company"),
 		(status = 404, description = "Company not found")
 	)
 )]
 #[post("/match/manual/company")]
 pub async fn manually_match_company(
-	match_request: Json<CompanyMatchRequest>,
+	match_request: Json<CompanyOrPlatformMatchRequest>,
 	db_conn: Data<DatabaseConnection>,
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
@@ -132,10 +136,17 @@ async fn handle_auth_and_permissions_match(
 ) -> error::Result<entity::user::Model> {
 	let user = handle_auth_and_permissions(&required_user_perms, req, db_conn).await?;
 
-	if required_user_perms == UserPermissionsEnum::Trusted
+	if user.permissions == UserPermissionsEnum::Trusted
 		&& match_request.get_manual_match_type() != ManualMatchMode::Trusted
 	{
 		match_request.set_manual_match_type(ManualMatchMode::Trusted);
+	}
+
+	if user.permissions != UserPermissionsEnum::Automation
+		&& user.permissions != UserPermissionsEnum::Admin
+		&& match_request.get_user_id() != Some(user.id)
+	{
+		match_request.set_user_id(Some(user.id));
 	}
 
 	Ok(user)

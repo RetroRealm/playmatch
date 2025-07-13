@@ -1,4 +1,5 @@
 use crate::model::{ManualMatchMode, MetadataProvider};
+use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -7,9 +8,13 @@ pub trait MatchRequest {
 	fn get_manual_match_type(&self) -> ManualMatchMode;
 
 	fn set_manual_match_type(&mut self, match_mode: ManualMatchMode) -> &mut Self;
+
+	fn get_user_id(&self) -> Option<Uuid>;
+
+	fn set_user_id(&mut self, user_id: Option<Uuid>) -> &mut Self;
 }
 
-impl MatchRequest for CompanyMatchRequest {
+impl MatchRequest for CompanyOrPlatformMatchRequest {
 	fn get_manual_match_type(&self) -> ManualMatchMode {
 		self.manual_match_type
 	}
@@ -18,15 +23,13 @@ impl MatchRequest for CompanyMatchRequest {
 		self.manual_match_type = match_mode;
 		self
 	}
-}
 
-impl MatchRequest for PlatformMatchRequest {
-	fn get_manual_match_type(&self) -> ManualMatchMode {
-		self.manual_match_type
+	fn get_user_id(&self) -> Option<Uuid> {
+		self.user_id
 	}
 
-	fn set_manual_match_type(&mut self, match_mode: ManualMatchMode) -> &mut Self {
-		self.manual_match_type = match_mode;
+	fn set_user_id(&mut self, user_id: Option<Uuid>) -> &mut Self {
+		self.user_id = user_id;
 		self
 	}
 }
@@ -40,12 +43,21 @@ impl MatchRequest for GameMatchRequest {
 		self.manual_match_type = match_mode;
 		self
 	}
+
+	fn get_user_id(&self) -> Option<Uuid> {
+		self.user_id
+	}
+
+	fn set_user_id(&mut self, user_id: Option<Uuid>) -> &mut Self {
+		self.user_id = user_id;
+		self
+	}
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CompanyMatchRequest {
-	/// Name of the Company to match.
+pub struct CompanyOrPlatformMatchRequest {
+	/// Name of the Company or Platform to match.
 	pub name: String,
 
 	/// Optional comment about the match.
@@ -54,30 +66,14 @@ pub struct CompanyMatchRequest {
 	/// Metadata provider to match for.
 	pub provider: MetadataProvider,
 
-	/// ID of the game file in the metadata provider.
+	/// ID of the Company or Platform file in the metadata provider.
 	pub provider_id: String,
 
 	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
 	pub manual_match_type: ManualMatchMode,
-}
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct PlatformMatchRequest {
-	/// Name of the Platform to match.
-	pub name: String,
-
-	/// Optional comment about the match.
-	pub comment: Option<String>,
-
-	/// Metadata provider to match for.
-	pub provider: MetadataProvider,
-
-	/// ID of the game file in the metadata provider.
-	pub provider_id: String,
-
-	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
-	pub manual_match_type: ManualMatchMode,
+	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	pub user_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -106,4 +102,7 @@ pub struct GameMatchRequest {
 
 	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
 	pub manual_match_type: ManualMatchMode,
+
+	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	pub user_id: Option<Uuid>,
 }

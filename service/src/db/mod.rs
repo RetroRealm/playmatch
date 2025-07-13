@@ -8,5 +8,5 @@ pub mod game_file;
 pub mod platform;
 pub mod signature_group;
 pub mod signature_metadata_mapping;
-mod suggestion;
+pub mod signature_metadata_mapping_suggestions;
 pub mod user;

@@ -13,6 +13,9 @@ pub enum Error {
 	#[error("Authentication failed: {0}")]
 	InvalidAuth(String),
 
+	#[error("You do not have permission to perform this action")]
+	InvalidAuthPermission,
+
 	#[error("User was not found")]
 	UserNotFound,
 
@@ -37,9 +40,12 @@ impl ResponseError for Error {
 					StatusCode::INTERNAL_SERVER_ERROR
 				}
 				ServiceError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+				ServiceError::SuggestionAlreadyExists => StatusCode::CONFLICT,
+				ServiceError::SuggestionNotFound => StatusCode::NOT_FOUND,
 			},
 			Error::InvalidAuth(_) => StatusCode::UNAUTHORIZED,
 			Error::UserNotFound => StatusCode::NOT_FOUND,
+			Error::InvalidAuthPermission => StatusCode::FORBIDDEN,
 		}
 	}
 
