@@ -69,8 +69,6 @@ use utoipa::OpenApi;
 		get_user,
 		get_game_by_id,
 		get_games_by_ids,
-		get_user,
-		get_user_by_discord_id,
 		update_user_permission_level,
 		search_game_by_name,
 		get_age_rating_by_id,

@@ -41,5 +41,5 @@ pub async fn update_user_permission_level(
 
 	let updated_user = active_model.update(db_conn).await?;
 
-	Ok(updated_user.try_into_model()?)
+	updated_user.try_into_model()
 }
