@@ -42,7 +42,9 @@ use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
 use service::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
 };
-use service::model::user::{User, UserPermissions};
+use service::model::user::{
+	CreateOrGetUserRequest, UpdateUserPermissionsRequest, User, UserPermissions,
+};
 use service::model::{
 	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
 	GameMatchType, ManualMatchMode, MatchType, MetadataProvider, PlatformResponse,
@@ -160,6 +162,8 @@ use utoipa::OpenApi;
 		Suggestion,
 		User,
 		UserPermissions,
+		CreateOrGetUserRequest,
+		UpdateUserPermissionsRequest,
 		NetworkType,
 		Platform,
 		PlatformCategory,

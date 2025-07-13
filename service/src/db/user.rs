@@ -1,7 +1,7 @@
-use entity::user::Model;
-use sea_orm::QueryFilter;
+use entity::user::{ActiveModel, Model};
 use sea_orm::prelude::Uuid;
 use sea_orm::{ActiveModelTrait, ColumnTrait, IntoActiveModel, Set, TryIntoModel};
+use sea_orm::{DatabaseConnection, QueryFilter};
 use sea_orm::{DbConn, DbErr, EntityTrait};
 
 pub async fn get_user_by_api_key(token: String, db_conn: &DbConn) -> Result<Option<Model>, DbErr> {
@@ -42,4 +42,10 @@ pub async fn update_user_permission_level(
 	let updated_user = active_model.update(db_conn).await?;
 
 	updated_user.try_into_model()
+}
+
+pub async fn insert_user(user: ActiveModel, db_conn: &DatabaseConnection) -> Result<Model, DbErr> {
+	entity::user::Entity::insert(user)
+		.exec_with_returning(db_conn)
+		.await
 }

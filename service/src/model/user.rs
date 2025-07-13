@@ -4,7 +4,21 @@ use entity::sea_orm_active_enums::UserPermissionsEnum;
 use entity::user::Model;
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
+
+/// Request to update a user's permissions.
+#[derive(Debug, IntoParams, Serialize, Deserialize, ToSchema)]
+pub struct UpdateUserPermissionsRequest {
+	pub new_permission: UserPermissions,
+}
+
+/// Request to get or create a user by their Discord ID.
+#[derive(Debug, IntoParams, Serialize, Deserialize, ToSchema)]
+pub struct CreateOrGetUserRequest {
+	pub discord_id: i64,
+	pub username: String,
+	pub permissions: UserPermissions,
+}
 
 /// A User inside Playmatch.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
