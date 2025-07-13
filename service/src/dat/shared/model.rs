@@ -22,7 +22,7 @@ pub struct Game {
 	#[serde(rename = "@id")]
 	pub id: Option<String>,
 
-	#[serde(rename = "@cloneof")]
+	#[serde(rename = "@cloneofid")]
 	pub cloneofid: Option<String>,
 
 	pub category: Option<Vec<String>>,
