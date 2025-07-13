@@ -1,10 +1,10 @@
+use crate::automatic_match::PAGE_SIZE;
 use crate::constants::PARALLELISM;
 use crate::db::dat_file::find_all_dat_files;
 use crate::db::game::{
 	find_game_by_signature_group_internal_id_and_dat_file_id, get_dat_file_id_of_game,
 	get_unpopulated_clone_of_games,
 };
-use crate::r#match::PAGE_SIZE;
 use entity::game;
 use log::debug;
 use sea_orm::ActiveValue::Set;

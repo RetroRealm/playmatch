@@ -12,6 +12,7 @@ use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
 };
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
+use crate::routes::user::{get_user, get_user_by_discord_id, update_user_permission_level};
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
@@ -31,6 +32,8 @@ use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use util::http::ReverProxyExtractor;
 use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::{Components, ComponentsBuilder};
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 pub mod error;
@@ -85,6 +88,34 @@ async fn start() -> anyhow::Result<()> {
 	let client_data = Data::from(client_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
+	fn create_openapi() -> utoipa::openapi::OpenApi {
+		let mut openapi = ApiDoc::openapi();
+
+		// Extract existing schemas if already generated
+		let existing_components = openapi
+			.components
+			.take()
+			.unwrap_or_else(Components::default);
+
+		// Build new components with security scheme
+		let new_components = ComponentsBuilder::from(existing_components)
+			.security_scheme(
+				"bearer_auth",
+				SecurityScheme::Http(
+					HttpBuilder::new()
+						.scheme(HttpAuthScheme::Bearer)
+						.bearer_format("JWT")
+						.build(),
+				),
+			)
+			.build();
+
+		// Assign merged components back to OpenAPI doc
+		openapi.components = Some(new_components);
+
+		openapi
+	}
+
 	let serv = HttpServer::new(move || {
 		App::new()
 			.wrap(Compress::default())
@@ -108,6 +139,9 @@ async fn start() -> anyhow::Result<()> {
 					.service(manually_match_game)
 					.service(manually_match_platform)
 					.service(manually_match_company)
+					.service(get_user_by_discord_id)
+					.service(get_user)
+					.service(update_user_permission_level)
 					.service(get_game_by_id)
 					.service(get_games_by_ids)
 					.service(search_game_by_name)
@@ -130,7 +164,7 @@ async fn start() -> anyhow::Result<()> {
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),
-				ApiDoc::openapi(),
+				create_openapi(),
 			)]))
 	})
 	.bind(format!("0.0.0.0:{port}"))?

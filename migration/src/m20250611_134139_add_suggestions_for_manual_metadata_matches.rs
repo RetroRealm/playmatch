@@ -92,6 +92,7 @@ impl MigrationTrait for Migration {
 					.if_not_exists()
 					.col(
 						ColumnDef::new(User::Id)
+							.primary_key()
 							.uuid()
 							.not_null()
 							.default(Expr::cust("gen_random_uuid()")),
@@ -116,7 +117,37 @@ impl MigrationTrait for Migration {
 							.not_null()
 							.default(Expr::cust("CURRENT_TIMESTAMP")),
 					)
-					.primary_key(Index::create().col(User::Id))
+					.to_owned(),
+			)
+			.await?;
+
+		// Create indexes for user table
+		manager
+			.create_index(
+				Index::create()
+					.name("idx_user_discord_id")
+					.table(User::Table)
+					.col(User::DiscordId)
+					.to_owned(),
+			)
+			.await?;
+
+		manager
+			.create_index(
+				Index::create()
+					.name("idx_user_username")
+					.table(User::Table)
+					.col(User::Username)
+					.to_owned(),
+			)
+			.await?;
+
+		manager
+			.create_index(
+				Index::create()
+					.name("idx_user_api_key")
+					.table(User::Table)
+					.col(User::ApiKey)
 					.to_owned(),
 			)
 			.await?;
@@ -353,10 +384,38 @@ impl MigrationTrait for Migration {
 	}
 
 	async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-		// 1. Drop indexes on suggestions
+		// 1. Drop indexes for users and suggestions
 		manager
 			.drop_index(
 				Index::drop()
+					.if_exists()
+					.name("idx_user_discord_id")
+					.table(User::Table)
+					.to_owned(),
+			)
+			.await?;
+		manager
+			.drop_index(
+				Index::drop()
+					.if_exists()
+					.name("idx_user_username")
+					.table(User::Table)
+					.to_owned(),
+			)
+			.await?;
+		manager
+			.drop_index(
+				Index::drop()
+					.if_exists()
+					.name("idx_user_api_key")
+					.table(User::Table)
+					.to_owned(),
+			)
+			.await?;
+		manager
+			.drop_index(
+				Index::drop()
+					.if_exists()
 					.name("idx_smm_sugg_platform_id")
 					.table(SignatureMetadataMappingSuggestions::Table)
 					.to_owned(),
@@ -365,6 +424,7 @@ impl MigrationTrait for Migration {
 		manager
 			.drop_index(
 				Index::drop()
+					.if_exists()
 					.name("idx_smm_sugg_company_id")
 					.table(SignatureMetadataMappingSuggestions::Table)
 					.to_owned(),
@@ -373,12 +433,12 @@ impl MigrationTrait for Migration {
 		manager
 			.drop_index(
 				Index::drop()
+					.if_exists()
 					.name("idx_smm_sugg_game_id")
 					.table(SignatureMetadataMappingSuggestions::Table)
 					.to_owned(),
 			)
 			.await?;
-
 		manager
 			.drop_index(
 				Index::drop()
@@ -393,6 +453,7 @@ impl MigrationTrait for Migration {
 		manager
 			.drop_table(
 				Table::drop()
+					.if_exists()
 					.table(SignatureMetadataMappingSuggestions::Table)
 					.to_owned(),
 			)
@@ -402,6 +463,7 @@ impl MigrationTrait for Migration {
 		manager
 			.drop_index(
 				Index::drop()
+					.if_exists()
 					.name("idx_smm_created_by")
 					.table(SignatureMetadataMapping::Table)
 					.to_owned(),
@@ -421,7 +483,7 @@ impl MigrationTrait for Migration {
 
 		// 5. Drop user table
 		manager
-			.drop_table(Table::drop().table(User::Table).to_owned())
+			.drop_table(Table::drop().if_exists().table(User::Table).to_owned())
 			.await?;
 
 		// 6. Drop user permissions enum

@@ -29,6 +29,7 @@ impl ResponseError for Error {
 				ServiceError::GameNotFound => StatusCode::NOT_FOUND,
 				ServiceError::PlatformNotFound => StatusCode::NOT_FOUND,
 				ServiceError::CompanyNotFound => StatusCode::NOT_FOUND,
+				ServiceError::UserNotFound => StatusCode::NOT_FOUND,
 				ServiceError::SignatureMetadataMappingInputBuilderError(_) => {
 					StatusCode::INTERNAL_SERVER_ERROR
 				}

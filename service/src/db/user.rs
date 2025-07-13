@@ -1,7 +1,7 @@
 use entity::user::Model;
-use sea_orm::ColumnTrait;
 use sea_orm::QueryFilter;
 use sea_orm::prelude::Uuid;
+use sea_orm::{ActiveModelTrait, ColumnTrait, IntoActiveModel, Set, TryIntoModel};
 use sea_orm::{DbConn, DbErr, EntityTrait};
 
 pub async fn get_user_by_api_key(token: String, db_conn: &DbConn) -> Result<Option<Model>, DbErr> {
@@ -29,4 +29,17 @@ pub async fn get_user_by_discord_id(
 		.await?;
 
 	Ok(user)
+}
+
+pub async fn update_user_permission_level(
+	user: Model,
+	permissions: entity::sea_orm_active_enums::UserPermissionsEnum,
+	db_conn: &DbConn,
+) -> Result<Model, DbErr> {
+	let mut active_model: entity::user::ActiveModel = user.into_active_model();
+	active_model.permissions = Set(permissions);
+
+	let updated_user = active_model.update(db_conn).await?;
+
+	Ok(updated_user.try_into_model()?)
 }

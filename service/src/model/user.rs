@@ -28,6 +28,17 @@ pub enum UserPermissions {
 	Admin,
 }
 
+impl From<UserPermissions> for UserPermissionsEnum {
+	fn from(value: UserPermissions) -> Self {
+		match value {
+			UserPermissions::User => UserPermissionsEnum::User,
+			UserPermissions::Trusted => UserPermissionsEnum::Trusted,
+			UserPermissions::Automation => UserPermissionsEnum::Automation,
+			UserPermissions::Admin => UserPermissionsEnum::Admin,
+		}
+	}
+}
+
 impl From<UserPermissionsEnum> for UserPermissions {
 	fn from(value: UserPermissionsEnum) -> Self {
 		match value {

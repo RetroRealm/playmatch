@@ -14,7 +14,9 @@ use crate::routes::r#match::{
 	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
 };
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
-use crate::routes::user::{__path_get_user, __path_get_user_by_discord_id};
+use crate::routes::user::{
+	__path_get_user, __path_get_user_by_discord_id, __path_update_user_permission_level,
+};
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
 	AgeRatingEnum, AlternativeName, Artwork, Character, CharacterGender, CharacterSpecies,
@@ -54,6 +56,9 @@ use utoipa::OpenApi;
 		get_user,
 		get_game_by_id,
 		get_games_by_ids,
+		get_user,
+		get_user_by_discord_id,
+		update_user_permission_level,
 		search_game_by_name,
 		get_age_rating_by_id,
 		get_age_ratings_by_ids,

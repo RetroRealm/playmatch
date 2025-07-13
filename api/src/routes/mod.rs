@@ -48,6 +48,7 @@ async fn handle_auth_and_permissions(
 
 	if let Some(user) = user {
 		match required_user_perms {
+			UserPermissionsEnum::User => Ok(user),
 			UserPermissionsEnum::Trusted
 				if [
 					UserPermissionsEnum::Trusted,

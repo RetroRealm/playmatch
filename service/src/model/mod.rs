@@ -1,4 +1,5 @@
 pub mod matching;
+pub mod suggestion;
 pub mod user;
 
 use derive_builder::Builder;

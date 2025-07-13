@@ -11,6 +11,9 @@ pub enum ServiceError {
 	#[error("The company couldn't be found by the given name")]
 	CompanyNotFound,
 
+	#[error("The user couldn't be found by the given ID")]
+	UserNotFound,
+
 	#[error(transparent)]
 	SignatureMetadataMappingInputBuilderError(#[from] SignatureMetadataMappingInputBuilderError),
 

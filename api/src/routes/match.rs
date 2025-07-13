@@ -4,7 +4,7 @@ use actix_web::web::{Data, Json};
 use actix_web::{HttpRequest, HttpResponse, Responder, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use sea_orm::DatabaseConnection;
-use service::game::{
+use service::manual_match::{
 	apply_manual_company_match, apply_manual_game_match, apply_manual_platform_match,
 };
 use service::model::ManualMatchMode;
@@ -18,6 +18,9 @@ use service::model::matching::{
 	post,
 	context_path = "/api",
 	tag = "Match",
+	security(
+        ("bearer_auth" = [])
+	),
 	responses(
 		(status = 200, description = "Successfully Matched Game", body = Vec<UpdatedMatchResult>),
 		(status = 400, description = "At least one of file_name, md5, sha1 or sha256 must be provided."),
@@ -59,6 +62,9 @@ pub async fn manually_match_game(
 	post,
 	context_path = "/api",
 	tag = "Match",
+	security(
+        ("bearer_auth" = [])
+	),
 	responses(
 		(status = 200, description = "Successfully Matched Platform", body = UpdatedMatchResult),
 		(status = 404, description = "Platform not found")
@@ -90,6 +96,9 @@ pub async fn manually_match_platform(
 	post,
 	context_path = "/api",
 	tag = "Match",
+	security(
+        ("bearer_auth" = [])
+	),
 	responses(
 		(status = 200, description = "Successfully Matched Company", body = UpdatedMatchResult),
 		(status = 404, description = "Company not found")
@@ -123,7 +132,7 @@ async fn handle_auth_and_permissions_match(
 ) -> error::Result<entity::user::Model> {
 	let user = handle_auth_and_permissions(&required_user_perms, req, db_conn).await?;
 
-	if &required_user_perms == &UserPermissionsEnum::Trusted
+	if required_user_perms == UserPermissionsEnum::Trusted
 		&& match_request.get_manual_match_type() != ManualMatchMode::Trusted
 	{
 		match_request.set_manual_match_type(ManualMatchMode::Trusted);

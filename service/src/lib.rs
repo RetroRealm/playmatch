@@ -1,3 +1,4 @@
+pub mod automatic_match;
 pub mod cache;
 pub mod company;
 pub mod constants;
@@ -7,9 +8,11 @@ pub mod error;
 mod fs;
 pub mod game;
 pub mod http;
-pub mod r#match;
+pub mod manual_match;
 pub mod metadata;
 pub mod model;
 pub mod platform;
+pub mod suggestion;
+pub mod user;
 mod util;
 mod zip;

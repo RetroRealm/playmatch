@@ -1,3 +1,5 @@
+use crate::automatic_match::PAGE_SIZE;
+use crate::automatic_match::igdb::{IGDB_CHUNK_SIZE, clean_name};
 use crate::db::game::{
 	find_game_parent, find_game_signature_metadata_mapping,
 	get_unmatched_games_with_clone_of_with_limit, get_unmatched_games_without_clone_of_with_limit,
@@ -8,8 +10,6 @@ use crate::db::platform::{
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
-use crate::r#match::PAGE_SIZE;
-use crate::r#match::igdb::{IGDB_CHUNK_SIZE, clean_name};
 use crate::metadata::igdb::IgdbClient;
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
