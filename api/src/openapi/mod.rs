@@ -19,7 +19,8 @@ use crate::routes::suggestion::{
 	__path_create_platform_suggestion, __path_delete_suggestion, __path_get_all_suggestions,
 };
 use crate::routes::user::{
-	__path_get_user, __path_get_user_by_discord_id, __path_update_user_permission_level,
+	__path_create_or_get_by_discord_id, __path_get_user, __path_get_user_by_discord_id,
+	__path_update_user_permission_level,
 };
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
@@ -67,6 +68,7 @@ use utoipa::OpenApi;
 		create_platform_suggestion,
 		approve_suggestion,
 		delete_suggestion,
+		create_or_get_by_discord_id,
 		get_user_by_discord_id,
 		get_user,
 		get_game_by_id,

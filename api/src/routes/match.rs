@@ -3,6 +3,7 @@ use crate::routes::handle_auth_and_permissions;
 use actix_web::web::{Data, Json};
 use actix_web::{HttpRequest, HttpResponse, Responder, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
+use log::debug;
 use sea_orm::DatabaseConnection;
 use service::manual_match::{
 	apply_manual_company_match, apply_manual_game_match, apply_manual_platform_match,
@@ -34,7 +35,7 @@ pub async fn manually_match_game(
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	let mut match_request = match_request.into_inner();
-	let user = handle_auth_and_permissions_match(
+	handle_auth_and_permissions_match(
 		UserPermissionsEnum::Trusted,
 		&mut match_request,
 		req,
@@ -51,7 +52,7 @@ pub async fn manually_match_game(
 			.body("At least one of file_name, md5, sha1 or sha256 must be provided."));
 	}
 
-	let updated = apply_manual_game_match(match_request, user, db_conn.get_ref()).await?;
+	let updated = apply_manual_game_match(match_request, db_conn.get_ref()).await?;
 
 	Ok(HttpResponse::Ok().json(updated))
 }
@@ -79,7 +80,7 @@ pub async fn manually_match_platform(
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	let mut match_request = match_request.into_inner();
-	let user = handle_auth_and_permissions_match(
+	handle_auth_and_permissions_match(
 		UserPermissionsEnum::Trusted,
 		&mut match_request,
 		req,
@@ -87,7 +88,7 @@ pub async fn manually_match_platform(
 	)
 	.await?;
 
-	let updated = apply_manual_platform_match(match_request, user, db_conn.get_ref()).await?;
+	let updated = apply_manual_platform_match(match_request, db_conn.get_ref()).await?;
 
 	Ok(HttpResponse::Ok().json(updated))
 }
@@ -115,7 +116,7 @@ pub async fn manually_match_company(
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	let mut match_request = match_request.into_inner();
-	let user = handle_auth_and_permissions_match(
+	handle_auth_and_permissions_match(
 		UserPermissionsEnum::Trusted,
 		&mut match_request,
 		req,
@@ -123,7 +124,7 @@ pub async fn manually_match_company(
 	)
 	.await?;
 
-	let updated = apply_manual_company_match(match_request, user, db_conn.get_ref()).await?;
+	let updated = apply_manual_company_match(match_request, db_conn.get_ref()).await?;
 
 	Ok(HttpResponse::Ok().json(updated))
 }
@@ -139,6 +140,7 @@ async fn handle_auth_and_permissions_match(
 	if user.permissions == UserPermissionsEnum::Trusted
 		&& match_request.get_manual_match_type() != ManualMatchMode::Trusted
 	{
+		debug!("User is Trusted, setting manual match type to Trusted");
 		match_request.set_manual_match_type(ManualMatchMode::Trusted);
 	}
 
@@ -146,6 +148,10 @@ async fn handle_auth_and_permissions_match(
 		&& user.permissions != UserPermissionsEnum::Admin
 		&& match_request.get_user_id() != Some(user.id)
 	{
+		debug!(
+			"User is not Automation or Admin, setting user_id to {}",
+			user.id
+		);
 		match_request.set_user_id(Some(user.id));
 	}
 

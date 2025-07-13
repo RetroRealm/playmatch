@@ -12,10 +12,9 @@ use uuid::Uuid;
 /// Find or Create a User by their Discord ID.
 /// This Endpoint requires Credentials of a User with at least Automation level.
 #[utoipa::path(
-	get,
+	post,
 	context_path = "/api",
 	tag = "User",
-	params(GetUserQuery),
 	security(
         ("bearer_auth" = [])
 	),

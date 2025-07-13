@@ -25,7 +25,6 @@ use sea_orm::DbConn;
 
 pub async fn apply_manual_company_match(
 	r#match: CompanyOrPlatformMatchRequest,
-	user: entity::user::Model,
 	conn: &DbConn,
 ) -> ServiceResult<UpdatedMatchResult> {
 	let found_company = find_company_by_name(r#match.name.as_str(), conn).await?;
@@ -62,7 +61,7 @@ pub async fn apply_manual_company_match(
 			.failed_match_reason(None)
 			.automatic_match_reason(None)
 			.comment(r#match.comment.clone())
-			.manually_matched_by(Some(user.id))
+			.manually_matched_by(r#match.user_id)
 			.build()?,
 		conn,
 	)
@@ -76,7 +75,6 @@ pub async fn apply_manual_company_match(
 
 pub async fn apply_manual_platform_match(
 	r#match: CompanyOrPlatformMatchRequest,
-	user: entity::user::Model,
 	conn: &DbConn,
 ) -> ServiceResult<UpdatedMatchResult> {
 	let found_platform = find_platform_by_name(r#match.name.as_str(), conn).await?;
@@ -113,7 +111,7 @@ pub async fn apply_manual_platform_match(
 			.failed_match_reason(None)
 			.automatic_match_reason(None)
 			.comment(r#match.comment.clone())
-			.manually_matched_by(Some(user.id))
+			.manually_matched_by(r#match.user_id)
 			.build()?,
 		conn,
 	)
@@ -127,7 +125,6 @@ pub async fn apply_manual_platform_match(
 
 pub async fn apply_manual_game_match(
 	r#match: GameMatchRequest,
-	user: entity::user::Model,
 	conn: &DbConn,
 ) -> ServiceResult<Vec<UpdatedMatchResult>> {
 	let found_game = if let Some(sha256) = &r#match.sha256 {
@@ -218,7 +215,7 @@ pub async fn apply_manual_game_match(
 				.failed_match_reason(None)
 				.automatic_match_reason(None)
 				.comment(r#match.comment.clone())
-				.manually_matched_by(Some(user.id))
+				.manually_matched_by(r#match.user_id)
 				.build()?,
 			conn,
 		)

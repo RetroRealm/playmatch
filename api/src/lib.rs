@@ -16,7 +16,9 @@ use crate::routes::suggestion::{
 	approve_suggestion, create_company_suggestion, create_game_suggestion,
 	create_platform_suggestion, delete_suggestion, get_all_suggestions,
 };
-use crate::routes::user::{get_user, get_user_by_discord_id, update_user_permission_level};
+use crate::routes::user::{
+	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
+};
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
@@ -149,6 +151,7 @@ async fn start() -> anyhow::Result<()> {
 					.service(create_platform_suggestion)
 					.service(approve_suggestion)
 					.service(delete_suggestion)
+					.service(create_or_get_by_discord_id)
 					.service(get_user_by_discord_id)
 					.service(get_user)
 					.service(update_user_permission_level)
