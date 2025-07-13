@@ -27,7 +27,7 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 
 ### Prerequisites
 
-1. Rust 1.80+ from [here](https://www.rust-lang.org/tools/install)
+1. Rust 1.88+ from [here](https://www.rust-lang.org/tools/install)
 2. PostgreSQL 12+ from [here](https://www.postgresql.org/download/)
 
 ### Development

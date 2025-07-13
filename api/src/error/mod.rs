@@ -10,6 +10,12 @@ pub enum Error {
 	#[error("a database error occurred: {0}")]
 	DbError(#[from] sea_orm::DbErr),
 
+	#[error("Authentication failed: {0}")]
+	InvalidAuth(String),
+
+	#[error("User was not found")]
+	UserNotFound,
+
 	#[error(transparent)]
 	ServiceError(#[from] ServiceError),
 }
@@ -20,7 +26,9 @@ impl ResponseError for Error {
 			Self::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			Self::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			Error::ServiceError(err) => match err {
-				ServiceError::GameNotFound => StatusCode::BAD_REQUEST,
+				ServiceError::GameNotFound => StatusCode::NOT_FOUND,
+				ServiceError::PlatformNotFound => StatusCode::NOT_FOUND,
+				ServiceError::CompanyNotFound => StatusCode::NOT_FOUND,
 				ServiceError::SignatureMetadataMappingInputBuilderError(_) => {
 					StatusCode::INTERNAL_SERVER_ERROR
 				}
@@ -29,6 +37,8 @@ impl ResponseError for Error {
 				}
 				ServiceError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			},
+			Error::InvalidAuth(_) => StatusCode::UNAUTHORIZED,
+			Error::UserNotFound => StatusCode::NOT_FOUND,
 		}
 	}
 

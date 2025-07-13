@@ -25,7 +25,7 @@ pub struct Model {
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
-	pub created_by: Option<Uuid>,
+	pub manually_matched_by: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -56,7 +56,7 @@ pub enum Relation {
 	Platform,
 	#[sea_orm(
 		belongs_to = "super::user::Entity",
-		from = "Column::CreatedBy",
+		from = "Column::ManuallyMatchedBy",
 		to = "super::user::Column::Id",
 		on_update = "Cascade",
 		on_delete = "SetNull"

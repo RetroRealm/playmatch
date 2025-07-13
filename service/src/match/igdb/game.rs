@@ -2,7 +2,9 @@ use crate::db::game::{
 	find_game_parent, find_game_signature_metadata_mapping,
 	get_unmatched_games_with_clone_of_with_limit, get_unmatched_games_without_clone_of_with_limit,
 };
-use crate::db::platform::{find_platform_of_game, find_related_signature_metadata_mapping};
+use crate::db::platform::{
+	find_platform_of_game, find_platform_related_signature_metadata_mapping,
+};
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
@@ -20,18 +22,17 @@ use sea_orm::prelude::Uuid;
 use std::pin::Pin;
 use std::sync::Arc;
 
-type FetchFn = fn(
-	u64,
-	DbConn,
-) -> Pin<
-	Box<dyn futures_util::Future<Output = Result<Option<Vec<Model>>, anyhow::Error>> + Send>,
->;
+type FetchFn =
+	fn(
+		u64,
+		DbConn,
+	) -> Pin<Box<dyn Future<Output = Result<Option<Vec<Model>>, anyhow::Error>> + Send>>;
 
 type MatchFn = fn(
 	Model,
 	Arc<IgdbClient>,
 	DbConn,
-) -> Pin<Box<dyn futures_util::Future<Output = Result<(), anyhow::Error>> + Send>>;
+) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>;
 
 pub async fn match_games_to_igdb(
 	igdb_client: Arc<IgdbClient>,
@@ -262,7 +263,7 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 	};
 
 	let platform_igdb_metadata_mapping =
-		match find_related_signature_metadata_mapping(&platform, db_conn).await? {
+		match find_platform_related_signature_metadata_mapping(&platform, db_conn).await? {
 			None => {
 				return Err(anyhow::anyhow!(
 					"Platform {} is missing its igdb metadata mapping, this shouldn't happen...",

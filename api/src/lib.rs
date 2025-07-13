@@ -8,7 +8,9 @@ use crate::routes::igdb::{
 	get_external_games_by_ids, get_franchise_by_id, get_franchises_by_ids, get_game_by_id,
 	get_games_by_ids, get_genre_by_id, get_genres_by_ids, search_game_by_name,
 };
-use crate::routes::r#match::match_game;
+use crate::routes::r#match::{
+	manually_match_company, manually_match_game, manually_match_platform,
+};
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
@@ -103,7 +105,9 @@ async fn start() -> anyhow::Result<()> {
 					.service(get_all_platforms)
 					.service(get_platform_by_id)
 					.service(identify)
-					.service(match_game)
+					.service(manually_match_game)
+					.service(manually_match_platform)
+					.service(manually_match_company)
 					.service(get_game_by_id)
 					.service(get_games_by_ids)
 					.service(search_game_by_name)

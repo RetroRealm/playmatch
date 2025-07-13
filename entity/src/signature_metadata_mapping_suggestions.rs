@@ -15,6 +15,7 @@ pub struct Model {
 	pub provider: MetadataProviderEnum,
 	pub provider_id: String,
 	pub comment: Option<String>,
+	pub created_by: Option<Uuid>,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 }
@@ -45,6 +46,14 @@ pub enum Relation {
 		on_delete = "Cascade"
 	)]
 	Platform,
+	#[sea_orm(
+		belongs_to = "super::user::Entity",
+		from = "Column::CreatedBy",
+		to = "super::user::Column::Id",
+		on_update = "Cascade",
+		on_delete = "NoAction"
+	)]
+	User,
 }
 
 impl Related<super::company::Entity> for Entity {
@@ -62,6 +71,12 @@ impl Related<super::game::Entity> for Entity {
 impl Related<super::platform::Entity> for Entity {
 	fn to() -> RelationDef {
 		Relation::Platform.def()
+	}
+}
+
+impl Related<super::user::Entity> for Entity {
+	fn to() -> RelationDef {
+		Relation::User.def()
 	}
 }
 

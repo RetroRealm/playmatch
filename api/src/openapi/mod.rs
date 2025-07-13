@@ -10,8 +10,11 @@ use crate::routes::igdb::{
 	__path_get_games_by_ids, __path_get_genre_by_id, __path_get_genres_by_ids,
 	__path_search_game_by_name,
 };
-use crate::routes::r#match::__path_match_game;
+use crate::routes::r#match::{
+	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
+};
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
+use crate::routes::user::{__path_get_user, __path_get_user_by_discord_id};
 use service::metadata::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentCategory, AgeRatingContentDescription,
 	AgeRatingEnum, AlternativeName, Artwork, Character, CharacterGender, CharacterSpecies,
@@ -29,9 +32,11 @@ use service::metadata::igdb::model::{
 	PopularityPrimitive, PopularitySource, PopularityType, Region, ReleaseDate,
 	ReleaseDateCategory, ReleaseDateRegion, ReleaseDateStatus, Screenshot, Theme, WebsiteCategory,
 };
+use service::model::matching::{CompanyMatchRequest, GameMatchRequest, PlatformMatchRequest};
+use service::model::user::{User, UserPermissions};
 use service::model::{
 	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
-	GameMatchType, ManualMatchMode, MatchRequest, MatchType, MetadataProvider, PlatformResponse,
+	GameMatchType, ManualMatchMode, MatchType, MetadataProvider, PlatformResponse,
 	UpdatedMatchResult,
 };
 use utoipa::OpenApi;
@@ -42,7 +47,11 @@ use utoipa::OpenApi;
 		health,
 		ready,
 		identify,
-		match_game,
+		manually_match_game,
+		manually_match_company,
+		manually_match_platform,
+		get_user_by_discord_id,
+		get_user,
 		get_game_by_id,
 		get_games_by_ids,
 		search_game_by_name,
@@ -128,7 +137,11 @@ use utoipa::OpenApi;
 		LanguageSupport,
 		LanguageSupportType,
 		MultiplayerMode,
-		MatchRequest,
+		GameMatchRequest,
+		CompanyMatchRequest,
+		PlatformMatchRequest,
+		User,
+		UserPermissions,
 		NetworkType,
 		Platform,
 		PlatformCategory,

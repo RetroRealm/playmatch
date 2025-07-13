@@ -67,3 +67,19 @@ pub enum MetadataProviderEnum {
 	#[sea_orm(string_value = "igdb")]
 	Igdb,
 }
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(
+	rs_type = "String",
+	db_type = "Enum",
+	enum_name = "user_permissions_enum"
+)]
+pub enum UserPermissionsEnum {
+	#[sea_orm(string_value = "user")]
+	User,
+	#[sea_orm(string_value = "trusted")]
+	Trusted,
+	#[sea_orm(string_value = "automation")]
+	Automation,
+	#[sea_orm(string_value = "admin")]
+	Admin,
+}

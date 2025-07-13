@@ -33,6 +33,8 @@ pub struct SignatureMetadataMappingInput {
 	pub failed_match_reason: Option<FailedMatchReasonEnum>,
 	#[builder(default)]
 	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
+	#[builder(default)]
+	pub manually_matched_by: Option<Uuid>,
 }
 
 pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provider(
@@ -83,6 +85,7 @@ pub async fn create_or_update_signature_metadata_mapping(
 	active_model.failed_match_reason = Set(input.failed_match_reason);
 	active_model.comment = Set(input.comment);
 	active_model.automatic_match_reason = Set(input.automatic_match_reason);
+	active_model.manually_matched_by = Set(input.manually_matched_by);
 
 	active_model = active_model.save(db_conn).await?;
 

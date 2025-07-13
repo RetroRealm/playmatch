@@ -1,3 +1,6 @@
+pub mod matching;
+pub mod user;
+
 use derive_builder::Builder;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
@@ -7,33 +10,6 @@ use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 use utoipa::{IntoParams, ToSchema};
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct MatchRequest {
-	/// MD5 hash of the game file.
-	pub md5: Option<String>,
-
-	/// SHA1 hash of the game file.
-	pub sha1: Option<String>,
-
-	/// SHA256 hash of the game file.
-	pub sha256: Option<String>,
-
-	/// Name of game or file.
-	pub name: Option<String>,
-
-	/// Optional comment about the match.
-	pub comment: Option<String>,
-
-	/// Metadata provider to match for.
-	pub provider: MetadataProvider,
-
-	/// ID of the game file in the metadata provider.
-	pub provider_id: String,
-
-	/// The type of manual match
-	pub manual_match_type: ManualMatchMode,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
@@ -73,16 +49,15 @@ pub enum GameMatchType {
 	NoMatch,
 }
 
-/// Result of a manual game match.
+/// Result of a manual match.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatedMatchResult {
-	/// ID of the game.
+	/// ID of the entity matched (game, platform or company).
 	pub id: Uuid,
 
-	/// External metadata for the matched game.
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	pub external_metadata: Vec<ExternalMetadata>,
+	/// The updated ExternalMetadata for the entity.
+	pub external_metadata: ExternalMetadata,
 }
 
 /// Result of a game match.

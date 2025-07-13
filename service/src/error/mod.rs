@@ -5,6 +5,12 @@ pub enum ServiceError {
 	#[error("The game couldn't be found by the given hashes or file name")]
 	GameNotFound,
 
+	#[error("The platform couldn't be found by the given name")]
+	PlatformNotFound,
+
+	#[error("The company couldn't be found by the given name")]
+	CompanyNotFound,
+
 	#[error(transparent)]
 	SignatureMetadataMappingInputBuilderError(#[from] SignatureMetadataMappingInputBuilderError),
 

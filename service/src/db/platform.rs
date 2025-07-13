@@ -154,13 +154,23 @@ pub async fn find_platform_of_game(
 		.await
 }
 
-pub async fn find_related_signature_metadata_mapping(
+pub async fn find_platform_related_signature_metadata_mapping(
 	model: &platform::Model,
 	conn: &DbConn,
 ) -> Result<Option<signature_metadata_mapping::Model>, DbErr> {
 	model
 		.find_related(signature_metadata_mapping::Entity)
 		.filter(signature_metadata_mapping::Column::Provider.eq(MetadataProviderEnum::Igdb))
+		.one(conn)
+		.await
+}
+
+pub async fn find_platform_by_name(
+	name: &str,
+	conn: &DbConn,
+) -> Result<Option<platform::Model>, DbErr> {
+	Platform::find()
+		.filter(platform::Column::Name.eq(name))
 		.one(conn)
 		.await
 }

@@ -2,6 +2,7 @@ use crate::cache::identify::{
 	find_game_and_id_mapping_by_md5_cached, find_game_and_id_mapping_by_sha1_cached,
 	find_game_and_id_mapping_by_sha256_cached,
 };
+use crate::db::company::{find_company_by_name, find_company_related_signature_metadata_mapping};
 use crate::db::game::{
 	find_all_children_of_game, find_game_and_id_mapping_by_md5,
 	find_game_and_id_mapping_by_name_and_size, find_game_and_id_mapping_by_sha1,
@@ -9,13 +10,16 @@ use crate::db::game::{
 	find_game_signature_metadata_mapping, find_games_by_name_and_platform_id,
 };
 use crate::db::game_file::get_game_files_from_game_id;
-use crate::db::platform::find_platform_of_game;
+use crate::db::platform::{
+	find_platform_by_name, find_platform_of_game, find_platform_related_signature_metadata_mapping,
+};
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
+use crate::model::matching::{CompanyMatchRequest, GameMatchRequest, PlatformMatchRequest};
 use crate::model::{
-	GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType, MatchRequest,
+	GameFileMatchSearch, GameMatchResult, GameMatchResultBuilder, GameMatchType,
 	UpdatedMatchResult, UpdatedMatchResultBuilder,
 };
 use cached::Cached;
@@ -25,8 +29,111 @@ use log::debug;
 use sea_orm::DbConn;
 use strum::IntoEnumIterator;
 
+pub async fn apply_manual_company_match(
+	r#match: CompanyMatchRequest,
+	user: entity::user::Model,
+	conn: &DbConn,
+) -> ServiceResult<UpdatedMatchResult> {
+	let found_company = find_company_by_name(r#match.name.as_str(), conn).await?;
+
+	let company = found_company.ok_or(ServiceError::CompanyNotFound)?;
+
+	let mapping = find_company_related_signature_metadata_mapping(&company, conn).await?;
+
+	if let Some(mapping) = mapping {
+		if mapping.match_type != MatchTypeEnum::Failed || mapping.match_type != MatchTypeEnum::None
+		{
+			debug!("Overwriting existing mapping for company: {}", company.id);
+			// TODO: decide how to notify the user that this entry is already matched
+		}
+
+		if let Some(provider_id) = &mapping.provider_id {
+			if provider_id == &r#match.provider_id && mapping.provider == r#match.provider.into() {
+				debug!("No update needed for company: {}", company.id);
+				return Ok(UpdatedMatchResultBuilder::default()
+					.id(company.id)
+					.external_metadata(mapping.into())
+					.build()?);
+			}
+		}
+	}
+
+	let updated = create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.company_id(Some(company.id))
+			.provider(r#match.provider.into())
+			.provider_id(Some(r#match.provider_id.clone()))
+			.match_type(MatchTypeEnum::Manual)
+			.manual_match_type(Some(r#match.manual_match_type.into()))
+			.failed_match_reason(None)
+			.automatic_match_reason(None)
+			.comment(r#match.comment.clone())
+			.manually_matched_by(Some(user.id))
+			.build()?,
+		conn,
+	)
+	.await?;
+
+	Ok(UpdatedMatchResultBuilder::default()
+		.id(company.id)
+		.external_metadata(updated.into())
+		.build()?)
+}
+
+pub async fn apply_manual_platform_match(
+	r#match: PlatformMatchRequest,
+	user: entity::user::Model,
+	conn: &DbConn,
+) -> ServiceResult<UpdatedMatchResult> {
+	let found_platform = find_platform_by_name(r#match.name.as_str(), conn).await?;
+
+	let platform = found_platform.ok_or(ServiceError::PlatformNotFound)?;
+
+	let mapping = find_platform_related_signature_metadata_mapping(&platform, conn).await?;
+
+	if let Some(mapping) = mapping {
+		if mapping.match_type != MatchTypeEnum::Failed || mapping.match_type != MatchTypeEnum::None
+		{
+			debug!("Overwriting existing mapping for platform: {}", platform.id);
+			// TODO: decide how to notify the user that this entry is already matched
+		}
+
+		if let Some(provider_id) = &mapping.provider_id {
+			if provider_id == &r#match.provider_id && mapping.provider == r#match.provider.into() {
+				debug!("No update needed for platform: {}", platform.id);
+				return Ok(UpdatedMatchResultBuilder::default()
+					.id(platform.id)
+					.external_metadata(mapping.into())
+					.build()?);
+			}
+		}
+	}
+
+	let updated = create_or_update_signature_metadata_mapping(
+		SignatureMetadataMappingInputBuilder::default()
+			.platform_id(Some(platform.id))
+			.provider(r#match.provider.into())
+			.provider_id(Some(r#match.provider_id.clone()))
+			.match_type(MatchTypeEnum::Manual)
+			.manual_match_type(Some(r#match.manual_match_type.into()))
+			.failed_match_reason(None)
+			.automatic_match_reason(None)
+			.comment(r#match.comment.clone())
+			.manually_matched_by(Some(user.id))
+			.build()?,
+		conn,
+	)
+	.await?;
+
+	Ok(UpdatedMatchResultBuilder::default()
+		.id(platform.id)
+		.external_metadata(updated.into())
+		.build()?)
+}
+
 pub async fn apply_manual_game_match(
-	r#match: MatchRequest,
+	r#match: GameMatchRequest,
+	user: entity::user::Model,
 	conn: &DbConn,
 ) -> ServiceResult<Vec<UpdatedMatchResult>> {
 	let found_game = if let Some(sha256) = &r#match.sha256 {
@@ -117,6 +224,7 @@ pub async fn apply_manual_game_match(
 				.failed_match_reason(None)
 				.automatic_match_reason(None)
 				.comment(r#match.comment.clone())
+				.manually_matched_by(Some(user.id))
 				.build()?,
 			conn,
 		)
@@ -131,7 +239,7 @@ pub async fn apply_manual_game_match(
 		results.push(
 			UpdatedMatchResultBuilder::default()
 				.id(game.id)
-				.external_metadata(vec![updated.into()])
+				.external_metadata(updated.into())
 				.build()?,
 		)
 	}

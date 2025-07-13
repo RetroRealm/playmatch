@@ -1,6 +1,6 @@
 use entity::company::ActiveModel;
 use entity::prelude::Company;
-use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
 use entity::{company, signature_metadata_mapping};
 use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
@@ -8,6 +8,29 @@ use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
 	QuerySelect, TryIntoModel,
 };
+
+pub async fn find_company_by_name(
+	name: &str,
+	conn: &DbConn,
+) -> Result<Option<company::Model>, DbErr> {
+	let company = company::Entity::find()
+		.filter(company::Column::Name.eq(name))
+		.one(conn)
+		.await?;
+
+	Ok(company)
+}
+
+pub async fn find_company_related_signature_metadata_mapping(
+	model: &company::Model,
+	conn: &DbConn,
+) -> Result<Option<signature_metadata_mapping::Model>, DbErr> {
+	model
+		.find_related(signature_metadata_mapping::Entity)
+		.filter(signature_metadata_mapping::Column::Provider.eq(MetadataProviderEnum::Igdb))
+		.one(conn)
+		.await
+}
 
 pub async fn get_by_id_and_join_signature_metadata_mappings(
 	id: Uuid,
