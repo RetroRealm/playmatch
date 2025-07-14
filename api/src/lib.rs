@@ -25,7 +25,7 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{Data, scope};
 use actix_web::{App, HttpServer};
-use log::{LevelFilter, debug, error, info};
+use log::{Level, LevelFilter, debug, error, info};
 use migration::{Migrator, MigratorTrait};
 use openapi::ApiDoc;
 use reqwest::Client;
@@ -132,9 +132,10 @@ async fn start() -> anyhow::Result<()> {
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))
-					.wrap(Logger::new(
-						"%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T",
-					))
+					.wrap(
+						Logger::new("%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T")
+							.log_level(Level::Debug),
+					)
 					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API.clone())))
 					.service(health)
 					.service(ready)
