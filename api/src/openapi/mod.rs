@@ -1,6 +1,11 @@
 use crate::routes::company::{__path_get_all_companies, __path_get_company_by_id};
+use crate::routes::game::{
+	__path_get_playmatch_game_by_id, __path_get_playmatch_game_with_relations_by_id,
+};
 use crate::routes::health::{__path_health, __path_ready};
-use crate::routes::identify::__path_identify;
+use crate::routes::identify::{
+	__path_identify_game_and_relations, __path_identify_game_with_metadata_ids,
+};
 use crate::routes::igdb::{
 	__path_get_age_rating_by_id, __path_get_age_ratings_by_ids, __path_get_alternative_name_by_id,
 	__path_get_alternative_names_by_ids, __path_get_artwork_by_id, __path_get_artworks_by_ids,
@@ -17,6 +22,7 @@ use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_i
 use crate::routes::suggestion::{
 	__path_approve_suggestion, __path_create_company_suggestion, __path_create_game_suggestion,
 	__path_create_platform_suggestion, __path_delete_suggestion, __path_get_all_suggestions,
+	__path_get_suggestion_by_id,
 };
 use crate::routes::user::{
 	__path_create_or_get_by_discord_id, __path_get_user, __path_get_user_by_discord_id,
@@ -42,14 +48,17 @@ use service::metadata::igdb::model::{
 use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
 use service::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
+	UpdatedMetadataMatchesFromSuggestionResponse,
 };
 use service::model::user::{
 	CreateOrGetUserRequest, UpdateUserPermissionsRequest, User, UserPermissions,
 };
 use service::model::{
-	AutomaticMatchReason, CompanyResponse, ExternalMetadata, FailedMatchReason, GameMatchResult,
-	GameMatchType, ManualMatchMode, MatchType, MetadataProvider, PlatformResponse,
-	UpdatedMatchResult,
+	AutomaticMatchReason, CompanyMetadataResponse, ExternalMetadata, FailedMatchReason,
+	GameAndRelationMatchResult, GameAndRelationsResult, GameMatchType, GameMetadataMatchResult,
+	ManualMatchMode, MatchType, MetadataProvider, PlatformMetadataResponse, PlaymatchCompany,
+	PlaymatchDatFile, PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile, PlaymatchPlatform,
+	PlaymatchSignatureGroup, UpdatedMatchResult,
 };
 use utoipa::OpenApi;
 
@@ -58,10 +67,14 @@ use utoipa::OpenApi;
 	paths(
 		health,
 		ready,
-		identify,
+		identify_game_with_metadata_ids,
+		identify_game_and_relations,
 		manually_match_game,
 		manually_match_company,
 		manually_match_platform,
+		get_playmatch_game_by_id,
+		get_playmatch_game_with_relations_by_id,
+		get_suggestion_by_id,
 		get_all_suggestions,
 		create_game_suggestion,
 		create_company_suggestion,
@@ -97,9 +110,9 @@ use utoipa::OpenApi;
 		get_platform_by_id
 	),
 	components(schemas(
-		GameMatchResult,
-		CompanyResponse,
-		PlatformResponse,
+		GameMetadataMatchResult,
+		CompanyMetadataResponse,
+		PlatformMetadataResponse,
 		GameMatchType,
 		ExternalMetadata,
 		MatchType,
@@ -159,8 +172,18 @@ use utoipa::OpenApi;
 		MultiplayerMode,
 		GameMatchRequest,
 		CompanyOrPlatformMatchRequest,
+		GameAndRelationMatchResult,
+		GameAndRelationsResult,
+		PlaymatchCompany,
+		PlaymatchGame,
+		PlaymatchGameFile,
+		PlaymatchPlatform,
+		PlaymatchDatFile,
+		PlaymatchDatFileImport,
+		PlaymatchSignatureGroup,
 		GameSuggestionRequest,
 		CompanyOrPlatformSuggestionRequest,
+		UpdatedMetadataMatchesFromSuggestionResponse,
 		Suggestion,
 		User,
 		UserPermissions,

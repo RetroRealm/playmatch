@@ -42,6 +42,9 @@ impl ResponseError for Error {
 				ServiceError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 				ServiceError::SuggestionAlreadyExists => StatusCode::CONFLICT,
 				ServiceError::SuggestionNotFound => StatusCode::NOT_FOUND,
+				ServiceError::GameAndRelationsResultBuilderError(_) => {
+					StatusCode::INTERNAL_SERVER_ERROR
+				}
 			},
 			Error::InvalidAuth(_) => StatusCode::UNAUTHORIZED,
 			Error::UserNotFound => StatusCode::NOT_FOUND,

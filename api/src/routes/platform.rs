@@ -14,7 +14,7 @@ use uuid::Uuid;
 	context_path = "/api",
 	tag = "Platform",
 	responses(
-		(status = 200, description = "Returns a list of Platforms playmatch knows about including its company and metadata mappings", body = Vec<PlatformResponse>)
+		(status = 200, description = "Returns a list of Platforms playmatch knows about including its company and metadata mappings", body = Vec<PlatformMetadataResponse>)
 	)
 )]
 #[get("/platforms")]
@@ -31,7 +31,7 @@ pub async fn get_all_platforms(db_conn: Data<DatabaseConnection>) -> error::Resu
 	context_path = "/api",
 	tag = "Platform",
 	responses(
-		(status = 200, description = "Returns a Platform and its metadata mappings", body = PlatformResponse),
+		(status = 200, description = "Returns a Platform and its metadata mappings", body = PlatformMetadataResponse),
 		(status = 404, description = "Platform not found")
 	)
 )]

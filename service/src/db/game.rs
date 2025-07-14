@@ -5,15 +5,73 @@ use ::entity::{
 	signature_metadata_mapping,
 };
 use entity::sea_orm_active_enums::MatchTypeEnum;
-use entity::{dat_file, dat_file_import, platform};
+use entity::{company, dat_file, dat_file_import, platform, signature_group};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
 	ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
-	JoinType, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
-	SelectModel, TryIntoModel, sea_query::SimpleExpr,
+	JoinType, ModelTrait, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+	RelationTrait, SelectModel, TryIntoModel, sea_query::SimpleExpr,
 };
+
+pub async fn get_game_by_id(game_id: Uuid, conn: &DbConn) -> Result<Option<game::Model>, DbErr> {
+	Game::find_by_id(game_id).one(conn).await
+}
+
+pub async fn find_all_relations_of_game(
+	game: &game::Model,
+	conn: &DbConn,
+) -> Result<
+	(
+		dat_file_import::Model,
+		dat_file::Model,
+		signature_group::Model,
+		platform::Model,
+		Option<company::Model>,
+		Vec<game_file::Model>,
+	),
+	DbErr,
+> {
+	let dat_file_import_opt = game.find_related(dat_file_import::Entity).one(conn).await?;
+
+	let dat_file_import = dat_file_import_opt
+		.ok_or_else(|| DbErr::RecordNotFound("Dat file import not found".to_string()))?;
+
+	let dat_file_opt = dat_file_import
+		.find_related(dat_file::Entity)
+		.one(conn)
+		.await?;
+
+	let dat_file =
+		dat_file_opt.ok_or_else(|| DbErr::RecordNotFound("Dat file not found".to_string()))?;
+
+	let signature_group_opt = dat_file
+		.find_related(signature_group::Entity)
+		.one(conn)
+		.await?;
+
+	let signature_group = signature_group_opt
+		.ok_or_else(|| DbErr::RecordNotFound("Signature group not found".to_string()))?;
+
+	let platform_opt = dat_file.find_related(platform::Entity).one(conn).await?;
+
+	let platform =
+		platform_opt.ok_or_else(|| DbErr::RecordNotFound("Platform not found".to_string()))?;
+
+	let company = platform.find_related(company::Entity).one(conn).await?;
+
+	let game_files = game.find_related(game_file::Entity).all(conn).await?;
+
+	Ok((
+		dat_file_import,
+		dat_file,
+		signature_group,
+		platform,
+		company,
+		game_files,
+	))
+}
 
 pub async fn insert_game(
 	dat_file_import_id: Uuid,

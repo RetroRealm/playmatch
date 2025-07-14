@@ -13,7 +13,7 @@ use uuid::Uuid;
 	context_path = "/api",
 	tag = "Company",
 	responses(
-		(status = 200, description = "Returns a list of Companies playmatch knows about including its metadata mappings", body = Vec<CompanyResponse>)
+		(status = 200, description = "Returns a list of Companies playmatch knows about including its metadata mappings", body = Vec<CompanyMetadataResponse>)
 	)
 )]
 #[get("/companies")]
@@ -29,7 +29,7 @@ pub async fn get_all_companies(db_conn: Data<DatabaseConnection>) -> error::Resu
 	context_path = "/api",
 	tag = "Company",
 	responses(
-		(status = 200, description = "Returns a Company and its metadata mappings", body = CompanyResponse),
+		(status = 200, description = "Returns a Company and its metadata mappings", body = CompanyMetadataResponse),
 		(status = 404, description = "Company not found")
 	)
 )]

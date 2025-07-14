@@ -106,3 +106,33 @@ pub struct GameMatchRequest {
 	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
 	pub user_id: Option<Uuid>,
 }
+
+#[derive(Debug)]
+pub struct GameMatchData {
+	/// Optional comment about the match.
+	pub comment: Option<String>,
+
+	/// Metadata provider to match for.
+	pub provider: MetadataProvider,
+
+	/// ID of the game file in the metadata provider.
+	pub provider_id: String,
+
+	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
+	pub manual_match_type: ManualMatchMode,
+
+	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	pub user_id: Option<Uuid>,
+}
+
+impl From<GameMatchRequest> for GameMatchData {
+	fn from(request: GameMatchRequest) -> Self {
+		Self {
+			comment: request.comment,
+			provider: request.provider,
+			provider_id: request.provider_id,
+			manual_match_type: request.manual_match_type,
+			user_id: request.user_id,
+		}
+	}
+}

@@ -12,9 +12,9 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
-use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
+use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchData, GameMatchRequest};
 use crate::model::{
-	GameMatchResult, GameMatchResultBuilder, GameMatchType, UpdatedMatchResult,
+	GameMatchType, GameMetadataMatchResult, GameMetadataMatchResultBuilder, UpdatedMatchResult,
 	UpdatedMatchResultBuilder,
 };
 use cached::Cached;
@@ -146,6 +146,15 @@ pub async fn apply_manual_game_match(
 	};
 
 	let game = found_game.ok_or(ServiceError::GameNotFound)?;
+
+	apply_manual_game_match_by_game(game, r#match.into(), conn).await
+}
+
+pub async fn apply_manual_game_match_by_game(
+	game: game::Model,
+	r#match: GameMatchData,
+	conn: &DbConn,
+) -> ServiceResult<Vec<UpdatedMatchResult>> {
 	let platform = find_platform_of_game(game.id, conn).await?;
 
 	// Find all games that match the name and have the same platform (this is useful for platforms having multiple dat sets for encrypted and decrypted versions)
@@ -262,12 +271,12 @@ async fn bust_cache_for_hashes(sha256: Option<String>, sha1: Option<String>, md5
 	}
 }
 
-pub(crate) fn build_result(
+pub fn build_result(
 	game_match_type: GameMatchType,
 	game: game::Model,
 	signature_metadata_mappings: Vec<signature_metadata_mapping::Model>,
-) -> anyhow::Result<GameMatchResult> {
-	let result = GameMatchResultBuilder::default()
+) -> anyhow::Result<GameMetadataMatchResult> {
+	let result = GameMetadataMatchResultBuilder::default()
 		.game_match_type(game_match_type)
 		.id(Some(game.id))
 		.external_metadata(

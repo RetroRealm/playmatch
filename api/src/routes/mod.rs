@@ -7,6 +7,7 @@ use sea_orm::DatabaseConnection;
 use service::db::user::get_user_by_api_key;
 
 pub mod company;
+pub mod game;
 pub mod health;
 pub mod identify;
 pub mod igdb;

@@ -29,6 +29,9 @@ pub enum ServiceError {
 	UpdatedMatchResultBuilderError(#[from] crate::model::UpdatedMatchResultBuilderError),
 
 	#[error(transparent)]
+	GameAndRelationsResultBuilderError(#[from] crate::model::GameAndRelationsResultBuilderError),
+
+	#[error(transparent)]
 	DbError(#[from] sea_orm::DbErr),
 }
 

@@ -11,6 +11,9 @@ use crate::db::signature_metadata_mapping_suggestions::{
 	get_all_suggestions, get_suggestion_by_id, insert_suggestion, suggestion_exists,
 };
 use crate::error::{ServiceError, ServiceResult};
+use crate::manual_match::apply_manual_game_match_by_game;
+use crate::model::ManualMatchMode;
+use crate::model::matching::GameMatchData;
 use crate::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
 };
@@ -22,6 +25,14 @@ pub async fn get_suggestions(db_conn: &DatabaseConnection) -> ServiceResult<Vec<
 	let suggestions = get_all_suggestions(db_conn).await?;
 
 	Ok(suggestions.into_iter().map(|s| s.into()).collect())
+}
+
+pub async fn get_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<Suggestion> {
+	let suggestion = get_suggestion_by_id(id, db_conn)
+		.await?
+		.ok_or(ServiceError::SuggestionNotFound)?;
+
+	Ok(suggestion.into())
 }
 
 pub async fn add_game_suggestion(
@@ -148,32 +159,55 @@ pub async fn add_company_suggestion(
 	Ok(created.into())
 }
 
-pub async fn accept_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<()> {
+pub async fn accept_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<i32> {
 	let suggestion_opt = get_suggestion_by_id(id, db_conn).await?;
 
 	let suggestion = suggestion_opt.ok_or(ServiceError::SuggestionNotFound)?;
 
-	create_or_update_signature_metadata_mapping(
-		SignatureMetadataMappingInputBuilder::default()
-			.provider(suggestion.provider.clone())
-			.provider_id(Some(suggestion.provider_id.clone()))
-			.game_id(suggestion.game_id)
-			.platform_id(suggestion.platform_id)
-			.company_id(suggestion.company_id)
-			.comment(suggestion.comment.clone())
-			.manually_matched_by(suggestion.created_by)
-			.manual_match_type(Some(ManualMatchModeEnum::Community))
-			.match_type(MatchTypeEnum::Manual)
-			.failed_match_reason(None)
-			.automatic_match_reason(None)
-			.build()?,
-		db_conn,
-	)
-	.await?;
+	let updated = if let Some(game_id) = suggestion.game_id {
+		let game_opt = crate::db::game::get_game_by_id(game_id, db_conn).await?;
+
+		let game = game_opt.ok_or(ServiceError::GameNotFound)?;
+
+		let updated = apply_manual_game_match_by_game(
+			game,
+			GameMatchData {
+				comment: suggestion.comment.clone(),
+				provider: suggestion.provider.clone().into(),
+				provider_id: suggestion.provider_id.clone(),
+				manual_match_type: ManualMatchMode::Community,
+				user_id: suggestion.created_by,
+			},
+			db_conn,
+		)
+		.await?;
+
+		updated.len() as i32
+	} else {
+		create_or_update_signature_metadata_mapping(
+			SignatureMetadataMappingInputBuilder::default()
+				.provider(suggestion.provider.clone())
+				.provider_id(Some(suggestion.provider_id.clone()))
+				.game_id(suggestion.game_id)
+				.platform_id(suggestion.platform_id)
+				.company_id(suggestion.company_id)
+				.comment(suggestion.comment.clone())
+				.manually_matched_by(suggestion.created_by)
+				.manual_match_type(Some(ManualMatchModeEnum::Community))
+				.match_type(MatchTypeEnum::Manual)
+				.failed_match_reason(None)
+				.automatic_match_reason(None)
+				.build()?,
+			db_conn,
+		)
+		.await?;
+
+		1
+	};
 
 	suggestion.delete(db_conn).await?;
 
-	Ok(())
+	Ok(updated)
 }
 
 pub async fn decline_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<()> {

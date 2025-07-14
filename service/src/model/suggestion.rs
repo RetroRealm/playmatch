@@ -91,6 +91,12 @@ pub struct Suggestion {
 	pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatedMetadataMatchesFromSuggestionResponse {
+	pub updated: i32,
+}
+
 impl From<Model> for Suggestion {
 	fn from(value: Model) -> Self {
 		Self {

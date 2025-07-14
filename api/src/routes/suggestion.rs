@@ -4,10 +4,13 @@ use actix_web::web::{Data, Json, Path};
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use sea_orm::DatabaseConnection;
-use service::model::suggestion::{CompanyOrPlatformSuggestionRequest, GameSuggestionRequest};
+use service::model::suggestion::{
+	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest,
+	UpdatedMetadataMatchesFromSuggestionResponse,
+};
 use service::suggestion::{
 	accept_suggestion, add_company_suggestion, add_game_suggestion, add_platform_suggestion,
-	decline_suggestion, get_suggestions,
+	decline_suggestion, get_suggestion, get_suggestions,
 };
 use uuid::Uuid;
 
@@ -34,6 +37,32 @@ pub async fn get_all_suggestions(
 	handle_auth_and_permissions(&UserPermissionsEnum::Automation, req, db_conn.clone()).await?;
 
 	Ok(HttpResponse::Ok().json(get_suggestions(db_conn.get_ref()).await?))
+}
+
+/// Gets a pending suggestion by id.
+/// This Endpoint requires Credentials of at least Automation level.
+#[utoipa::path(
+	get,
+	context_path = "/api",
+	tag = "Suggestion",
+	security(
+        ("bearer_auth" = [])
+	),
+	responses(
+		(status = 200, description = "Successfully retrieved suggestions", body = Suggestion),
+		(status = 401, description = "Unauthorized, you need to be logged in to view suggestion"),
+		(status = 403, description = "Forbidden, you do not have permission to view suggestions"),
+	)
+)]
+#[get("/suggestion/{id}")]
+pub async fn get_suggestion_by_id(
+	id: Path<Uuid>,
+	db_conn: Data<DatabaseConnection>,
+	req: HttpRequest,
+) -> error::Result<impl Responder> {
+	handle_auth_and_permissions(&UserPermissionsEnum::Automation, req, db_conn.clone()).await?;
+
+	Ok(HttpResponse::Ok().json(get_suggestion(id.into_inner(), db_conn.get_ref()).await?))
 }
 
 /// Adds a suggestion for a manual game metadata match.
@@ -131,7 +160,7 @@ pub async fn create_company_suggestion(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 204, description = "Successfully approved suggestion"),
+		(status = 200, description = "Successfully approved suggestion", body = UpdatedMetadataMatchesFromSuggestionResponse),
 		(status = 401, description = "Unauthorized, you need to be logged in to approve a suggestion"),
 		(status = 403, description = "Forbidden, you do not have permission to approve suggestions"),
 		(status = 404, description = "Could not find a Suggestion with the provided id"),
@@ -145,9 +174,9 @@ pub async fn approve_suggestion(
 ) -> error::Result<impl Responder> {
 	handle_auth_and_permissions(&UserPermissionsEnum::Automation, req, db_conn.clone()).await?;
 
-	accept_suggestion(id.into_inner(), db_conn.get_ref()).await?;
+	let updated = accept_suggestion(id.into_inner(), db_conn.get_ref()).await?;
 
-	Ok(HttpResponse::NoContent())
+	Ok(HttpResponse::Ok().json(UpdatedMetadataMatchesFromSuggestionResponse { updated }))
 }
 
 /// Declines a suggestion by id.

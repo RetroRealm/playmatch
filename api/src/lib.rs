@@ -1,6 +1,7 @@
 use crate::routes::company::{get_all_companies, get_company_by_id};
+use crate::routes::game::{get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id};
 use crate::routes::health::{health, ready};
-use crate::routes::identify::identify;
+use crate::routes::identify::{identify_game_and_relations, identify_game_with_metadata_ids};
 use crate::routes::igdb::{
 	get_age_rating_by_id, get_age_ratings_by_ids, get_alternative_name_by_id,
 	get_alternative_names_by_ids, get_artwork_by_id, get_artworks_by_ids, get_collection_by_id,
@@ -14,7 +15,7 @@ use crate::routes::r#match::{
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::suggestion::{
 	approve_suggestion, create_company_suggestion, create_game_suggestion,
-	create_platform_suggestion, delete_suggestion, get_all_suggestions,
+	create_platform_suggestion, delete_suggestion, get_all_suggestions, get_suggestion_by_id,
 };
 use crate::routes::user::{
 	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
@@ -141,10 +142,14 @@ async fn start() -> anyhow::Result<()> {
 					.service(get_company_by_id)
 					.service(get_all_platforms)
 					.service(get_platform_by_id)
-					.service(identify)
+					.service(identify_game_with_metadata_ids)
+					.service(identify_game_and_relations)
 					.service(manually_match_game)
 					.service(manually_match_platform)
 					.service(manually_match_company)
+					.service(get_playmatch_game_by_id)
+					.service(get_playmatch_game_with_relations_by_id)
+					.service(get_suggestion_by_id)
 					.service(get_all_suggestions)
 					.service(create_game_suggestion)
 					.service(create_company_suggestion)
