@@ -9,7 +9,7 @@ use uuid::Uuid;
 #[utoipa::path(
 	get,
 	context_path = "/api",
-	tag = "PlaymatchGame",
+	tag = "Game",
 	responses(
 		(status = 200, description = "Returns the found game", body = PlaymatchGame)
 	)
@@ -26,7 +26,7 @@ pub async fn get_playmatch_game_by_id(
 #[utoipa::path(
 	get,
 	context_path = "/api",
-	tag = "PlaymatchGame",
+	tag = "Game",
 	responses(
 		(status = 200, description = "Returns the found game including all relations", body = GameAndRelationsResult)
 	)
