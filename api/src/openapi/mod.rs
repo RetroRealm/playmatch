@@ -63,6 +63,8 @@ use service::model::{
 	PlaymatchSignatureGroup, UpdatedMatchResult,
 };
 use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::{Components, ComponentsBuilder};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -219,3 +221,31 @@ use utoipa::OpenApi;
 	))
 )]
 pub struct ApiDoc;
+
+pub fn create_openapi() -> utoipa::openapi::OpenApi {
+	let mut openapi = ApiDoc::openapi();
+
+	// Extract existing schemas if already generated
+	let existing_components = openapi
+		.components
+		.take()
+		.unwrap_or_else(Components::default);
+
+	// Build new components with security scheme
+	let new_components = ComponentsBuilder::from(existing_components)
+		.security_scheme(
+			"bearer_auth",
+			SecurityScheme::Http(
+				HttpBuilder::new()
+					.scheme(HttpAuthScheme::Bearer)
+					.bearer_format("JWT")
+					.build(),
+			),
+		)
+		.build();
+
+	// Assign merged components back to OpenAPI doc
+	openapi.components = Some(new_components);
+
+	openapi
+}

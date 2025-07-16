@@ -1,3 +1,4 @@
+use crate::openapi::create_openapi;
 use crate::routes::company::{get_all_companies, get_company_by_id};
 use crate::routes::game::{get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id};
 use crate::routes::health::{health, ready};
@@ -26,9 +27,10 @@ use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger};
 use actix_web::web::{Data, scope};
 use actix_web::{App, HttpServer};
+use actix_web_prom::PrometheusMetricsBuilder;
+use anyhow::anyhow;
 use log::{Level, LevelFilter, debug, error, info};
 use migration::{Migrator, MigratorTrait};
-use openapi::ApiDoc;
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::constants::http::X_VERSION_HEADER_API;
@@ -39,9 +41,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use util::http::ReverProxyExtractor;
-use utoipa::OpenApi;
-use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::openapi::{Components, ComponentsBuilder};
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 pub mod error;
@@ -87,6 +86,10 @@ async fn start() -> anyhow::Result<()> {
 		env::var("IGDB_CLIENT_SECRET")?,
 		client.clone(),
 	)?;
+	let prometheus = PrometheusMetricsBuilder::new("api")
+		.endpoint("/metrics")
+		.build()
+		.map_err(|e| anyhow!(e))?;
 
 	let conn_arc = Arc::new(conn);
 	let client_arc = Arc::new(client);
@@ -96,37 +99,10 @@ async fn start() -> anyhow::Result<()> {
 	let client_data = Data::from(client_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
-	fn create_openapi() -> utoipa::openapi::OpenApi {
-		let mut openapi = ApiDoc::openapi();
-
-		// Extract existing schemas if already generated
-		let existing_components = openapi
-			.components
-			.take()
-			.unwrap_or_else(Components::default);
-
-		// Build new components with security scheme
-		let new_components = ComponentsBuilder::from(existing_components)
-			.security_scheme(
-				"bearer_auth",
-				SecurityScheme::Http(
-					HttpBuilder::new()
-						.scheme(HttpAuthScheme::Bearer)
-						.bearer_format("JWT")
-						.build(),
-				),
-			)
-			.build();
-
-		// Assign merged components back to OpenAPI doc
-		openapi.components = Some(new_components);
-
-		openapi
-	}
-
 	let serv = HttpServer::new(move || {
 		App::new()
 			.wrap(Compress::default())
+			.wrap(prometheus.clone())
 			.app_data(conn_data.clone())
 			.app_data(client_data.clone())
 			.app_data(igdb_data.clone())
