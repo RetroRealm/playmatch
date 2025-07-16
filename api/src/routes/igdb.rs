@@ -27,7 +27,7 @@ use service::metadata::igdb::model::{
 	)
 )]
 #[get("/igdb/game")]
-pub async fn get_game_by_id(
+pub async fn get_igdb_game_by_id(
 	query: Query<SlugIdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -59,7 +59,7 @@ pub async fn get_game_by_id(
 	)
 )]
 #[get("/igdb/games")]
-pub async fn get_games_by_ids(
+pub async fn get_igdb_games_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -85,7 +85,7 @@ pub async fn get_games_by_ids(
 	)
 )]
 #[get("/igdb/game/search")]
-pub async fn search_game_by_name(
+pub async fn search_igdb_game_by_name(
 	query: Query<SearchQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -107,7 +107,7 @@ pub async fn search_game_by_name(
 	)
 )]
 #[get("/igdb/age-rating")]
-pub async fn get_age_rating_by_id(
+pub async fn get_igdb_age_rating_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -131,7 +131,7 @@ pub async fn get_age_rating_by_id(
 	)
 )]
 #[get("/igdb/age-ratings")]
-pub async fn get_age_ratings_by_ids(
+pub async fn get_igdb_age_ratings_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -158,7 +158,7 @@ pub async fn get_age_ratings_by_ids(
 	)
 )]
 #[get("/igdb/alternative-name")]
-pub async fn get_alternative_name_by_id(
+pub async fn get_igdb_alternative_name_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -183,7 +183,7 @@ pub async fn get_alternative_name_by_id(
 	)
 )]
 #[get("/igdb/alternative-names")]
-pub async fn get_alternative_names_by_ids(
+pub async fn get_igdb_alternative_names_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -210,7 +210,7 @@ pub async fn get_alternative_names_by_ids(
 	)
 )]
 #[get("/igdb/artwork")]
-pub async fn get_artwork_by_id(
+pub async fn get_igdb_artwork_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -234,7 +234,7 @@ pub async fn get_artwork_by_id(
 	)
 )]
 #[get("/igdb/artworks")]
-pub async fn get_artworks_by_ids(
+pub async fn get_igdb_artworks_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -261,7 +261,7 @@ pub async fn get_artworks_by_ids(
 	)
 )]
 #[get("/igdb/collection")]
-pub async fn get_collection_by_id(
+pub async fn get_igdb_collection_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -285,7 +285,7 @@ pub async fn get_collection_by_id(
 	)
 )]
 #[get("/igdb/collections")]
-pub async fn get_collections_by_ids(
+pub async fn get_igdb_collections_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -312,7 +312,7 @@ pub async fn get_collections_by_ids(
 	)
 )]
 #[get("/igdb/cover")]
-pub async fn get_cover_by_id(
+pub async fn get_igdb_cover_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -336,7 +336,7 @@ pub async fn get_cover_by_id(
 	)
 )]
 #[get("/igdb/covers")]
-pub async fn get_covers_by_ids(
+pub async fn get_igdb_covers_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -363,7 +363,7 @@ pub async fn get_covers_by_ids(
 	)
 )]
 #[get("/igdb/external-game")]
-pub async fn get_external_game_by_id(
+pub async fn get_igdb_external_game_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -388,7 +388,7 @@ pub async fn get_external_game_by_id(
 	)
 )]
 #[get("/igdb/external-games")]
-pub async fn get_external_games_by_ids(
+pub async fn get_igdb_external_games_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -415,7 +415,7 @@ pub async fn get_external_games_by_ids(
 	)
 )]
 #[get("/igdb/franchise")]
-pub async fn get_franchise_by_id(
+pub async fn get_igdb_franchise_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -439,7 +439,7 @@ pub async fn get_franchise_by_id(
 	)
 )]
 #[get("/igdb/franchises")]
-pub async fn get_franchises_by_ids(
+pub async fn get_igdb_franchises_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -466,7 +466,7 @@ pub async fn get_franchises_by_ids(
 	)
 )]
 #[get("/igdb/genre")]
-pub async fn get_genre_by_id(
+pub async fn get_igdb_genre_by_id(
 	query: Query<IdQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
@@ -490,7 +490,7 @@ pub async fn get_genre_by_id(
 	)
 )]
 #[get("/igdb/genres")]
-pub async fn get_genres_by_ids(
+pub async fn get_igdb_genres_by_ids(
 	query: Query<IdsQuery>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
