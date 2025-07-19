@@ -62,7 +62,7 @@ pub async fn create_or_update_signature_metadata_mapping(
 			input.platform_id,
 			input.game_id,
 			input.company_id,
-			input.provider.clone(),
+			input.provider,
 			db_conn,
 		)
 		.await?;

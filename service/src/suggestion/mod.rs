@@ -173,7 +173,7 @@ pub async fn accept_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> Servic
 			game,
 			GameMatchData {
 				comment: suggestion.comment.clone(),
-				provider: suggestion.provider.clone().into(),
+				provider: suggestion.provider.into(),
 				provider_id: suggestion.provider_id.clone(),
 				manual_match_type: ManualMatchMode::Community,
 				user_id: suggestion.created_by,
@@ -186,7 +186,7 @@ pub async fn accept_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> Servic
 	} else {
 		create_or_update_signature_metadata_mapping(
 			SignatureMetadataMappingInputBuilder::default()
-				.provider(suggestion.provider.clone())
+				.provider(suggestion.provider)
 				.provider_id(Some(suggestion.provider_id.clone()))
 				.game_id(suggestion.game_id)
 				.platform_id(suggestion.platform_id)

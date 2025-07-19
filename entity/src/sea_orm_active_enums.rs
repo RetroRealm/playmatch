@@ -3,7 +3,7 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
 	rs_type = "String",
 	db_type = "Enum",
@@ -19,7 +19,7 @@ pub enum AutomaticMatchReasonEnum {
 	#[sea_orm(string_value = "via_parent")]
 	ViaParent,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
 	rs_type = "String",
 	db_type = "Enum",
@@ -31,7 +31,7 @@ pub enum FailedMatchReasonEnum {
 	#[sea_orm(string_value = "too_many_matches")]
 	TooManyMatches,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
 	rs_type = "String",
 	db_type = "Enum",
@@ -45,7 +45,7 @@ pub enum ManualMatchModeEnum {
 	#[sea_orm(string_value = "community")]
 	Community,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "match_type_enum")]
 pub enum MatchTypeEnum {
 	#[sea_orm(string_value = "none")]
@@ -57,7 +57,7 @@ pub enum MatchTypeEnum {
 	#[sea_orm(string_value = "failed")]
 	Failed,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
 	rs_type = "String",
 	db_type = "Enum",
@@ -67,7 +67,7 @@ pub enum MetadataProviderEnum {
 	#[sea_orm(string_value = "igdb")]
 	Igdb,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
 	rs_type = "String",
 	db_type = "Enum",
