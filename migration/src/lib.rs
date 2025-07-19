@@ -14,6 +14,8 @@ mod m20250602_180531_add_lowercase_index_for_signature_metadata_mapping;
 mod m20250610_162421_make_dat_file_import_md5_hash_consistent;
 mod m20250611_134139_add_suggestions_for_manual_metadata_matches;
 mod m20250713_163201_add_signature_group_internal_clone_of_id_index;
+mod m20250716_174600_add_legacy_signature_group;
+mod m20250719_011819_add_case_insensitive_index;
 
 pub struct Migrator;
 
@@ -35,6 +37,8 @@ impl MigratorTrait for Migrator {
 			Box::new(m20250610_162421_make_dat_file_import_md5_hash_consistent::Migration),
 			Box::new(m20250611_134139_add_suggestions_for_manual_metadata_matches::Migration),
 			Box::new(m20250713_163201_add_signature_group_internal_clone_of_id_index::Migration),
+			Box::new(m20250716_174600_add_legacy_signature_group::Migration),
+			Box::new(m20250719_011819_add_case_insensitive_index::Migration),
 		]
 	}
 }

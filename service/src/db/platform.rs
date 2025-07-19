@@ -1,3 +1,4 @@
+use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
 use entity::platform::ActiveModel;
 use entity::prelude::Platform;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
@@ -99,7 +100,7 @@ pub async fn create_or_find_platform_by_name(
 	conn: &DbConn,
 ) -> Result<platform::Model, DbErr> {
 	let platform = Platform::find()
-		.filter(platform::Column::Name.eq(name))
+		.filter(platform::Column::Name.eq_ignore_case(name))
 		.one(conn)
 		.await?;
 

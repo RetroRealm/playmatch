@@ -11,6 +11,8 @@ use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
 
 use crate::constants::PARALLELISM;
+use lazy_static::lazy_static;
+use regex::Regex;
 use sea_orm::{ActiveModelTrait, DbConn, IntoActiveModel};
 use std::path::Path;
 use tokio::fs::File;
@@ -177,63 +179,131 @@ fn parse_company_and_platform(
 ) -> anyhow::Result<(Option<String>, String, Vec<String>)> {
 	let mut dat_header = dat.header.name.clone();
 
-	// remove Arcade - from the name as its not a company or system
+	// Remove Arcade - from the name as its not a company or system
 	dat_header = dat_header.replace("Arcade - ", "");
+
+	// Remove subset prefix if present
+	if let Some(subset) = &dat.header.subset {
+		let subset_prefix = format!("{} - ", subset);
+		if dat_header.starts_with(&subset_prefix) {
+			dat_header = dat_header.replacen(&subset_prefix, "", 1);
+		}
+	}
 
 	let split = dat_header.split(" - ").collect::<Vec<&str>>();
 
-	if split.is_empty() {
+	if split.is_empty() || (split.len() == 1 && split[0].is_empty()) {
 		return Err(anyhow::anyhow!("No company or system found"));
 	}
 
-	let subset = &dat.header.subset;
 	let version = &dat.header.version;
 	let mut tags = Vec::new();
-	let mut company = String::new();
-	let mut platform_parts = Vec::new();
+	let mut company = None;
+	let mut platform;
 
-	let mut real_index = 0;
-	for part in split {
-		if let Some(subset) = subset {
-			if subset == part {
-				continue;
+	match split.len() {
+		1 => {
+			// Single part - it's the platform, no company
+			platform = split[0].to_string();
+		}
+		2 => {
+			// Two parts - company and platform
+			company = Some(split[0].to_string());
+			platform = split[1].to_string();
+		}
+		_ => {
+			// Three or more parts
+			company = Some(split[0].to_string());
+
+			// Join the remaining parts
+			let remaining_parts = split[1..].to_vec();
+
+			// Check if this looks like extra metadata (contains brackets, "NKit", etc)
+			let mut platform_parts = Vec::new();
+			for part in remaining_parts {
+				// Stop adding to platform if we hit what looks like metadata
+				if part.contains('[')
+					|| part.contains("NKit")
+					|| part.contains("RVZ")
+					|| part.contains("Discs")
+					|| part.contains("zstd")
+					|| part.contains("WUX")
+				{
+					break;
+				}
+				platform_parts.push(part);
+			}
+
+			platform = if platform_parts.is_empty() {
+				split[1].to_string()
+			} else {
+				platform_parts.join(" - ")
+			};
+		}
+	}
+
+	// Remove company name from platform if it appears there for GameCube
+	if let Some(ref company_name) = company {
+		// Remove "Company Platform" -> "Platform"
+		if platform.starts_with(company_name) && platform.to_lowercase().contains("gamecube") {
+			let after_company = platform.strip_prefix(company_name).unwrap_or(&platform);
+			// Clean up any leading spaces or separators
+			platform = after_company
+				.trim_start_matches(' ')
+				.trim_start_matches('-')
+				.trim()
+				.to_string();
+		}
+
+		// Also check for "CompanyPlatform" (no space) patterns
+		let company_no_spaces = company_name.replace(' ', "");
+		if platform.starts_with(&company_no_spaces) && platform.len() > company_no_spaces.len() {
+			let potential_platform = &platform[company_no_spaces.len()..];
+			// Check if the next character is uppercase (indicating camelCase split)
+			if potential_platform
+				.chars()
+				.next()
+				.map(|c| c.is_uppercase())
+				.unwrap_or(false)
+			{
+				platform = potential_platform.to_string();
 			}
 		}
+	}
 
-		if real_index == 0 {
-			company = part.to_string();
-		} else {
-			platform_parts.push(part.to_string());
+	// Remove version from platform if present
+	platform = platform.replace(&format!(" ({})", version), "");
+
+	// Extract tags from platform
+	let mut clean_platform = platform.clone();
+	for capture in DAT_TAG_REGEX.captures_iter(&platform) {
+		if let Some(tag_match) = capture.get(1) {
+			let tag = tag_match.as_str();
+			// Don't treat version-like strings as tags
+			if !tag.contains('-') || !tag.chars().all(|c| c.is_numeric() || c == '-' || c == ' ') {
+				tags.push(tag.to_owned());
+				clean_platform = clean_platform.replace(&format!(" ({})", tag), "");
+			}
 		}
+	}
+	platform = clean_platform.trim().to_string();
 
-		real_index += 1;
+	lazy_static! {
+		// Matches "PS" followed by digits, possibly followed by " - anything"
+		static ref PS_REGEX: Regex = Regex::new(r"^PS(\d+)(?:\s*-\s*.*)?$").unwrap();
 	}
 
-	let mut platform = platform_parts.join(" - ");
+	if let Some(captures) = PS_REGEX.captures(&platform) {
+		if let Some(number_match) = captures.get(1) {
+			let number_str = number_match.as_str();
+			let number = number_str.parse::<u32>().unwrap_or(1);
 
-	if platform.is_empty() {
-		platform = company.clone();
-		company = "".to_string();
+			// Convert PS1, PS2, PS3, etc. to PlayStation 1, PlayStation 2, etc.
+			platform = format!("PlayStation {}", number);
+		}
 	}
 
-	// replace version out of name as that's not needed for tags
-	platform = platform.replace(format!(" ({version})").as_str(), "");
-
-	for tag in DAT_TAG_REGEX.captures_iter(&platform.clone()) {
-		let tag = tag.get(1).map(|x| x.as_str()).unwrap_or_default();
-		tags.push(tag.to_owned());
-		platform = platform.replace(&format!(" ({tag})"), "");
-	}
-
-	Ok((
-		if company.is_empty() {
-			None
-		} else {
-			Some(company)
-		},
-		platform,
-		tags,
-	))
+	Ok((company, platform, tags))
 }
 
 pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version: &str) -> String {
@@ -294,4 +364,194 @@ pub async fn update_dat_file_and_insert_dat_file_import(
 		conn,
 	)
 	.await?)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::dat::shared::model::Header;
+
+	fn create_datafile(name: &str, subset: Option<&str>, version: &str) -> Datafile {
+		Datafile {
+			header: Header {
+				id: None,
+				name: name.to_string(),
+				subset: subset.map(|s| s.to_string()),
+				author: None,
+				homepage: None,
+				version: version.to_string(),
+				description: None,
+				url: None,
+			},
+			game: None,
+		}
+	}
+
+	#[test]
+	fn test_nintendo_gamecube_non_redump() {
+		let dat = create_datafile(
+			"Non-Redump - Nintendo - Nintendo GameCube",
+			Some("Non-Redump"),
+			"20250405-114402",
+		);
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "GameCube".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_nintendo_gamecube_redump() {
+		let dat = create_datafile("Nintendo - GameCube", None, "2025-07-11 07-41-21");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "GameCube".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_nintendo_gamecube_nkit() {
+		let dat = create_datafile(
+			"Nintendo - GameCube - NKit RVZ [zstd-19-128k]",
+			None,
+			"2023-01-09 15:43:45",
+		);
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "GameCube".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_arcade_sega_naomi() {
+		let dat = create_datafile("Arcade - Sega - Naomi", None, "2025-03-30 19-07-31");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Sega".to_string()));
+		assert_eq!(result.1, "Naomi".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_microsoft_xbox() {
+		let dat = create_datafile("Microsoft - Xbox", None, "2025-07-18 20-42-57");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Microsoft".to_string()));
+		assert_eq!(result.1, "Xbox".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_sony_playstation3() {
+		let dat = create_datafile(
+			"Unofficial - Sony - PlayStation 3 (BD-Video Extras)",
+			Some("Unofficial"),
+			"20250405-202040",
+		);
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Sony".to_string()));
+		assert_eq!(result.1, "PlayStation 3".to_string());
+		assert_eq!(result.2, vec!["BD-Video Extras".to_string()]);
+	}
+
+	#[test]
+	fn test_sega_mega_drive_genesis() {
+		let dat = create_datafile("Sega - Mega Drive - Genesis", None, "20250715-223313");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Sega".to_string()));
+		assert_eq!(result.1, "Mega Drive - Genesis".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_sony_playstation_portable_psn() {
+		let dat = create_datafile(
+			"Sony - PlayStation Portable (PSN) (Decrypted)",
+			None,
+			"20250717-231452",
+		);
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Sony".to_string()));
+		assert_eq!(result.1, "PlayStation Portable".to_string());
+		assert_eq!(result.2, vec!["PSN".to_string(), "Decrypted".to_string()]);
+	}
+
+	#[test]
+	fn test_platform_with_tags() {
+		let dat = create_datafile("Nintendo - GameCube (Demo) (Beta)", None, "2023-01-01");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "GameCube".to_string());
+		assert_eq!(result.2, vec!["Demo".to_string(), "Beta".to_string()]);
+	}
+
+	#[test]
+	fn test_no_company() {
+		let dat = create_datafile("GameCube", None, "2023-01-01");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, None);
+		assert_eq!(result.1, "GameCube".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_empty_header() {
+		let dat = create_datafile("", None, "2023-01-01");
+
+		let result = parse_company_and_platform(&dat);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_version_in_platform_name() {
+		let dat = create_datafile("Company - Platform (2023-01-01)", None, "2023-01-01");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Company".to_string()));
+		assert_eq!(result.1, "Platform".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_complex_metadata_suffix() {
+		let dat = create_datafile(
+			"Sony - PlayStation - NKit RVZ [zstd-19-128k] - Discs (100)",
+			None,
+			"2023-01-01",
+		);
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Sony".to_string()));
+		assert_eq!(result.1, "PlayStation".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_playstation_exception() {
+		let dat = create_datafile("Sony - PS3 - Decrypted", None, "2022-09-18 03:49:47");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Sony".to_string()));
+		assert_eq!(result.1, "PlayStation 3".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_wii_u_wux_naming() {
+		let dat = create_datafile("Nintendo - Wii U - WUX", None, "2022-09-06 19:27:35");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "Wii U".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
 }

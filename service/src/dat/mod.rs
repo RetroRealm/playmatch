@@ -1,7 +1,8 @@
 use crate::automatic_match::clone::populate_all_clone_of_ids;
 use crate::constants::PARALLELISM;
-use crate::dat::no_intro::download::download_no_intro_dats;
-use crate::dat::redump::download::download_redump_dats;
+use crate::dat::dats_site::download_dats_site_legacy_dats;
+use crate::dat::no_intro::download_no_intro_dats;
+use crate::dat::redump::{RedumpType, download_redump_dats};
 use crate::dat::shared::import::parse_and_import_dat_file;
 use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
@@ -14,6 +15,7 @@ use reqwest::Client;
 use sea_orm::DbConn;
 use std::path::PathBuf;
 
+mod dats_site;
 mod no_intro;
 mod redump;
 pub mod shared;
@@ -33,9 +35,17 @@ pub async fn download_and_parse_dats(
 	info!("Starting to download No-Intro DATs.");
 	download_no_intro_dats(client).await?;
 	info!("Successfully downloaded No-Intro DATs");
-	info!("Starting to download Redump DATs.");
-	download_redump_dats(client).await?;
-	info!("Successfully downloaded Redump DATs");
+
+	info!("Starting to download Public Redump DATs.");
+	download_redump_dats(client, RedumpType::Public).await?;
+	info!("Successfully downloaded Public Redump DATs");
+	info!("Starting to download Private Redump DATs.");
+	download_redump_dats(client, RedumpType::Private).await?;
+	info!("Successfully downloaded Private Redump DATs");
+
+	info!("Starting to download dats.site Legacy DATs.");
+	download_dats_site_legacy_dats(client).await?;
+	info!("Successfully downloaded dats.site Legacy DATs");
 
 	tokio::fs::remove_dir_all(&tmp_dir).await?;
 
@@ -115,20 +125,17 @@ pub async fn download_and_parse_dats(
 			signature_group = Some("MAME");
 		}
 
+		if parent.contains("dats-site") {
+			signature_group = Some("DatsSite-Legacy");
+		}
+
 		let signature_group_entity = match signature_group {
-			None => {
-				return Err(anyhow!("Signature Group not found"));
-			}
-			Some(signature_group_name) => {
-				match find_signature_group_by_name(signature_group_name, conn).await? {
-					Some(sg) => sg,
-					None => {
-						return Err(anyhow!(
-							"Signature Group not found in database (are all migrations applied?)"
-						));
-					}
-				}
-			}
+			Some(signature_group_name) => find_signature_group_by_name(signature_group_name, conn)
+				.await?
+				.ok_or_else(|| {
+					anyhow!("Signature Group not found in database (are all migrations applied?)")
+				})?,
+			None => return Err(anyhow!("Signature Group not found")),
 		};
 
 		debug!("Importing DAT file: {file:?}");

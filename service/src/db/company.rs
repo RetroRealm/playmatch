@@ -1,3 +1,4 @@
+use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
 use entity::company::ActiveModel;
 use entity::prelude::Company;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
@@ -69,7 +70,7 @@ pub async fn create_or_find_company_by_name(
 	conn: &DbConn,
 ) -> Result<company::Model, DbErr> {
 	let company = Company::find()
-		.filter(company::Column::Name.eq(name))
+		.filter(company::Column::Name.eq_ignore_case(name))
 		.one(conn)
 		.await?;
 

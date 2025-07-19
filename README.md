@@ -11,7 +11,7 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 
 ### Supported
 
-- [x] Supports No-Intro and Redump dat files
+- [x] Supports No-Intro, Redump (Public and Private) and certain Community Dat files
 - [x] Automatically daily downloads and updates dat files
 - [x] Hash dat files to skip daily import if nothing changed
 - [x] Support for IGDB as metadata provider
@@ -19,16 +19,16 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 ### Planned
 
 - [ ] Support for more dat files sources (TOSEC, MAME, GoodTools, etc)
-- [ ] Support for more metadata providers (MobyGames, etc)
+- [ ] Support for more metadata providers (MobyGames, ScreenScraper, SteamGridDB, Launchbox, etc)
 - [ ] Add all IGDB endpoints to proxy
-- [ ] Support bios and other non-game files which you can also hash and verify this way
+- [ ] Support bios and other non-game files, which you can also hash and verify this way
 
 ## Getting Started
 
 ### Prerequisites
 
 1. Rust 1.88+ from [here](https://www.rust-lang.org/tools/install)
-2. PostgreSQL 12+ from [here](https://www.postgresql.org/download/)
+2. PostgreSQL 13+ from [here](https://www.postgresql.org/download/)
 
 ### Development
 
