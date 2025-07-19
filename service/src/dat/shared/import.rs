@@ -184,7 +184,7 @@ fn parse_company_and_platform(
 
 	// Remove subset prefix if present
 	if let Some(subset) = &dat.header.subset {
-		let subset_prefix = format!("{} - ", subset);
+		let subset_prefix = format!("{subset} - ");
 		if dat_header.starts_with(&subset_prefix) {
 			dat_header = dat_header.replacen(&subset_prefix, "", 1);
 		}
@@ -272,7 +272,7 @@ fn parse_company_and_platform(
 	}
 
 	// Remove version from platform if present
-	platform = platform.replace(&format!(" ({})", version), "");
+	platform = platform.replace(&format!(" ({version})"), "");
 
 	// Extract tags from platform
 	let mut clean_platform = platform.clone();
@@ -282,7 +282,7 @@ fn parse_company_and_platform(
 			// Don't treat version-like strings as tags
 			if !tag.contains('-') || !tag.chars().all(|c| c.is_numeric() || c == '-' || c == ' ') {
 				tags.push(tag.to_owned());
-				clean_platform = clean_platform.replace(&format!(" ({})", tag), "");
+				clean_platform = clean_platform.replace(&format!(" ({tag})"), "");
 			}
 		}
 	}
@@ -299,7 +299,7 @@ fn parse_company_and_platform(
 			let number = number_str.parse::<u32>().unwrap_or(1);
 
 			// Convert PS1, PS2, PS3, etc. to PlayStation 1, PlayStation 2, etc.
-			platform = format!("PlayStation {}", number);
+			platform = format!("PlayStation {number}");
 		}
 	}
 
