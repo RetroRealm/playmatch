@@ -554,4 +554,28 @@ mod tests {
 		assert_eq!(result.1, "Wii U".to_string());
 		assert_eq!(result.2, Vec::<String>::new());
 	}
+
+	#[test]
+	fn test_game_boy_color_source_code_naming() {
+		let dat = create_datafile(
+			"Source Code - Nintendo - Game Boy Color",
+			Some("Source Code"),
+			"20250313-191959",
+		);
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "Game Boy Color".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn test_game_boy_color_naming() {
+		let dat = create_datafile("Nintendo - Game Boy Color", None, "20250614-001651");
+
+		let result = parse_company_and_platform(&dat).unwrap();
+		assert_eq!(result.0, Some("Nintendo".to_string()));
+		assert_eq!(result.1, "Game Boy Color".to_string());
+		assert_eq!(result.2, Vec::<String>::new());
+	}
 }
