@@ -56,7 +56,7 @@ jobs:
           target: ${{ matrix.target.build_target }}
 
       - name: Run cargo test
-        run: cargo test
+        run: cargo test --workspace
 
   fmt:
     name: Cargo fmt
