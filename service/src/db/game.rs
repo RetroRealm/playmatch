@@ -308,7 +308,11 @@ pub fn get_unpopulated_clone_of_games(
 	conn: &DbConn,
 ) -> Paginator<DbConn, SelectModel<game::Model>> {
 	Game::find()
-		.filter(game::Column::SignatureGroupInternalCloneOfId.is_not_null())
+		.filter(
+			game::Column::SignatureGroupInternalCloneOfId
+				.is_not_null()
+				.and(game::Column::CloneOf.is_null()),
+		)
 		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
 		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
 		.order_by_asc(game::Column::Id)
