@@ -8,10 +8,14 @@ on:
     branches:
       - main
       - develop
+      - feature/*
+      - fix/*
   pull_request:
     branches-ignore:
       - main
       - develop
+      - feature/*
+      - fix/*
 
 jobs:
   check:
