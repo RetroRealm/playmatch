@@ -11,9 +11,10 @@ use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
 
 use crate::constants::PARALLELISM;
+use entity::game::Model;
 use lazy_static::lazy_static;
 use regex::Regex;
-use sea_orm::{ActiveModelTrait, DbConn, IntoActiveModel};
+use sea_orm::{ActiveModelTrait, DbConn, DbErr, IntoActiveModel, Set};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -83,6 +84,8 @@ pub async fn parse_and_import_dat_file(
 							.await?;
 
 					if let Some(existing_game) = result {
+						update_game_properties(&game, &conn, &existing_game).await?;
+
 						let existing_files =
 							get_game_files_from_game_id(existing_game.id, &conn).await?;
 						let existing_files_set: HashSet<_> = existing_files
@@ -171,6 +174,36 @@ pub async fn parse_and_import_dat_file(
 		}
 	}
 
+	Ok(())
+}
+
+async fn update_game_properties(
+	game: &Game,
+	conn: &DbConn,
+	existing_game: &Model,
+) -> Result<(), DbErr> {
+	let mut has_changes = false;
+
+	let mut existing_game_active = existing_game.clone().into_active_model();
+
+	if existing_game.signature_group_internal_id != game.id {
+		existing_game_active.signature_group_internal_id = Set(game.id.clone());
+		has_changes = true;
+	}
+
+	if existing_game.signature_group_internal_clone_of_id != game.cloneofid {
+		existing_game_active.signature_group_internal_clone_of_id = Set(game.cloneofid.clone());
+		has_changes = true;
+	}
+
+	if existing_game.description != game.description {
+		existing_game_active.description = Set(game.description.clone());
+		has_changes = true;
+	}
+
+	if has_changes {
+		existing_game_active.save(conn).await?;
+	}
 	Ok(())
 }
 
