@@ -1,6 +1,6 @@
 use crate::cache::identify::{
-	find_game_and_id_mapping_by_md5_cached, find_game_and_id_mapping_by_sha1_cached,
-	find_game_and_id_mapping_by_sha256_cached,
+	IdentifyEntry, find_game_and_metadata_ids_by_md5_cached,
+	find_game_and_metadata_ids_by_sha1_cached, find_game_and_metadata_ids_by_sha256_cached,
 };
 use crate::db::game::{
 	find_all_relations_of_game, find_game_and_id_mapping_by_name_and_size, get_game_by_id,
@@ -12,6 +12,7 @@ use crate::model::{
 	GameAndRelationsResultBuilder, GameFileMatchSearch, GameMatchType, GameMetadataMatchResult,
 	PlaymatchGame,
 };
+use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use strum::IntoEnumIterator;
@@ -48,7 +49,8 @@ pub async fn get_game_and_all_relations(
 
 pub async fn identify_game_and_get_relations(
 	search: GameFileMatchSearch,
-	conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
 ) -> anyhow::Result<GameAndRelationMatchResult> {
 	let mut response_body = None;
 
@@ -57,41 +59,47 @@ pub async fn identify_game_and_get_relations(
 			continue;
 		}
 
-		if let Some((game_release, _)) = match r#type {
+		if let Some(entry) = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
-					find_game_and_id_mapping_by_sha256_cached(sha256, conn).await?
+					find_game_and_metadata_ids_by_sha256_cached(sha256, redis_conn, db_conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::SHA1 => {
 				if let Some(sha1) = &search.sha1 {
-					find_game_and_id_mapping_by_sha1_cached(sha1, conn).await?
+					find_game_and_metadata_ids_by_sha1_cached(sha1, redis_conn, db_conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::MD5 => {
 				if let Some(md5) = &search.md5 {
-					find_game_and_id_mapping_by_md5_cached(md5, conn).await?
+					find_game_and_metadata_ids_by_md5_cached(md5, redis_conn, db_conn).await?
 				} else {
 					None
 				}
 			}
-			GameMatchType::FileNameAndSize => {
-				find_game_and_id_mapping_by_name_and_size(&search.file_name, search.file_size, conn)
-					.await?
-			}
+			GameMatchType::FileNameAndSize => find_game_and_id_mapping_by_name_and_size(
+				&search.file_name,
+				search.file_size,
+				db_conn,
+			)
+			.await?
+			.map(|r| IdentifyEntry {
+				game: r.0,
+				metadata_mappings: r.1,
+			}),
 			GameMatchType::NoMatch => unreachable!(),
 		} {
 			let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
-				find_all_relations_of_game(&game_release, conn).await?;
+				find_all_relations_of_game(&entry.game, db_conn).await?;
 
 			response_body = Some(
 				GameAndRelationMatchResultBuilder::default()
 					.game_match_type(r#type)
-					.game(Some(game_release.into()))
+					.game(Some(entry.game.into()))
 					.platform(Some(platform.into()))
 					.company(company.map(|c| c.into()))
 					.game_files(game_files.into_iter().map(|gf| gf.into()).collect())
@@ -119,7 +127,8 @@ pub async fn identify_game_and_get_relations(
 
 pub async fn identify_game_and_metadata_mappings(
 	search: GameFileMatchSearch,
-	conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
 ) -> anyhow::Result<GameMetadataMatchResult> {
 	let mut response_body = None;
 
@@ -128,39 +137,41 @@ pub async fn identify_game_and_metadata_mappings(
 			continue;
 		}
 
-		if let Some((game_release, game_release_id_mappings)) = match r#type {
+		if let Some(entry) = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
-					find_game_and_id_mapping_by_sha256_cached(sha256, conn).await?
+					find_game_and_metadata_ids_by_sha256_cached(sha256, redis_conn, db_conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::SHA1 => {
 				if let Some(sha1) = &search.sha1 {
-					find_game_and_id_mapping_by_sha1_cached(sha1, conn).await?
+					find_game_and_metadata_ids_by_sha1_cached(sha1, redis_conn, db_conn).await?
 				} else {
 					None
 				}
 			}
 			GameMatchType::MD5 => {
 				if let Some(md5) = &search.md5 {
-					find_game_and_id_mapping_by_md5_cached(md5, conn).await?
+					find_game_and_metadata_ids_by_md5_cached(md5, redis_conn, db_conn).await?
 				} else {
 					None
 				}
 			}
-			GameMatchType::FileNameAndSize => {
-				find_game_and_id_mapping_by_name_and_size(&search.file_name, search.file_size, conn)
-					.await?
-			}
+			GameMatchType::FileNameAndSize => find_game_and_id_mapping_by_name_and_size(
+				&search.file_name,
+				search.file_size,
+				db_conn,
+			)
+			.await?
+			.map(|r| IdentifyEntry {
+				game: r.0,
+				metadata_mappings: r.1,
+			}),
 			GameMatchType::NoMatch => unreachable!(),
 		} {
-			response_body = Some(build_result(
-				r#type,
-				game_release,
-				game_release_id_mappings,
-			)?);
+			response_body = Some(build_result(r#type, entry.game, entry.metadata_mappings)?);
 			break;
 		}
 	}

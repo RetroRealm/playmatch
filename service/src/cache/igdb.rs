@@ -1,144 +1,399 @@
+use crate::cache::{
+	CACHE_PREFIX, CacheKey, deserialize_option_redis_value, serialize_option_redis_value,
+};
 use crate::metadata::igdb::IgdbClient;
 use crate::metadata::igdb::model::{
 	AgeRating, AlternativeName, Artwork, Collection, Cover, ExternalGame, Franchise, Game, Genre,
 };
-use cached::TimedSizedCache;
-use cached::proc_macro::cached;
+use log::debug;
+use redis::AsyncTypedCommands;
+use redis::aio::MultiplexedConnection;
+use std::time::Duration;
 
-const CACHE_SIZE: usize = 20000;
-const CACHE_LIFESPAN: u64 = 86400;
-const REFRESH_ON_RETRIEVE: bool = true;
+const IGDB_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24).as_secs(); // 1 day
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<Game>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
-pub async fn get_game_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Result<Option<Game>> {
-	client.get_game_by_id(id).await
+pub async fn get_game_by_id_cached(
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
+	id: i32,
+) -> anyhow::Result<Option<Game>> {
+	let cache_key = IgdbCacheType::GetIgdbGameById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Game with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Game with id: {id}");
+
+	let game = igdb_client.get_game_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(game.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(game)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<String, Option<Game>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ slug.clone() }"#
-)]
 pub async fn get_game_by_slug_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	slug: String,
 ) -> anyhow::Result<Option<Game>> {
-	client.get_game_by_slug(&slug).await
+	let cache_key = IgdbCacheType::GetIgdbGameBySlug.get_cache_key(&slug);
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Game with slug: {slug}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Game with slug: {slug}");
+
+	let game = igdb_client.get_game_by_slug(&slug).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(game.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(game)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<String, Vec<Game>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ query.clone() }"#
-)]
 pub async fn search_game_by_name_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	query: String,
 ) -> anyhow::Result<Vec<Game>> {
-	client.search_game_by_name(&query).await
+	let cache_key = IgdbCacheType::SearchIgdbGameByName.get_cache_key(&query);
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Search Game by Name: {query}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized: Vec<Game> = serde_json::from_str(&cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Search Game by Name: {query}");
+
+	let games = igdb_client.search_game_by_name(&query).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serde_json::to_string(&games)?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(games)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<AgeRating>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
 pub async fn get_age_rating_by_id_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	id: i32,
 ) -> anyhow::Result<Option<AgeRating>> {
-	client.get_age_rating_by_id(id).await
+	let cache_key = IgdbCacheType::GetAgeRatingById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Age Rating with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Age Rating with id: {id}");
+
+	let age_rating = igdb_client.get_age_rating_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(age_rating.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(age_rating)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<AlternativeName>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
 pub async fn get_alternative_name_by_id_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	id: i32,
 ) -> anyhow::Result<Option<AlternativeName>> {
-	client.get_alternative_name_by_id(id).await
+	let cache_key = IgdbCacheType::GetAlternativeNameById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Alternative Name with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Alternative Name with id: {id}");
+
+	let alternative_name = igdb_client.get_alternative_name_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(alternative_name.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(alternative_name)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<Artwork>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
 pub async fn get_artwork_by_id_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	id: i32,
 ) -> anyhow::Result<Option<Artwork>> {
-	client.get_artwork_by_id(id).await
+	let cache_key = IgdbCacheType::GetArtworkById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Artwork with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Artwork with id: {id}");
+
+	let artwork = igdb_client.get_artwork_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(artwork.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(artwork)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<Collection>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
 pub async fn get_collection_by_id_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	id: i32,
 ) -> anyhow::Result<Option<Collection>> {
-	client.get_collection_by_id(id).await
+	let cache_key = IgdbCacheType::GetCollectionById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Collection with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Collection with id: {id}");
+
+	let collection = igdb_client.get_collection_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(collection.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(collection)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<Cover>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
-pub async fn get_cover_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Result<Option<Cover>> {
-	client.get_cover_by_id(id).await
+pub async fn get_cover_by_id_cached(
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
+	id: i32,
+) -> anyhow::Result<Option<Cover>> {
+	let cache_key = IgdbCacheType::GetCoverById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Cover with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Cover with id: {id}");
+
+	let cover = igdb_client.get_cover_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(cover.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(cover)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<ExternalGame>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
 pub async fn get_external_game_by_id_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	id: i32,
 ) -> anyhow::Result<Option<ExternalGame>> {
-	client.get_external_game_by_id(id).await
+	let cache_key = IgdbCacheType::GetExternalGameById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for External Game with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for External Game with id: {id}");
+
+	let external_game = igdb_client.get_external_game_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(external_game.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(external_game)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<Franchise>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
 pub async fn get_franchise_by_id_cached(
-	client: &IgdbClient,
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
 	id: i32,
 ) -> anyhow::Result<Option<Franchise>> {
-	client.get_franchise_by_id(id).await
+	let cache_key = IgdbCacheType::GetFranchiseById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Franchise with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Franchise with id: {id}");
+
+	let franchise = igdb_client.get_franchise_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(franchise.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(franchise)
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<i32, Option<Genre>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ id.clone() }"#
-)]
-pub async fn get_genre_by_id_cached(client: &IgdbClient, id: i32) -> anyhow::Result<Option<Genre>> {
-	client.get_genre_by_id(id).await
+pub async fn get_genre_by_id_cached(
+	igdb_client: &IgdbClient,
+	redis_conn: &mut MultiplexedConnection,
+	id: i32,
+) -> anyhow::Result<Option<Genre>> {
+	let cache_key = IgdbCacheType::GetGenreById.get_cache_key(&id.to_string());
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("igdb Cache hit for Genre with id: {id}");
+		redis_conn
+			.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+	debug!("igdb Cache miss for Genre with id: {id}");
+
+	let genre = igdb_client.get_genre_by_id(id).await?;
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(genre.clone())?,
+			IGDB_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(genre)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum IgdbCacheType {
+	GetIgdbGameById,
+	GetIgdbGameBySlug,
+	SearchIgdbGameByName,
+	GetAgeRatingById,
+	GetAlternativeNameById,
+	GetArtworkById,
+	GetCollectionById,
+	GetCoverById,
+	GetExternalGameById,
+	GetFranchiseById,
+	GetGenreById,
+}
+
+impl CacheKey for IgdbCacheType {
+	fn get_cache_key(&self, identifier: &str) -> String {
+		match self {
+			IgdbCacheType::GetIgdbGameById => {
+				format!("{}:cache:igdb:game{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetIgdbGameBySlug => {
+				format!("{}:cache:igdb:game:slug:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::SearchIgdbGameByName => {
+				format!("{}:cache:igdb:game:search:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetAgeRatingById => {
+				format!("{}:cache:igdb:age_rating:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetAlternativeNameById => format!(
+				"{}:cache:igdb:alternative_name:{}",
+				CACHE_PREFIX, identifier
+			),
+			IgdbCacheType::GetArtworkById => {
+				format!("{}:cache:igdb:artwork:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetCollectionById => {
+				format!("{}:cache:igdb:collection:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetCoverById => {
+				format!("{}:cache:igdb:cover:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetExternalGameById => {
+				format!("{}:cache:igdb:external_game:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetFranchiseById => {
+				format!("{}:cache:igdb:franchise:{}", CACHE_PREFIX, identifier)
+			}
+			IgdbCacheType::GetGenreById => {
+				format!("{}:cache:igdb:genre:{}", CACHE_PREFIX, identifier)
+			}
+		}
+	}
 }

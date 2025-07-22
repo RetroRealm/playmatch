@@ -32,6 +32,7 @@ use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest, 
 pub async fn manually_match_game(
 	match_request: Json<GameMatchRequest>,
 	db_conn: Data<DatabaseConnection>,
+	redis_client: Data<redis::Client>,
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	let mut match_request = match_request.into_inner();
@@ -52,7 +53,12 @@ pub async fn manually_match_game(
 			.body("At least one of file_name, md5, sha1 or sha256 must be provided."));
 	}
 
-	let updated = apply_manual_game_match(match_request, db_conn.get_ref()).await?;
+	let updated = apply_manual_game_match(
+		match_request,
+		db_conn.get_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+	)
+	.await?;
 
 	Ok(HttpResponse::Ok().json(updated))
 }

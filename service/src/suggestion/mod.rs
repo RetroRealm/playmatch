@@ -18,6 +18,7 @@ use crate::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
 };
 use entity::sea_orm_active_enums::{ManualMatchModeEnum, MatchTypeEnum};
+use redis::aio::MultiplexedConnection;
 use sea_orm::prelude::Uuid;
 use sea_orm::{DatabaseConnection, ModelTrait, Set};
 
@@ -159,7 +160,11 @@ pub async fn add_company_suggestion(
 	Ok(created.into())
 }
 
-pub async fn accept_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<i32> {
+pub async fn accept_suggestion(
+	id: Uuid,
+	db_conn: &DatabaseConnection,
+	redis_conn: &mut MultiplexedConnection,
+) -> ServiceResult<i32> {
 	let suggestion_opt = get_suggestion_by_id(id, db_conn).await?;
 
 	let suggestion = suggestion_opt.ok_or(ServiceError::SuggestionNotFound)?;
@@ -179,6 +184,7 @@ pub async fn accept_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> Servic
 				user_id: suggestion.created_by,
 			},
 			db_conn,
+			redis_conn,
 		)
 		.await?;
 

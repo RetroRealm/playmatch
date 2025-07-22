@@ -27,3 +27,4 @@ uuid = "^1.10"
 derive_builder = "^0.20"
 tokio-cron-scheduler = "^0.14"
 actix-web-prom = { version = "^0.10", features = ["process"] }
+redis = { version = "^0.32", features = ["tokio-rustls-comp"] }

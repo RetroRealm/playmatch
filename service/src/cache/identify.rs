@@ -1,51 +1,131 @@
+use crate::cache::{
+	CACHE_PREFIX, CacheKey, deserialize_option_redis_value, serialize_option_redis_value,
+};
 use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
 	find_game_and_id_mapping_by_sha256,
 };
-use cached::TimedSizedCache;
-use cached::proc_macro::cached;
+use crate::error::ServiceResult;
 use entity::{game, signature_metadata_mapping};
-use sea_orm::{DbConn, DbErr};
+use log::debug;
+use redis::AsyncTypedCommands;
+use redis::aio::MultiplexedConnection;
+use sea_orm::DbConn;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-const CACHE_SIZE: usize = 1_000_000; // 1 million entries
-const CACHE_LIFESPAN: u64 = 86400; // 24 hours in seconds
-const REFRESH_ON_RETRIEVE: bool = true;
+const IDENTIFY_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24 * 7).as_secs(); // 7 days
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<String, Option<(game::Model, Vec<signature_metadata_mapping::Model>)>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ sha256.to_string() }"#
-)]
-pub async fn find_game_and_id_mapping_by_sha256_cached(
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IdentifyEntry {
+	pub game: game::Model,
+	pub metadata_mappings: Vec<signature_metadata_mapping::Model>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum IdentifyCacheType {
+	IdentifySha256,
+	IdentifySha1,
+	IdentifyMd5,
+}
+
+impl CacheKey for IdentifyCacheType {
+	fn get_cache_key(&self, identifier: &str) -> String {
+		match &self {
+			IdentifyCacheType::IdentifySha256 => {
+				format!("{}:cache:identify:sha256:{}", CACHE_PREFIX, identifier)
+			}
+			IdentifyCacheType::IdentifySha1 => {
+				format!("{}:cache:identify:sha1:{}", CACHE_PREFIX, identifier)
+			}
+			IdentifyCacheType::IdentifyMd5 => {
+				format!("{}:cache:identify:md5:{}", CACHE_PREFIX, identifier)
+			}
+		}
+	}
+}
+
+pub async fn delete_identify_cache(
+	hash: &str,
+	r#type: IdentifyCacheType,
+	redis_conn: &mut MultiplexedConnection,
+) -> ServiceResult<()> {
+	let cache_key = r#type.get_cache_key(hash);
+	debug!("Deleting cache for key: {}", cache_key);
+	redis_conn.del(&cache_key).await?;
+	Ok(())
+}
+
+pub async fn find_game_and_metadata_ids_by_sha256_cached(
 	sha256: &str,
-	conn: &DbConn,
-) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
-	find_game_and_id_mapping_by_sha256(sha256, conn).await
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> ServiceResult<Option<IdentifyEntry>> {
+	find_game_and_metadata_ids_cached(
+		sha256,
+		IdentifyCacheType::IdentifySha256,
+		redis_conn,
+		db_conn,
+	)
+	.await
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<String, Option<(game::Model, Vec<signature_metadata_mapping::Model>)>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ sha1.to_string() }"#
-)]
-pub async fn find_game_and_id_mapping_by_sha1_cached(
+pub async fn find_game_and_metadata_ids_by_sha1_cached(
 	sha1: &str,
-	conn: &DbConn,
-) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
-	find_game_and_id_mapping_by_sha1(sha1, conn).await
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> ServiceResult<Option<IdentifyEntry>> {
+	find_game_and_metadata_ids_cached(sha1, IdentifyCacheType::IdentifySha1, redis_conn, db_conn)
+		.await
 }
 
-#[cached(
-	result = true,
-	ty = "TimedSizedCache<String, Option<(game::Model, Vec<signature_metadata_mapping::Model>)>>",
-	create = "{ TimedSizedCache::with_size_and_lifespan_and_refresh(CACHE_SIZE, CACHE_LIFESPAN, REFRESH_ON_RETRIEVE) }",
-	convert = r#"{ md5.to_string() }"#
-)]
-pub async fn find_game_and_id_mapping_by_md5_cached(
+pub async fn find_game_and_metadata_ids_by_md5_cached(
 	md5: &str,
-	conn: &DbConn,
-) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
-	find_game_and_id_mapping_by_md5(md5, conn).await
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> ServiceResult<Option<IdentifyEntry>> {
+	find_game_and_metadata_ids_cached(md5, IdentifyCacheType::IdentifyMd5, redis_conn, db_conn)
+		.await
+}
+
+async fn find_game_and_metadata_ids_cached(
+	hash: &str,
+	r#type: IdentifyCacheType,
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> ServiceResult<Option<IdentifyEntry>> {
+	let cache_key = r#type.get_cache_key(hash);
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("Cache hit for key: {}", hash);
+		redis_conn
+			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
+			.await?;
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(deserialized);
+	}
+
+	debug!("Cache miss for key: {}", hash);
+
+	let entry = match r#type {
+		IdentifyCacheType::IdentifySha256 => {
+			find_game_and_id_mapping_by_sha256(hash, db_conn).await?
+		}
+		IdentifyCacheType::IdentifySha1 => find_game_and_id_mapping_by_sha1(hash, db_conn).await?,
+		IdentifyCacheType::IdentifyMd5 => find_game_and_id_mapping_by_md5(hash, db_conn).await?,
+	}
+	.map(|(game, mappings)| IdentifyEntry {
+		game,
+		metadata_mappings: mappings,
+	});
+
+	redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(entry.clone())?,
+			IDENTIFY_CACHE_LIFETIME,
+		)
+		.await?;
+
+	Ok(entry)
 }

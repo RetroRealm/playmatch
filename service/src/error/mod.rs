@@ -33,6 +33,18 @@ pub enum ServiceError {
 
 	#[error(transparent)]
 	DbError(#[from] sea_orm::DbErr),
+
+	#[error(transparent)]
+	RedisError(#[from] redis::RedisError),
+
+	#[error(transparent)]
+	JsonError(#[from] serde_json::Error),
+
+	#[error(transparent)]
+	ParseIntError(#[from] std::num::ParseIntError),
+
+	#[error(transparent)]
+	AnyhowError(#[from] anyhow::Error),
 }
 
 pub type ServiceResult<T> = Result<T, ServiceError>;

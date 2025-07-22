@@ -170,11 +170,17 @@ pub async fn create_company_suggestion(
 pub async fn approve_suggestion(
 	id: Path<Uuid>,
 	db_conn: Data<DatabaseConnection>,
+	redis_client: Data<redis::Client>,
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	handle_auth_and_permissions(&UserPermissionsEnum::Automation, req, db_conn.clone()).await?;
 
-	let updated = accept_suggestion(id.into_inner(), db_conn.get_ref()).await?;
+	let updated = accept_suggestion(
+		id.into_inner(),
+		db_conn.get_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+	)
+	.await?;
 
 	Ok(HttpResponse::Ok().json(UpdatedMetadataMatchesFromSuggestionResponse { updated }))
 }

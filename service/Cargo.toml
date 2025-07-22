@@ -26,10 +26,10 @@ derive_builder = "^0.20"
 tower = { version = "^0.5", features = ["util", "limit", "retry"] }
 oauth2 = { version = "^5", features = ["reqwest"] }
 utoipa = { version = "~4", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
-cached = { version = "^0.55", features = ["async"] }
 md-5 = "^0.10"
 num_cpus = "^1.16"
 bigdecimal = { version = "^0.4", features = ["serde-json"] }
+redis = { version = "^0.32", features = ["tokio-rustls-comp", "aio"] }
 
 [dependencies.sea-orm]
 version = "~1" # sea-orm version

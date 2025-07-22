@@ -86,6 +86,7 @@ async fn start() -> anyhow::Result<()> {
 		env::var("IGDB_CLIENT_SECRET")?,
 		client.clone(),
 	)?;
+	let redis_client = redis::Client::open(env::var("REDIS_URL")?)?;
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.endpoint("/metrics")
 		.build()
@@ -95,6 +96,7 @@ async fn start() -> anyhow::Result<()> {
 	let client_arc = Arc::new(client);
 	let igdb_client_arc = Arc::new(igdb_client);
 
+	let redis_client_data = Data::new(redis_client);
 	let conn_data = Data::from(conn_arc.clone());
 	let client_data = Data::from(client_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
@@ -106,6 +108,7 @@ async fn start() -> anyhow::Result<()> {
 			.app_data(conn_data.clone())
 			.app_data(client_data.clone())
 			.app_data(igdb_data.clone())
+			.app_data(redis_client_data.clone())
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))

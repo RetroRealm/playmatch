@@ -20,9 +20,14 @@ use web::Query;
 pub async fn identify_game_with_metadata_ids(
 	query: Query<GameFileMatchSearch>,
 	db_conn: Data<DatabaseConnection>,
+	redis_client: Data<redis::Client>,
 ) -> error::Result<impl Responder> {
-	let response =
-		identify_game_and_metadata_mappings(query.into_inner(), db_conn.get_ref()).await?;
+	let response = identify_game_and_metadata_mappings(
+		query.into_inner(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		db_conn.get_ref(),
+	)
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -41,8 +46,14 @@ pub async fn identify_game_with_metadata_ids(
 pub async fn identify_game_and_relations(
 	query: Query<GameFileMatchSearch>,
 	db_conn: Data<DatabaseConnection>,
+	redis_client: Data<redis::Client>,
 ) -> error::Result<impl Responder> {
-	let response = identify_game_and_get_relations(query.into_inner(), db_conn.get_ref()).await?;
+	let response = identify_game_and_get_relations(
+		query.into_inner(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		db_conn.get_ref(),
+	)
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }

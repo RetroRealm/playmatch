@@ -21,6 +21,9 @@ pub enum Error {
 
 	#[error(transparent)]
 	ServiceError(#[from] ServiceError),
+
+	#[error(transparent)]
+	RedisError(#[from] redis::RedisError),
 }
 
 impl ResponseError for Error {
@@ -45,10 +48,15 @@ impl ResponseError for Error {
 				ServiceError::GameAndRelationsResultBuilderError(_) => {
 					StatusCode::INTERNAL_SERVER_ERROR
 				}
+				ServiceError::RedisError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+				ServiceError::JsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+				ServiceError::ParseIntError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+				ServiceError::AnyhowError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			},
 			Error::InvalidAuth(_) => StatusCode::UNAUTHORIZED,
 			Error::UserNotFound => StatusCode::NOT_FOUND,
 			Error::InvalidAuthPermission => StatusCode::FORBIDDEN,
+			Error::RedisError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 		}
 	}
 

@@ -29,14 +29,16 @@ use service::metadata::igdb::model::{
 #[get("/igdb/game")]
 pub async fn get_igdb_game_by_id(
 	query: Query<SlugIdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let query = query.into_inner();
+	let redis_conn = &mut redis_client.get_multiplexed_async_connection().await?;
 
 	let response = if let Some(id) = query.id {
-		get_game_by_id_cached(igdb_client.as_ref(), id).await?
+		get_game_by_id_cached(igdb_client.as_ref(), redis_conn, id).await?
 	} else if let Some(slug) = query.slug {
-		get_game_by_slug_cached(igdb_client.as_ref(), slug).await?
+		get_game_by_slug_cached(igdb_client.as_ref(), redis_conn, slug).await?
 	} else {
 		return Ok(HttpResponse::BadRequest().body("Either slug or id must be provided"));
 	};
@@ -61,12 +63,16 @@ pub async fn get_igdb_game_by_id(
 #[get("/igdb/games")]
 pub async fn get_igdb_games_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<Game>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_game_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_game_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -87,10 +93,15 @@ pub async fn get_igdb_games_by_ids(
 #[get("/igdb/game/search")]
 pub async fn search_igdb_game_by_name(
 	query: Query<SearchQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		search_game_by_name_cached(igdb_client.as_ref(), query.into_inner().query).await?;
+	let response = search_game_by_name_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().query,
+	)
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -109,9 +120,15 @@ pub async fn search_igdb_game_by_name(
 #[get("/igdb/age-rating")]
 pub async fn get_igdb_age_rating_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_age_rating_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_age_rating_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -133,12 +150,16 @@ pub async fn get_igdb_age_rating_by_id(
 #[get("/igdb/age-ratings")]
 pub async fn get_igdb_age_ratings_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<AgeRating>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_age_rating_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_age_rating_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -160,10 +181,15 @@ pub async fn get_igdb_age_ratings_by_ids(
 #[get("/igdb/alternative-name")]
 pub async fn get_igdb_alternative_name_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_alternative_name_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_alternative_name_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -185,12 +211,15 @@ pub async fn get_igdb_alternative_name_by_id(
 #[get("/igdb/alternative-names")]
 pub async fn get_igdb_alternative_names_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
 	let response = igdb_route_mutli_id_helper::<AlternativeName>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_alternative_name_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_alternative_name_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -212,9 +241,15 @@ pub async fn get_igdb_alternative_names_by_ids(
 #[get("/igdb/artwork")]
 pub async fn get_igdb_artwork_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_artwork_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_artwork_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -236,12 +271,16 @@ pub async fn get_igdb_artwork_by_id(
 #[get("/igdb/artworks")]
 pub async fn get_igdb_artworks_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<Artwork>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_artwork_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_artwork_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -263,9 +302,15 @@ pub async fn get_igdb_artworks_by_ids(
 #[get("/igdb/collection")]
 pub async fn get_igdb_collection_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_collection_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_collection_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -287,12 +332,16 @@ pub async fn get_igdb_collection_by_id(
 #[get("/igdb/collections")]
 pub async fn get_igdb_collections_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<Collection>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_collection_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_collection_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -314,9 +363,15 @@ pub async fn get_igdb_collections_by_ids(
 #[get("/igdb/cover")]
 pub async fn get_igdb_cover_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_cover_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_cover_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -338,12 +393,16 @@ pub async fn get_igdb_cover_by_id(
 #[get("/igdb/covers")]
 pub async fn get_igdb_covers_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<Cover>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_cover_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_cover_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -365,10 +424,15 @@ pub async fn get_igdb_covers_by_ids(
 #[get("/igdb/external-game")]
 pub async fn get_igdb_external_game_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response =
-		get_external_game_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_external_game_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -390,12 +454,16 @@ pub async fn get_igdb_external_game_by_id(
 #[get("/igdb/external-games")]
 pub async fn get_igdb_external_games_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<ExternalGame>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_external_game_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_external_game_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -417,9 +485,15 @@ pub async fn get_igdb_external_games_by_ids(
 #[get("/igdb/franchise")]
 pub async fn get_igdb_franchise_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_franchise_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_franchise_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -441,12 +515,16 @@ pub async fn get_igdb_franchise_by_id(
 #[get("/igdb/franchises")]
 pub async fn get_igdb_franchises_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<Franchise>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_franchise_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_franchise_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -468,9 +546,15 @@ pub async fn get_igdb_franchises_by_ids(
 #[get("/igdb/genre")]
 pub async fn get_igdb_genre_by_id(
 	query: Query<IdQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
-	let response = get_genre_by_id_cached(igdb_client.as_ref(), query.into_inner().id).await?;
+	let response = get_genre_by_id_cached(
+		igdb_client.as_ref(),
+		&mut redis_client.get_multiplexed_async_connection().await?,
+		query.into_inner().id,
+	)
+	.await?;
 
 	if response.is_none() {
 		return Ok(HttpResponse::NotFound().finish());
@@ -492,12 +576,16 @@ pub async fn get_igdb_genre_by_id(
 #[get("/igdb/genres")]
 pub async fn get_igdb_genres_by_ids(
 	query: Query<IdsQuery>,
+	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
+
 	let response = igdb_route_mutli_id_helper::<Genre>(query.into_inner().ids, |id| {
 		tokio::spawn({
 			let client = igdb_client.clone();
-			async move { get_genre_by_id_cached(client.as_ref(), id).await }
+			let mut redis_conn = redis_conn.clone();
+			async move { get_genre_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;

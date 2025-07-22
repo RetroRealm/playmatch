@@ -1,3 +1,4 @@
+use crate::cache::identify::{IdentifyCacheType, delete_identify_cache};
 use crate::db::company::{find_company_by_name, find_company_related_signature_metadata_mapping};
 use crate::db::game::{
 	find_all_children_of_game, find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
@@ -17,10 +18,10 @@ use crate::model::{
 	GameMatchType, GameMetadataMatchResult, GameMetadataMatchResultBuilder, UpdatedMatchResult,
 	UpdatedMatchResultBuilder,
 };
-use cached::Cached;
 use entity::sea_orm_active_enums::MatchTypeEnum;
 use entity::{game, signature_metadata_mapping};
 use log::debug;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 
 pub async fn apply_manual_company_match(
@@ -125,41 +126,43 @@ pub async fn apply_manual_platform_match(
 
 pub async fn apply_manual_game_match(
 	r#match: GameMatchRequest,
-	conn: &DbConn,
+	db_conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
 ) -> ServiceResult<Vec<UpdatedMatchResult>> {
 	let found_game = if let Some(sha256) = &r#match.sha256 {
-		find_game_and_id_mapping_by_sha256(sha256, conn)
+		find_game_and_id_mapping_by_sha256(sha256, db_conn)
 			.await?
 			.map(|(game, _)| game)
 	} else if let Some(sha1) = &r#match.sha1 {
-		find_game_and_id_mapping_by_sha1(sha1, conn)
+		find_game_and_id_mapping_by_sha1(sha1, db_conn)
 			.await?
 			.map(|(game, _)| game)
 	} else if let Some(md5) = &r#match.md5 {
-		find_game_and_id_mapping_by_md5(md5, conn)
+		find_game_and_id_mapping_by_md5(md5, db_conn)
 			.await?
 			.map(|(game, _)| game)
 	} else if let Some(file_name) = &r#match.name {
-		find_game_by_name_or_game_file_name(file_name, conn).await?
+		find_game_by_name_or_game_file_name(file_name, db_conn).await?
 	} else {
 		None
 	};
 
 	let game = found_game.ok_or(ServiceError::GameNotFound)?;
 
-	apply_manual_game_match_by_game(game, r#match.into(), conn).await
+	apply_manual_game_match_by_game(game, r#match.into(), db_conn, redis_conn).await
 }
 
 pub async fn apply_manual_game_match_by_game(
 	game: game::Model,
 	r#match: GameMatchData,
-	conn: &DbConn,
+	db_conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
 ) -> ServiceResult<Vec<UpdatedMatchResult>> {
-	let platform = find_platform_of_game(game.id, conn).await?;
+	let platform = find_platform_of_game(game.id, db_conn).await?;
 
 	// Find all games that match the name and have the same platform (this is useful for platforms having multiple dat sets for encrypted and decrypted versions)
 	let games = if let Some(platform) = platform {
-		find_games_by_name_and_platform_id(&game.name, platform.id, conn).await?
+		find_games_by_name_and_platform_id(&game.name, platform.id, db_conn).await?
 	} else {
 		vec![game]
 	};
@@ -168,10 +171,10 @@ pub async fn apply_manual_game_match_by_game(
 
 	// Find all parents and children of the same game
 	for game in games {
-		if let Some(parent) = find_game_parent(&game, conn).await? {
+		if let Some(parent) = find_game_parent(&game, db_conn).await? {
 			debug!("Found parent game: {}", parent.id);
 
-			let children = find_all_children_of_game(&parent, conn).await?;
+			let children = find_all_children_of_game(&parent, db_conn).await?;
 			debug!(
 				"Found {} children for parent game: {}",
 				children.len(),
@@ -182,7 +185,7 @@ pub async fn apply_manual_game_match_by_game(
 			games_to_update.extend(children);
 		} else {
 			debug!("No parent game found for game: {}", game.id);
-			let children = find_all_children_of_game(&game, conn).await?;
+			let children = find_all_children_of_game(&game, db_conn).await?;
 			debug!("Found {} children for game: {}", children.len(), game.id);
 			games_to_update.push(game);
 			games_to_update.extend(children);
@@ -194,7 +197,7 @@ pub async fn apply_manual_game_match_by_game(
 	for game in games_to_update {
 		debug!("Updating game: {}", game.name);
 
-		let mapping = find_game_signature_metadata_mapping(&game, conn).await?;
+		let mapping = find_game_signature_metadata_mapping(&game, db_conn).await?;
 
 		if let Some(mapping) = mapping {
 			if mapping.match_type != MatchTypeEnum::Failed
@@ -226,14 +229,15 @@ pub async fn apply_manual_game_match_by_game(
 				.comment(r#match.comment.clone())
 				.manually_matched_by(r#match.user_id)
 				.build()?,
-			conn,
+			db_conn,
 		)
 		.await?;
 
 		// Bust the cache for the hashes of the game files associated with this game so that the next time it is queried, it will return the updated mapping
-		let game_files = get_game_files_from_game_id(game.id, conn).await?;
+		let game_files = get_game_files_from_game_id(game.id, db_conn).await?;
 		for game_file in game_files {
-			bust_cache_for_hashes(game_file.sha256, game_file.sha1, game_file.md5).await
+			bust_cache_for_hashes(game_file.sha256, game_file.sha1, game_file.md5, redis_conn)
+				.await?
 		}
 
 		results.push(
@@ -249,26 +253,27 @@ pub async fn apply_manual_game_match_by_game(
 	Ok(results)
 }
 
-async fn bust_cache_for_hashes(sha256: Option<String>, sha1: Option<String>, md5: Option<String>) {
-	let mut sha256_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA256_CACHED
-		.lock()
-		.await;
-	let mut sha1_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_SHA1_CACHED
-		.lock()
-		.await;
-	let mut md5_lock = crate::cache::identify::FIND_GAME_AND_ID_MAPPING_BY_MD5_CACHED
-		.lock()
-		.await;
-
+async fn bust_cache_for_hashes(
+	sha256: Option<String>,
+	sha1: Option<String>,
+	md5: Option<String>,
+	redis_conn: &mut MultiplexedConnection,
+) -> ServiceResult<()> {
 	if let Some(sha256) = &sha256 {
-		sha256_lock.cache_remove(sha256);
+		delete_identify_cache(sha256, IdentifyCacheType::IdentifySha256, redis_conn).await?;
 	}
 	if let Some(sha1) = &sha1 {
-		sha1_lock.cache_remove(sha1);
+		delete_identify_cache(sha1, IdentifyCacheType::IdentifySha1, redis_conn).await?;
 	}
 	if let Some(md5) = &md5 {
-		md5_lock.cache_remove(md5);
+		delete_identify_cache(md5, IdentifyCacheType::IdentifyMd5, redis_conn).await?;
 	}
+	debug!(
+		"Cache busted for hashes: sha256: {:?}, sha1: {:?}, md5: {:?}",
+		sha256, sha1, md5
+	);
+
+	Ok(())
 }
 
 pub fn build_result(
