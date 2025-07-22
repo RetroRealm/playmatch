@@ -33,13 +33,13 @@ impl CacheKey for IdentifyCacheType {
 	fn get_cache_key(&self, identifier: &str) -> String {
 		match &self {
 			IdentifyCacheType::IdentifySha256 => {
-				format!("{}:cache:identify:sha256:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:identify:sha256:{identifier}")
 			}
 			IdentifyCacheType::IdentifySha1 => {
-				format!("{}:cache:identify:sha1:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:identify:sha1:{identifier}")
 			}
 			IdentifyCacheType::IdentifyMd5 => {
-				format!("{}:cache:identify:md5:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:identify:md5:{identifier}")
 			}
 		}
 	}
@@ -51,7 +51,7 @@ pub async fn delete_identify_cache(
 	redis_conn: &mut MultiplexedConnection,
 ) -> ServiceResult<()> {
 	let cache_key = r#type.get_cache_key(hash);
-	debug!("Deleting cache for key: {}", cache_key);
+	debug!("Deleting cache for key: {cache_key}");
 	redis_conn.del(&cache_key).await?;
 	Ok(())
 }
@@ -97,7 +97,7 @@ async fn find_game_and_metadata_ids_cached(
 	let cache_key = r#type.get_cache_key(hash);
 
 	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
-		debug!("Cache hit for key: {}", hash);
+		debug!("Cache hit for key: {hash}");
 		redis_conn
 			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
 			.await?;
@@ -105,7 +105,7 @@ async fn find_game_and_metadata_ids_cached(
 		return Ok(deserialized);
 	}
 
-	debug!("Cache miss for key: {}", hash);
+	debug!("Cache miss for key: {hash}");
 
 	let entry = match r#type {
 		IdentifyCacheType::IdentifySha256 => {

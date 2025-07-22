@@ -268,10 +268,7 @@ async fn bust_cache_for_hashes(
 	if let Some(md5) = &md5 {
 		delete_identify_cache(md5, IdentifyCacheType::IdentifyMd5, redis_conn).await?;
 	}
-	debug!(
-		"Cache busted for hashes: sha256: {:?}, sha1: {:?}, md5: {:?}",
-		sha256, sha1, md5
-	);
+	debug!("Cache busted for hashes: sha256: {sha256:?}, sha1: {sha1:?}, md5: {md5:?}");
 
 	Ok(())
 }

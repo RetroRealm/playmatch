@@ -361,38 +361,37 @@ impl CacheKey for IgdbCacheType {
 	fn get_cache_key(&self, identifier: &str) -> String {
 		match self {
 			IgdbCacheType::GetIgdbGameById => {
-				format!("{}:cache:igdb:game{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:game:{identifier}")
 			}
 			IgdbCacheType::GetIgdbGameBySlug => {
-				format!("{}:cache:igdb:game:slug:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:game:slug:{identifier}")
 			}
 			IgdbCacheType::SearchIgdbGameByName => {
-				format!("{}:cache:igdb:game:search:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:game:search:{identifier}")
 			}
 			IgdbCacheType::GetAgeRatingById => {
-				format!("{}:cache:igdb:age_rating:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:age_rating:{identifier}")
 			}
-			IgdbCacheType::GetAlternativeNameById => format!(
-				"{}:cache:igdb:alternative_name:{}",
-				CACHE_PREFIX, identifier
-			),
+			IgdbCacheType::GetAlternativeNameById => {
+				format!("{CACHE_PREFIX}:cache:igdb:alternative_name:{identifier}")
+			}
 			IgdbCacheType::GetArtworkById => {
-				format!("{}:cache:igdb:artwork:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:artwork:{identifier}")
 			}
 			IgdbCacheType::GetCollectionById => {
-				format!("{}:cache:igdb:collection:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:collection:{identifier}")
 			}
 			IgdbCacheType::GetCoverById => {
-				format!("{}:cache:igdb:cover:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:cover:{identifier}")
 			}
 			IgdbCacheType::GetExternalGameById => {
-				format!("{}:cache:igdb:external_game:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:external_game:{identifier}")
 			}
 			IgdbCacheType::GetFranchiseById => {
-				format!("{}:cache:igdb:franchise:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:franchise:{identifier}")
 			}
 			IgdbCacheType::GetGenreById => {
-				format!("{}:cache:igdb:genre:{}", CACHE_PREFIX, identifier)
+				format!("{CACHE_PREFIX}:cache:igdb:genre:{identifier}")
 			}
 		}
 	}
