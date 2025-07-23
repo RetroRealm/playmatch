@@ -1,11 +1,17 @@
 use crate::error::ServiceResult;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 pub mod identify;
 pub mod igdb;
 
 pub const CACHE_PREFIX: &str = "playmatch";
+
+#[derive(Debug, Clone)]
+pub enum CacheStatus<T> {
+	Cached(T),
+	NonCached(T),
+}
 
 pub trait CacheKey {
 	fn get_cache_key(&self, identifier: &str) -> String;

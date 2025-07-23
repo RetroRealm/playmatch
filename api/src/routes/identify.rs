@@ -1,7 +1,9 @@
 use crate::error;
 use actix_web::web::Data;
-use actix_web::{HttpResponse, Responder, get, web};
+use actix_web::{get, web, HttpResponse, Responder};
+use log::debug;
 use sea_orm::DatabaseConnection;
+use service::cache::CacheStatus;
 use service::game::{identify_game_and_get_relations, identify_game_and_metadata_mappings};
 use service::model::GameFileMatchSearch;
 use web::Query;
@@ -22,14 +24,26 @@ pub async fn identify_game_with_metadata_ids(
 	db_conn: Data<DatabaseConnection>,
 	redis_client: Data<redis::Client>,
 ) -> error::Result<impl Responder> {
-	let response = identify_game_and_metadata_mappings(
+	let identify_result = identify_game_and_metadata_mappings(
 		query.into_inner(),
 		&mut redis_client.get_multiplexed_async_connection().await?,
 		db_conn.get_ref(),
 	)
 	.await?;
 
-	Ok(HttpResponse::Ok().json(response))
+	let cache_status = match identify_result {
+		CacheStatus::Cached(match_result) => ("HIT", match_result),
+		CacheStatus::NonCached(match_result) => ("MISS", match_result),
+	};
+
+	debug!(
+		"Cache {} for identify game and get metadata ids",
+		cache_status.0
+	);
+
+	Ok(HttpResponse::Ok()
+		.append_header(("X-Cache", cache_status.0))
+		.json(cache_status.1))
 }
 
 /// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate), returning information about the game, game files, publisher and company
@@ -48,12 +62,21 @@ pub async fn identify_game_and_relations(
 	db_conn: Data<DatabaseConnection>,
 	redis_client: Data<redis::Client>,
 ) -> error::Result<impl Responder> {
-	let response = identify_game_and_get_relations(
+	let identify_result = identify_game_and_get_relations(
 		query.into_inner(),
 		&mut redis_client.get_multiplexed_async_connection().await?,
 		db_conn.get_ref(),
 	)
 	.await?;
 
-	Ok(HttpResponse::Ok().json(response))
+	let cache_status = match identify_result {
+		CacheStatus::Cached(match_result) => ("HIT", match_result),
+		CacheStatus::NonCached(match_result) => ("MISS", match_result),
+	};
+
+	debug!("Cache {} for identify game and relations", cache_status.0);
+
+	Ok(HttpResponse::Ok()
+		.append_header(("X-Cache", cache_status.0))
+		.json(cache_status.1))
 }

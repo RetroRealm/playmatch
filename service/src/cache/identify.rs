@@ -1,5 +1,7 @@
+use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::cache::{
-	CACHE_PREFIX, CacheKey, deserialize_option_redis_value, serialize_option_redis_value,
+	deserialize_option_redis_value, serialize_option_redis_value, CacheKey, CacheStatus,
+	CACHE_PREFIX,
 };
 use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
@@ -8,8 +10,8 @@ use crate::db::game::{
 use crate::error::ServiceResult;
 use entity::{game, signature_metadata_mapping};
 use log::debug;
-use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
+use redis::AsyncTypedCommands;
 use sea_orm::DbConn;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -60,7 +62,7 @@ pub async fn find_game_and_metadata_ids_by_sha256_cached(
 	sha256: &str,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
-) -> ServiceResult<Option<IdentifyEntry>> {
+) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
 	find_game_and_metadata_ids_cached(
 		sha256,
 		IdentifyCacheType::IdentifySha256,
@@ -74,7 +76,7 @@ pub async fn find_game_and_metadata_ids_by_sha1_cached(
 	sha1: &str,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
-) -> ServiceResult<Option<IdentifyEntry>> {
+) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
 	find_game_and_metadata_ids_cached(sha1, IdentifyCacheType::IdentifySha1, redis_conn, db_conn)
 		.await
 }
@@ -83,7 +85,7 @@ pub async fn find_game_and_metadata_ids_by_md5_cached(
 	md5: &str,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
-) -> ServiceResult<Option<IdentifyEntry>> {
+) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
 	find_game_and_metadata_ids_cached(md5, IdentifyCacheType::IdentifyMd5, redis_conn, db_conn)
 		.await
 }
@@ -93,7 +95,7 @@ async fn find_game_and_metadata_ids_cached(
 	r#type: IdentifyCacheType,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
-) -> ServiceResult<Option<IdentifyEntry>> {
+) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
 	let cache_key = r#type.get_cache_key(hash);
 
 	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
@@ -102,7 +104,7 @@ async fn find_game_and_metadata_ids_cached(
 			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
 			.await?;
 		let deserialized = deserialize_option_redis_value(cached_val)?;
-		return Ok(deserialized);
+		return Ok(Cached(deserialized));
 	}
 
 	debug!("Cache miss for key: {hash}");
@@ -127,5 +129,5 @@ async fn find_game_and_metadata_ids_cached(
 		)
 		.await?;
 
-	Ok(entry)
+	Ok(NonCached(entry))
 }

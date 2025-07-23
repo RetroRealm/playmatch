@@ -1,7 +1,8 @@
 use crate::cache::identify::{
-	IdentifyEntry, find_game_and_metadata_ids_by_md5_cached,
-	find_game_and_metadata_ids_by_sha1_cached, find_game_and_metadata_ids_by_sha256_cached,
+	find_game_and_metadata_ids_by_md5_cached, find_game_and_metadata_ids_by_sha1_cached,
+	find_game_and_metadata_ids_by_sha256_cached, IdentifyEntry,
 };
+use crate::cache::CacheStatus;
 use crate::db::game::{
 	find_all_relations_of_game, find_game_and_id_mapping_by_name_and_size, get_game_by_id,
 };
@@ -12,10 +13,12 @@ use crate::model::{
 	GameAndRelationsResultBuilder, GameFileMatchSearch, GameMatchType, GameMetadataMatchResult,
 	PlaymatchGame,
 };
+use log::debug;
 use redis::aio::MultiplexedConnection;
-use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
+use sea_orm::DbConn;
 use strum::IntoEnumIterator;
+use CacheStatus::{Cached, NonCached};
 
 pub async fn get_game_by_id_from_db(game_id: Uuid, conn: &DbConn) -> ServiceResult<PlaymatchGame> {
 	let game_opt = get_game_by_id(game_id, conn).await?;
@@ -51,69 +54,117 @@ pub async fn identify_game_and_get_relations(
 	search: GameFileMatchSearch,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
-) -> anyhow::Result<GameAndRelationMatchResult> {
-	let mut response_body = None;
+) -> anyhow::Result<CacheStatus<GameAndRelationMatchResult>> {
+	let expected_count = [
+		search.sha256.as_ref(),
+		search.sha1.as_ref(),
+		search.md5.as_ref(),
+	]
+	.iter()
+	.filter(|hash| hash.is_some())
+	.count();
 
-	for r#type in GameMatchType::iter() {
-		if r#type == GameMatchType::NoMatch {
-			continue;
-		}
+	let mut cached_results = 0;
 
-		if let Some(entry) = match r#type {
+	for r#type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
+		let type_result = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
 					find_game_and_metadata_ids_by_sha256_cached(sha256, redis_conn, db_conn).await?
 				} else {
-					None
+					NonCached(None)
 				}
 			}
 			GameMatchType::SHA1 => {
 				if let Some(sha1) = &search.sha1 {
 					find_game_and_metadata_ids_by_sha1_cached(sha1, redis_conn, db_conn).await?
 				} else {
-					None
+					NonCached(None)
 				}
 			}
 			GameMatchType::MD5 => {
 				if let Some(md5) = &search.md5 {
 					find_game_and_metadata_ids_by_md5_cached(md5, redis_conn, db_conn).await?
 				} else {
-					None
+					NonCached(None)
 				}
 			}
-			GameMatchType::FileNameAndSize => find_game_and_id_mapping_by_name_and_size(
-				&search.file_name,
-				search.file_size,
-				db_conn,
-			)
-			.await?
-			.map(|r| IdentifyEntry {
-				game: r.0,
-				metadata_mappings: r.1,
-			}),
+			GameMatchType::FileNameAndSize => NonCached(
+				find_game_and_id_mapping_by_name_and_size(
+					&search.file_name,
+					search.file_size,
+					db_conn,
+				)
+				.await?
+				.map(|r| IdentifyEntry {
+					game: r.0,
+					metadata_mappings: r.1,
+				}),
+			),
 			GameMatchType::NoMatch => unreachable!(),
-		} {
-			let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
-				find_all_relations_of_game(&entry.game, db_conn).await?;
+		};
 
-			response_body = Some(
-				GameAndRelationMatchResultBuilder::default()
-					.game_match_type(r#type)
-					.game(Some(entry.game.into()))
-					.platform(Some(platform.into()))
-					.company(company.map(|c| c.into()))
-					.game_files(game_files.into_iter().map(|gf| gf.into()).collect())
-					.dat_file(Some(dat_file.into()))
-					.dat_file_import(Some(dat_file_import.into()))
-					.signature_group(Some(signature_group.into()))
-					.build()?,
-			);
+		match type_result {
+			Cached(Some(entry)) => {
+				debug!("Cache hit for game and relations match: {entry:?}");
 
-			break;
+				let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
+					find_all_relations_of_game(&entry.game, db_conn).await?;
+
+				return Ok(Cached(
+					GameAndRelationMatchResultBuilder::default()
+						.game_match_type(r#type)
+						.game(Some(entry.game.into()))
+						.platform(Some(platform.into()))
+						.company(company.map(|c| c.into()))
+						.game_files(game_files.into_iter().map(|gf| gf.into()).collect())
+						.dat_file(Some(dat_file.into()))
+						.dat_file_import(Some(dat_file_import.into()))
+						.signature_group(Some(signature_group.into()))
+						.build()?,
+				));
+			}
+			NonCached(Some(entry)) => {
+				debug!("Cache miss for game and relations match: {entry:?}");
+
+				let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
+					find_all_relations_of_game(&entry.game, db_conn).await?;
+
+				return Ok(Cached(
+					GameAndRelationMatchResultBuilder::default()
+						.game_match_type(r#type)
+						.game(Some(entry.game.into()))
+						.platform(Some(platform.into()))
+						.company(company.map(|c| c.into()))
+						.game_files(game_files.into_iter().map(|gf| gf.into()).collect())
+						.dat_file(Some(dat_file.into()))
+						.dat_file_import(Some(dat_file_import.into()))
+						.signature_group(Some(signature_group.into()))
+						.build()?,
+				));
+			}
+			Cached(None) => {
+				cached_results += 1;
+			}
+			_ => continue,
 		}
 	}
 
-	Ok(response_body.unwrap_or(GameAndRelationMatchResult {
+	if cached_results == expected_count {
+		debug!("All (possible) game metadata matches were cached, returning cached result");
+		return Ok(Cached(GameAndRelationMatchResult {
+			game_match_type: GameMatchType::NoMatch,
+			game: None,
+			game_files: vec![],
+			company: None,
+			platform: None,
+			dat_file_import: None,
+			dat_file: None,
+			signature_group: None,
+		}));
+	}
+
+	Ok(NonCached(GameAndRelationMatchResult {
 		game_match_type: GameMatchType::NoMatch,
 		game: None,
 		game_files: vec![],
@@ -129,54 +180,90 @@ pub async fn identify_game_and_metadata_mappings(
 	search: GameFileMatchSearch,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
-) -> anyhow::Result<GameMetadataMatchResult> {
-	let mut response_body = None;
+) -> anyhow::Result<CacheStatus<GameMetadataMatchResult>> {
+	let expected_count = [
+		search.sha256.as_ref(),
+		search.sha1.as_ref(),
+		search.md5.as_ref(),
+	]
+	.iter()
+	.filter(|hash| hash.is_some())
+	.count();
 
-	for r#type in GameMatchType::iter() {
-		if r#type == GameMatchType::NoMatch {
-			continue;
-		}
+	let mut cached_results = 0;
 
-		if let Some(entry) = match r#type {
+	for r#type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
+		let type_result = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
 					find_game_and_metadata_ids_by_sha256_cached(sha256, redis_conn, db_conn).await?
 				} else {
-					None
+					NonCached(None)
 				}
 			}
 			GameMatchType::SHA1 => {
 				if let Some(sha1) = &search.sha1 {
 					find_game_and_metadata_ids_by_sha1_cached(sha1, redis_conn, db_conn).await?
 				} else {
-					None
+					NonCached(None)
 				}
 			}
 			GameMatchType::MD5 => {
 				if let Some(md5) = &search.md5 {
 					find_game_and_metadata_ids_by_md5_cached(md5, redis_conn, db_conn).await?
 				} else {
-					None
+					NonCached(None)
 				}
 			}
-			GameMatchType::FileNameAndSize => find_game_and_id_mapping_by_name_and_size(
-				&search.file_name,
-				search.file_size,
-				db_conn,
-			)
-			.await?
-			.map(|r| IdentifyEntry {
-				game: r.0,
-				metadata_mappings: r.1,
-			}),
+			GameMatchType::FileNameAndSize => NonCached(
+				find_game_and_id_mapping_by_name_and_size(
+					&search.file_name,
+					search.file_size,
+					db_conn,
+				)
+				.await?
+				.map(|r| IdentifyEntry {
+					game: r.0,
+					metadata_mappings: r.1,
+				}),
+			),
 			GameMatchType::NoMatch => unreachable!(),
-		} {
-			response_body = Some(build_result(r#type, entry.game, entry.metadata_mappings)?);
-			break;
+		};
+
+		match type_result {
+			Cached(Some(entry)) => {
+				debug!("Cache hit for game metadata match: {entry:?}");
+				return Ok(Cached(build_result(
+					r#type,
+					entry.game,
+					entry.metadata_mappings,
+				)?));
+			}
+			NonCached(Some(entry)) => {
+				debug!("Cache miss for game metadata match: {entry:?}");
+				return Ok(NonCached(build_result(
+					r#type,
+					entry.game,
+					entry.metadata_mappings,
+				)?));
+			}
+			Cached(None) => {
+				cached_results += 1;
+			}
+			_ => continue,
 		}
 	}
 
-	Ok(response_body.unwrap_or(GameMetadataMatchResult {
+	if cached_results == expected_count {
+		debug!("All (possible) game metadata matches were cached, returning cached result");
+		return Ok(Cached(GameMetadataMatchResult {
+			game_match_type: GameMatchType::NoMatch,
+			id: None,
+			external_metadata: Vec::new(),
+		}));
+	}
+
+	Ok(NonCached(GameMetadataMatchResult {
 		game_match_type: GameMatchType::NoMatch,
 		id: None,
 		external_metadata: Vec::new(),
