@@ -1,7 +1,7 @@
 use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::cache::{
-	deserialize_option_redis_value, serialize_option_redis_value, CacheKey, CacheStatus,
-	CACHE_PREFIX,
+	CACHE_PREFIX, CacheKey, CacheStatus, deserialize_option_redis_value,
+	serialize_option_redis_value,
 };
 use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
@@ -10,8 +10,8 @@ use crate::db::game::{
 use crate::error::ServiceResult;
 use entity::{game, signature_metadata_mapping};
 use log::debug;
-use redis::aio::MultiplexedConnection;
 use redis::AsyncTypedCommands;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

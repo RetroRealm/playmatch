@@ -1,8 +1,8 @@
-use crate::cache::identify::{
-	find_game_and_metadata_ids_by_md5_cached, find_game_and_metadata_ids_by_sha1_cached,
-	find_game_and_metadata_ids_by_sha256_cached, IdentifyEntry,
-};
 use crate::cache::CacheStatus;
+use crate::cache::identify::{
+	IdentifyEntry, find_game_and_metadata_ids_by_md5_cached,
+	find_game_and_metadata_ids_by_sha1_cached, find_game_and_metadata_ids_by_sha256_cached,
+};
 use crate::db::game::{
 	find_all_relations_of_game, find_game_and_id_mapping_by_name_and_size, get_game_by_id,
 };
@@ -13,12 +13,12 @@ use crate::model::{
 	GameAndRelationsResultBuilder, GameFileMatchSearch, GameMatchType, GameMetadataMatchResult,
 	PlaymatchGame,
 };
+use CacheStatus::{Cached, NonCached};
 use log::debug;
 use redis::aio::MultiplexedConnection;
-use sea_orm::prelude::Uuid;
 use sea_orm::DbConn;
+use sea_orm::prelude::Uuid;
 use strum::IntoEnumIterator;
-use CacheStatus::{Cached, NonCached};
 
 pub async fn get_game_by_id_from_db(game_id: Uuid, conn: &DbConn) -> ServiceResult<PlaymatchGame> {
 	let game_opt = get_game_by_id(game_id, conn).await?;

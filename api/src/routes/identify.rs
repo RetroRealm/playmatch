@@ -1,6 +1,6 @@
 use crate::error;
 use actix_web::web::Data;
-use actix_web::{get, web, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, get, web};
 use log::debug;
 use sea_orm::DatabaseConnection;
 use service::cache::CacheStatus;

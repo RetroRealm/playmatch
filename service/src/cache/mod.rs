@@ -1,6 +1,6 @@
 use crate::error::ServiceResult;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 pub mod identify;
 pub mod igdb;
