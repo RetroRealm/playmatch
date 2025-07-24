@@ -87,6 +87,10 @@ async fn start() -> anyhow::Result<()> {
 		client.clone(),
 	)?;
 	let redis_client = redis::Client::open(env::var("REDIS_URL")?)?;
+
+	redis_client.get_multiplexed_async_connection().await?;
+	info!("Connected to Redis");
+
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.endpoint("/metrics")
 		.build()
