@@ -27,7 +27,7 @@ pub async fn identify_game_with_metadata_ids(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate), returning information about the game, game files, publisher and company
+/// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate), returning information about the game, game files, metadata mappings, publisher and company
 #[utoipa::path(
 	get,
 	context_path = "/api",

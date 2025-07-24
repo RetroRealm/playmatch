@@ -111,6 +111,10 @@ pub struct GameAndRelationMatchResult {
 	/// if a match was found, the dat file import this game belongs to.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dat_file_import: Option<PlaymatchDatFileImport>,
+
+	/// If a match was found, External metadata for the game.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
 }
 
 /// Result of a game match including company, platform and files.

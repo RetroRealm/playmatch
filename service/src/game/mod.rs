@@ -57,7 +57,7 @@ pub async fn identify_game_and_get_relations(
 			continue;
 		}
 
-		if let Some((game_release, _)) = match r#type {
+		if let Some((game_release, metadata_mappings)) = match r#type {
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
 					find_game_and_id_mapping_by_sha256_cached(sha256, conn).await?
@@ -98,6 +98,12 @@ pub async fn identify_game_and_get_relations(
 					.dat_file(Some(dat_file.into()))
 					.dat_file_import(Some(dat_file_import.into()))
 					.signature_group(Some(signature_group.into()))
+					.external_metadata(
+						metadata_mappings
+							.into_iter()
+							.map(|mapping| mapping.into())
+							.collect(),
+					)
 					.build()?,
 			);
 
@@ -114,6 +120,7 @@ pub async fn identify_game_and_get_relations(
 		dat_file_import: None,
 		dat_file: None,
 		signature_group: None,
+		external_metadata: vec![],
 	}))
 }
 
