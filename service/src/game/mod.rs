@@ -121,6 +121,13 @@ pub async fn identify_game_and_get_relations(
 						.dat_file(Some(dat_file.into()))
 						.dat_file_import(Some(dat_file_import.into()))
 						.signature_group(Some(signature_group.into()))
+						.external_metadata(
+							entry
+								.metadata_mappings
+								.into_iter()
+								.map(|m| m.into())
+								.collect(),
+						)
 						.build()?,
 				));
 			}
@@ -161,6 +168,7 @@ pub async fn identify_game_and_get_relations(
 			dat_file_import: None,
 			dat_file: None,
 			signature_group: None,
+			external_metadata: vec![],
 		}));
 	}
 
@@ -173,6 +181,7 @@ pub async fn identify_game_and_get_relations(
 		dat_file_import: None,
 		dat_file: None,
 		signature_group: None,
+		external_metadata: vec![],
 	}))
 }
 
