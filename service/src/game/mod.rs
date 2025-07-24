@@ -64,7 +64,7 @@ pub async fn identify_game_and_get_relations(
 	.filter(|hash| hash.is_some())
 	.count();
 
-	let mut cached_results = 0;
+	let mut cached_but_empty = 0;
 
 	for r#type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
 		let type_result = match r#type {
@@ -151,13 +151,13 @@ pub async fn identify_game_and_get_relations(
 				));
 			}
 			Cached(None) => {
-				cached_results += 1;
+				cached_but_empty += 1;
 			}
 			_ => continue,
 		}
 	}
 
-	if cached_results == expected_count {
+	if cached_but_empty == expected_count && cached_but_empty != 0 {
 		debug!("All (possible) game metadata matches were cached, returning cached result");
 		return Ok(Cached(GameAndRelationMatchResult {
 			game_match_type: GameMatchType::NoMatch,
@@ -199,7 +199,7 @@ pub async fn identify_game_and_metadata_mappings(
 	.filter(|hash| hash.is_some())
 	.count();
 
-	let mut cached_results = 0;
+	let mut cached_but_empty = 0;
 
 	for r#type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
 		let type_result = match r#type {
@@ -257,13 +257,13 @@ pub async fn identify_game_and_metadata_mappings(
 				)?));
 			}
 			Cached(None) => {
-				cached_results += 1;
+				cached_but_empty += 1;
 			}
 			_ => continue,
 		}
 	}
 
-	if cached_results == expected_count {
+	if cached_but_empty == expected_count && cached_but_empty != 0 {
 		debug!("All (possible) game metadata matches were cached, returning cached result");
 		return Ok(Cached(GameMetadataMatchResult {
 			game_match_type: GameMatchType::NoMatch,
