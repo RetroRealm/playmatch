@@ -1,9 +1,12 @@
-# Playmatch
+<div align="center">
+  <img src=".github/resources/Playmatch%20Main%20Logo.png" height="180px" width="auto" alt="romm logo">
+  <h3 style="font-size: 50px;">
+    Identify and Match your ROMs at blazingly fast speed
+  </h3>
+</div>
 
-A microservice for matching ROM file hashes and retrieving and caching game metadata. Ensures fast and accurate ROM
-identification
-and efficient metadata retrieval, made for RetroRealm but offers an api which any Rom Manager or Archival System can
-use.
+
+Playmatch is an open-source service to match, identify and verify your ROMs while also providing & caching metadata for them.
 
 The public API is available at [playmatch.retrorealm.dev](https://playmatch.retrorealm.dev/swagger-ui/)
 
