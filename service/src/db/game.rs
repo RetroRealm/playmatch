@@ -4,15 +4,16 @@ use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,
 };
-use entity::sea_orm_active_enums::MatchTypeEnum;
+use chrono::{Duration, NaiveDateTime, Utc};
+use entity::sea_orm_active_enums::{FailedMatchReasonEnum, MatchTypeEnum};
 use entity::{company, dat_file, dat_file_import, platform, signature_group};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
-	ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
-	JoinType, ModelTrait, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
-	RelationTrait, SelectModel, TryIntoModel, sea_query::SimpleExpr,
+	ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType,
+	ModelTrait, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+	SelectModel, TryIntoModel, sea_query::SimpleExpr,
 };
 
 pub async fn get_game_by_id(game_id: Uuid, conn: &DbConn) -> Result<Option<game::Model>, DbErr> {
@@ -333,6 +334,41 @@ pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
 	get_unmatched_games_with_limit(false, page_size, conn)
 }
 
+pub fn get_automatic_match_failed_games_with_limit<'a>(
+	page_size: u64,
+	conn: DbConn,
+) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
+	Box::pin(async move {
+		let sixty_days_ago = Utc::now() - Duration::days(60);
+		let sixty_days_ago_naive: NaiveDateTime = sixty_days_ago.naive_utc();
+
+		let res = Game::find()
+			.join(
+				JoinType::LeftJoin,
+				game::Relation::SignatureMetadataMapping.def(),
+			)
+			.filter(
+				signature_metadata_mapping::Column::MatchType
+					.eq(MatchTypeEnum::Failed)
+					.and(
+						signature_metadata_mapping::Column::FailedMatchReason
+							.eq(FailedMatchReasonEnum::NoDirectMatch),
+					)
+					.and(signature_metadata_mapping::Column::UpdatedAt.lt(sixty_days_ago_naive)),
+			)
+			.order_by_asc(game::Column::Id)
+			.limit(page_size)
+			.all(&conn)
+			.await?;
+
+		if res.is_empty() {
+			Ok(None)
+		} else {
+			Ok(Some(res))
+		}
+	})
+}
+
 fn get_unmatched_games_with_limit<'a>(
 	clone_of_null: bool,
 	page_size: u64,
@@ -365,19 +401,15 @@ fn get_unmatched_games_with_limit<'a>(
 				game::Column::CloneOf.is_not_null()
 			})
 			.filter(
-				Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType)).is_in(
-					vec![
-						MatchTypeEnum::Automatic.as_enum(),
-						MatchTypeEnum::Manual.as_enum(),
-					],
-				),
+				Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType))
+					.is_in(vec![MatchTypeEnum::Automatic, MatchTypeEnum::Manual]),
 			)
 			.filter(
 				Expr::col((smm2.clone(), signature_metadata_mapping::Column::Id))
 					.is_null()
 					.or(
 						Expr::col((smm2, signature_metadata_mapping::Column::MatchType))
-							.eq(MatchTypeEnum::None.as_enum()),
+							.eq(MatchTypeEnum::None),
 					),
 			)
 			.order_by_asc(game::Column::Id)

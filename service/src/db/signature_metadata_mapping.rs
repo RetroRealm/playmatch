@@ -1,4 +1,5 @@
 use crate::db::abstraction::ColumnNullTrait;
+use chrono::Utc;
 use derive_builder::Builder;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
@@ -86,6 +87,7 @@ pub async fn create_or_update_signature_metadata_mapping(
 	active_model.comment = Set(input.comment);
 	active_model.automatic_match_reason = Set(input.automatic_match_reason);
 	active_model.manually_matched_by = Set(input.manually_matched_by);
+	active_model.updated_at = Set(Utc::now().fixed_offset());
 
 	active_model = active_model.save(db_conn).await?;
 

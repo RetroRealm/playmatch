@@ -3,7 +3,8 @@ use crate::automatic_match::igdb::{IGDB_CHUNK_SIZE, clean_name};
 use crate::automatic_match::util::roman_to_int;
 use crate::db::game::{
 	find_game_parent, find_game_signature_metadata_mapping,
-	get_unmatched_games_with_clone_of_with_limit, get_unmatched_games_without_clone_of_with_limit,
+	get_automatic_match_failed_games_with_limit, get_unmatched_games_with_clone_of_with_limit,
+	get_unmatched_games_without_clone_of_with_limit,
 };
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
@@ -58,6 +59,15 @@ pub async fn match_games_to_igdb(
 	)
 	.await?;
 	debug!("Finished matching games with clone_of id to IGDB");
+
+	match_games_in_batches(
+		get_automatic_match_failed_games_with_limit,
+		match_game_to_igdb,
+		igdb_client.clone(),
+		db_conn,
+	)
+	.await?;
+	debug!("Finished matching games which failed to match 60 days ago to IGDB");
 
 	Ok(())
 }
