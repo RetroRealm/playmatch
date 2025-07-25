@@ -1,9 +1,12 @@
 <div align="center">
-  <img src=".github/resources/Playmatch%20Main%20Logo.png" height="180px" width="auto" alt="romm logo">
-  <h3 style="font-size: 50px;">
-    Identify and Match your ROMs at blazingly fast speed
-  </h3>
+  <picture>
+    <source srcset=".github/resources/Playmatch%20Inverted%20Color%20Transparent%20bg.svg" media="(prefers-color-scheme: dark)">
+    <source srcset=".github/resources/Playmatch%20Main%20Logo%20Transparent%20bg.svg" media="(prefers-color-scheme: light)">
+    <img src=".github/resources/Playmatch%20Main%20Logo%20Transparent%20bg.svg" height="180" alt="Playmatch logo">
+  </picture>
+  <h3>Identify and Match your ROMs at blazingly fast speed</h3>
 </div>
+
 
 
 Playmatch is an open-source service to match, identify and verify your ROMs while also providing & caching metadata for them.
