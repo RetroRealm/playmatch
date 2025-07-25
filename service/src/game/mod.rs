@@ -104,30 +104,9 @@ pub async fn identify_game_and_get_relations(
 			GameMatchType::NoMatch => unreachable!(),
 		};
 
-<<<<<<< HEAD
 		match type_result {
 			Cached(Some(entry)) => {
 				debug!("Cache hit for game and relations match: {entry:?}");
-=======
-			response_body = Some(
-				GameAndRelationMatchResultBuilder::default()
-					.game_match_type(r#type)
-					.game(Some(game_release.into()))
-					.platform(Some(platform.into()))
-					.company(company.map(|c| c.into()))
-					.game_files(game_files.into_iter().map(|gf| gf.into()).collect())
-					.dat_file(Some(dat_file.into()))
-					.dat_file_import(Some(dat_file_import.into()))
-					.signature_group(Some(signature_group.into()))
-					.external_metadata(
-						metadata_mappings
-							.into_iter()
-							.map(|mapping| mapping.into())
-							.collect(),
-					)
-					.build()?,
-			);
->>>>>>> develop
 
 				let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
 					find_all_relations_of_game(&entry.game, db_conn).await?;
