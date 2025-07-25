@@ -4,13 +4,6 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-#[derive(DeriveIden, EnumIter)]
-pub enum AutomaticMatchReason {
-	DirectName,
-	AlternativeName,
-	NormalizedName,
-}
-
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
 	async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
