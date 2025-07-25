@@ -66,12 +66,8 @@ pub async fn identify_game_and_get_relations(
 
 	let mut cached_but_empty = 0;
 
-<<<<<<< HEAD
 	for r#type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
 		let type_result = match r#type {
-=======
-		if let Some((game_release, metadata_mappings)) = match r#type {
->>>>>>> develop
 			GameMatchType::SHA256 => {
 				if let Some(sha256) = &search.sha256 {
 					find_game_and_metadata_ids_by_sha256_cached(sha256, redis_conn, db_conn).await?
