@@ -137,7 +137,7 @@ pub async fn identify_game_and_get_relations(
 				let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
 					find_all_relations_of_game(&entry.game, db_conn).await?;
 
-				return Ok(Cached(
+				return Ok(NonCached(
 					GameAndRelationMatchResultBuilder::default()
 						.game_match_type(r#type)
 						.game(Some(entry.game.into()))
@@ -147,6 +147,13 @@ pub async fn identify_game_and_get_relations(
 						.dat_file(Some(dat_file.into()))
 						.dat_file_import(Some(dat_file_import.into()))
 						.signature_group(Some(signature_group.into()))
+						.external_metadata(
+							entry
+								.metadata_mappings
+								.into_iter()
+								.map(|m| m.into())
+								.collect(),
+						)
 						.build()?,
 				));
 			}
