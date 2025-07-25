@@ -18,6 +18,10 @@ pub enum AutomaticMatchReasonEnum {
 	ViaChild,
 	#[sea_orm(string_value = "via_parent")]
 	ViaParent,
+	#[sea_orm(string_value = "normalized_name")]
+	NormalizedName,
+	#[sea_orm(string_value = "normalized_alternative_name")]
+	NormalizedAlternativeName,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

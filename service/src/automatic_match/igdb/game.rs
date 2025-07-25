@@ -1,5 +1,6 @@
 use crate::automatic_match::PAGE_SIZE;
 use crate::automatic_match::igdb::{IGDB_CHUNK_SIZE, clean_name};
+use crate::automatic_match::util::roman_to_int;
 use crate::db::game::{
 	find_game_parent, find_game_signature_metadata_mapping,
 	get_unmatched_games_with_clone_of_with_limit, get_unmatched_games_without_clone_of_with_limit,
@@ -16,7 +17,9 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
+use lazy_static::lazy_static;
 use log::{debug, error};
+use regex::Regex;
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::pin::Pin;
@@ -161,14 +164,16 @@ fn match_game_to_igdb<'a>(
 	Box::pin(async move {
 		let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
 
-		let clean_name = clean_name(&game.name);
+		let clean_name = clean_name(&game.name).to_lowercase();
 
 		let search_results = igdb_client
 			.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 			.await?;
 
 		for search_result in search_results {
-			if search_result.name.to_lowercase() == clean_name.to_lowercase() {
+			let search_result_name = search_result.name.to_lowercase();
+
+			if search_result_name == clean_name {
 				debug!(
 					"Matched Game \"{}\" to IGDB Game ID {} (Direct Match)",
 					&clean_name, search_result.id
@@ -177,6 +182,25 @@ fn match_game_to_igdb<'a>(
 					search_result.id.to_string(),
 					game.id,
 					AutomaticMatchReasonEnum::DirectName,
+					&db_conn,
+				)
+				.await?;
+
+				return Ok(());
+			}
+
+			let search_result_name_normalized = normalize_title(&search_result_name);
+			let clean_name_normalized = normalize_title(&clean_name);
+
+			if search_result_name_normalized == clean_name_normalized {
+				debug!(
+					"Matched Game \"{}\" to IGDB Game ID {} (Normalized Name Match)",
+					&clean_name, search_result.id
+				);
+				create_or_update_signature_metadata_mapping_success(
+					search_result.id.to_string(),
+					game.id,
+					AutomaticMatchReasonEnum::NormalizedName,
 					&db_conn,
 				)
 				.await?;
@@ -195,7 +219,9 @@ fn match_game_to_igdb<'a>(
 					.await?;
 
 				for alternative_name in alternative_names_resolved {
-					if alternative_name.name.to_lowercase() == clean_name.to_lowercase() {
+					let alternative_name_lower = alternative_name.name.to_lowercase();
+
+					if alternative_name_lower == clean_name {
 						debug!(
 							"Matched Game \"{}\" to IGDB Game ID {} (Alternative Name Match)",
 							&clean_name, search_result.id
@@ -204,6 +230,24 @@ fn match_game_to_igdb<'a>(
 							search_result.id.to_string(),
 							game.id,
 							AutomaticMatchReasonEnum::AlternativeName,
+							&db_conn,
+						)
+						.await?;
+
+						return Ok(());
+					}
+
+					let alternative_name_normalized = normalize_title(&alternative_name_lower);
+
+					if alternative_name_normalized == clean_name_normalized {
+						debug!(
+							"Matched Game \"{}\" to IGDB Game ID {} (Normalized Alternative Name Match)",
+							&clean_name, search_result.id
+						);
+						create_or_update_signature_metadata_mapping_success(
+							search_result.id.to_string(),
+							game.id,
+							AutomaticMatchReasonEnum::NormalizedAlternativeName,
 							&db_conn,
 						)
 						.await?;
@@ -228,6 +272,42 @@ fn match_game_to_igdb<'a>(
 
 		Ok(())
 	})
+}
+
+pub fn normalize_title(input: &str) -> String {
+	lazy_static! {
+		static ref RE_STRIP: Regex = Regex::new(r" - |: ").unwrap();
+		static ref RE_LEADING: Regex = Regex::new(r"^(?i)(the |a |an )").unwrap();
+		// Remove ", The", ", A", ", An" anywhere in the string (case-insensitive)
+		static ref RE_ARTICLE: Regex = Regex::new(r"(?i),\s*(the|a|an)\b").unwrap();
+		static ref RE_ROMAN: Regex = Regex::new(
+			r"\b(?i:M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\b"
+		).unwrap();
+	}
+
+	// 1. Strip " - " and ": "
+	let mut s = RE_STRIP.replace_all(input, " ").to_string();
+
+	// 2. Strip leading article
+	s = RE_LEADING.replace(&s, "").to_string();
+
+	// 3. Remove all article suffixes (anywhere in string)
+	s = RE_ARTICLE.replace_all(&s, "").to_string();
+
+	// 4. Replace all roman numerals
+	s = RE_ROMAN
+		.replace_all(&s, |caps: &regex::Captures| {
+			let roman = &caps[0];
+			if !roman.is_empty() {
+				if let Some(val) = roman_to_int(roman) {
+					return val.to_string();
+				}
+			}
+			roman.to_string()
+		})
+		.to_string();
+
+	s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 async fn create_or_update_signature_metadata_mapping_success(
@@ -297,4 +377,40 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 	};
 
 	Ok(platform_igdb_id)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_normalize_title() {
+		assert_eq!(
+			normalize_title("The Legend of Zelda: Majora's Mask"),
+			"Legend of Zelda Majora's Mask"
+		);
+		assert_eq!(
+			normalize_title("Star Wars IV: A New Hope"),
+			"Star Wars 4 A New Hope"
+		);
+		assert_eq!(
+			normalize_title("A Series of Unfortunate Events, The"),
+			"Series of Unfortunate Events"
+		);
+		assert_eq!(
+			normalize_title("An American Tail - Fievel Goes West"),
+			"American Tail Fievel Goes West"
+		);
+		assert_eq!(normalize_title("Final Fantasy VII"), "Final Fantasy 7");
+		assert_eq!(normalize_title("Rocky II"), "Rocky 2");
+		assert_eq!(normalize_title("An Untitled Story"), "Untitled Story");
+		assert_eq!(
+			normalize_title("Legend of Zelda, The - Twilight Princess"),
+			"Legend of Zelda Twilight Princess"
+		);
+		assert_eq!(
+			normalize_title("The Legend of Zelda: Twilight Princess"),
+			"Legend of Zelda Twilight Princess"
+		)
+	}
 }

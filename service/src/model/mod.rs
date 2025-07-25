@@ -474,6 +474,12 @@ pub enum AutomaticMatchReason {
 
 	/// A Game which this game is a clone of (a different version) was matched.
 	ViaParent,
+
+	/// Matched by the normalized name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
+	NormalizedName,
+
+	/// Matched by the normalized alternative name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
+	NormalizedAlternativeName,
 }
 
 impl From<entity::signature_group::Model> for PlaymatchSignatureGroup {
@@ -665,6 +671,10 @@ impl From<AutomaticMatchReasonEnum> for AutomaticMatchReason {
 			AutomaticMatchReasonEnum::DirectName => AutomaticMatchReason::DirectName,
 			AutomaticMatchReasonEnum::ViaChild => AutomaticMatchReason::ViaChild,
 			AutomaticMatchReasonEnum::ViaParent => AutomaticMatchReason::ViaParent,
+			AutomaticMatchReasonEnum::NormalizedName => AutomaticMatchReason::NormalizedName,
+			AutomaticMatchReasonEnum::NormalizedAlternativeName => {
+				AutomaticMatchReason::NormalizedAlternativeName
+			}
 		}
 	}
 }
