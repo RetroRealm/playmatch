@@ -11,9 +11,9 @@ use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
-	ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType,
-	ModelTrait, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
-	SelectModel, TryIntoModel, sea_query::SimpleExpr,
+	ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
+	JoinType, ModelTrait, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+	RelationTrait, SelectModel, TryIntoModel, sea_query::SimpleExpr,
 };
 
 pub async fn get_game_by_id(game_id: Uuid, conn: &DbConn) -> Result<Option<game::Model>, DbErr> {
@@ -401,15 +401,19 @@ fn get_unmatched_games_with_limit<'a>(
 				game::Column::CloneOf.is_not_null()
 			})
 			.filter(
-				Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType))
-					.is_in(vec![MatchTypeEnum::Automatic, MatchTypeEnum::Manual]),
+				Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType)).is_in(
+					vec![
+						MatchTypeEnum::Automatic.as_enum(),
+						MatchTypeEnum::Manual.as_enum(),
+					],
+				),
 			)
 			.filter(
 				Expr::col((smm2.clone(), signature_metadata_mapping::Column::Id))
 					.is_null()
 					.or(
 						Expr::col((smm2, signature_metadata_mapping::Column::MatchType))
-							.eq(MatchTypeEnum::None),
+							.eq(MatchTypeEnum::None.as_enum()),
 					),
 			)
 			.order_by_asc(game::Column::Id)
