@@ -201,6 +201,11 @@ async fn update_game_properties(
 		has_changes = true;
 	}
 
+	if existing_game.categories != game.category {
+		existing_game_active.categories = Set(game.category.clone());
+		has_changes = true;
+	}
+
 	if has_changes {
 		existing_game_active.save(conn).await?;
 	}
