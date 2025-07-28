@@ -1,4 +1,3 @@
-use crate::automatic_match::PAGE_SIZE;
 use crate::constants::PARALLELISM;
 use crate::db::dat_file::find_all_dat_files;
 use crate::db::game::{
@@ -23,20 +22,18 @@ pub async fn populate_all_clone_of_ids(conn: &DbConn) -> anyhow::Result<()> {
 }
 
 pub async fn populate_clone_of_id(dat_file_id: Uuid, conn: &DbConn) -> anyhow::Result<()> {
-	let mut paginator = get_unpopulated_clone_of_games(dat_file_id, PAGE_SIZE, conn);
+	let games = get_unpopulated_clone_of_games(dat_file_id, conn).await?;
 
-	while let Some(games_to_match) = paginator.fetch_and_next().await? {
-		for games_chunk in games_to_match.chunks(*PARALLELISM) {
-			let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
+	for games_chunk in games.chunks(*PARALLELISM) {
+		let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
 
-			for game in games_chunk.iter() {
-				let conn = conn.clone();
-				futures.push(tokio::spawn(try_match_parent(game.clone(), conn)));
-			}
+		for game in games_chunk.iter() {
+			let conn = conn.clone();
+			futures.push(tokio::spawn(try_match_parent(game.clone(), conn)));
+		}
 
-			for future in futures {
-				future.await??;
-			}
+		for future in futures {
+			future.await??;
 		}
 	}
 

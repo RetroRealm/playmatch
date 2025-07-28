@@ -12,8 +12,8 @@ use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
 	ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
-	JoinType, ModelTrait, Paginator, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
-	RelationTrait, SelectModel, TryIntoModel, sea_query::SimpleExpr,
+	JoinType, ModelTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
+	sea_query::SimpleExpr,
 };
 
 pub async fn get_game_by_id(game_id: Uuid, conn: &DbConn) -> Result<Option<game::Model>, DbErr> {
@@ -303,11 +303,10 @@ pub async fn get_dat_file_id_of_game(game: &game::Model, conn: &DbConn) -> Resul
 		)),
 	}
 }
-pub fn get_unpopulated_clone_of_games(
+pub async fn get_unpopulated_clone_of_games(
 	dat_file_id: Uuid,
-	page_size: u64,
 	conn: &DbConn,
-) -> Paginator<DbConn, SelectModel<game::Model>> {
+) -> Result<Vec<game::Model>, DbErr> {
 	Game::find()
 		.filter(
 			game::Column::SignatureGroupInternalCloneOfId
@@ -317,7 +316,8 @@ pub fn get_unpopulated_clone_of_games(
 		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
 		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
 		.order_by_asc(game::Column::Id)
-		.paginate(conn, page_size)
+		.all(conn)
+		.await
 }
 
 pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
