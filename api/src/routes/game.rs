@@ -2,7 +2,7 @@ use crate::error;
 use actix_web::web::Data;
 use actix_web::{HttpResponse, Responder, get, web};
 use sea_orm::DatabaseConnection;
-use service::game::{get_game_and_all_relations, get_game_by_id_from_db};
+use service::identification::{get_game_and_all_relations, get_game_by_id_from_db};
 use uuid::Uuid;
 
 /// Gets a Playmatch game by its ID.

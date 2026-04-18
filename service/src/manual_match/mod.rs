@@ -1,4 +1,3 @@
-use crate::cache::identify::{IdentifyCacheType, delete_identify_cache};
 use crate::db::company::{find_company_by_name, find_company_related_signature_metadata_mapping};
 use crate::db::game::{
 	find_all_children_of_game, find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
@@ -13,6 +12,7 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
+use crate::identification::cache::{IdentifyCacheType, delete_identify_cache};
 use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchData, GameMatchRequest};
 use crate::model::{
 	GameMatchType, GameMetadataMatchResult, GameMetadataMatchResultBuilder, UpdatedMatchResult,

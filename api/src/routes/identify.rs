@@ -4,7 +4,9 @@ use actix_web::{HttpResponse, Responder, get, web};
 use log::debug;
 use sea_orm::DatabaseConnection;
 use service::cache::CacheStatus;
-use service::game::{identify_game_and_get_relations, identify_game_and_metadata_mappings};
+use service::identification::{
+	identify_game_and_get_relations, identify_game_and_metadata_mappings,
+};
 use service::model::GameFileMatchSearch;
 use web::Query;
 
