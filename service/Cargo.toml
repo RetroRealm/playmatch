@@ -5,16 +5,16 @@ edition.workspace = true
 
 [dependencies]
 entity = { path = "../entity" }
-tokio = { version = "^1", features = ["macros", "rt"] }
-reqwest = { version = "^0.12", features = ["rustls-tls", "cookies", "stream"], default-features = false }
-serde = { version = "^1", features = ["derive"] }
+tokio = { workspace = true, features = ["macros", "rt"] }
+reqwest = { workspace = true, features = ["rustls-tls", "cookies", "stream"] }
+serde = { workspace = true, features = ["derive"] }
 serde-xml-rs = "^0.8"
-serde_repr = "^0.1"
-serde_json = "^1"
-anyhow = "^1"
-thiserror = "^2"
-log = "^0.4"
-chrono = "^0.4"
+serde_repr = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true }
 rand = "^0.10"
 regex = "^1"
 lazy_static = "^1"
@@ -22,20 +22,13 @@ futures-util = "^0.3"
 zip = "^8"
 async-recursion = "^1.1"
 strum = { version = "^0.28", features = ["derive"] }
-derive_builder = "^0.20"
+derive_builder = { workspace = true }
 tower = { version = "^0.5", features = ["util", "limit", "retry"] }
 oauth2 = { version = "^5", features = ["reqwest"] }
-utoipa = { version = "~4", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
+utoipa = { workspace = true, features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
 md-5 = "^0.11"
 hex = "^0.4"
 num_cpus = "^1.16"
 bigdecimal = { version = "^0.4", features = ["serde-json"] }
-redis = { version = "^1", features = ["tokio-rustls-comp", "aio"] }
-
-[dependencies.sea-orm]
-version = "~1" # sea-orm version
-features = [
-	"debug-print",
-	"runtime-tokio-rustls",
-	"sqlx-postgres"
-]
+redis = { workspace = true, features = ["tokio-rustls-comp", "aio"] }
+sea-orm = { workspace = true, features = ["debug-print", "runtime-tokio-rustls", "sqlx-postgres"] }

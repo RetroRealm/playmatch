@@ -13,11 +13,26 @@ members = [".", "api", "service", "entity", "migration"]
 version = "0.2.0"
 edition = "2024"
 
+[workspace.dependencies]
+tokio = "^1"
+reqwest = { version = "^0.12", default-features = false }
+sea-orm = "~1"
+serde = "^1"
+serde_json = "^1"
+serde_repr = "^0.1"
+chrono = "^0.4"
+log = "^0.4"
+anyhow = "^1"
+thiserror = "^2"
+utoipa = "~4"
+derive_builder = "^0.20"
+redis = "^1"
+
 [dependencies]
 api = { path = "api" }
 service = { path = "service" }
 env_logger = "^0.11"
-log = "^0.4"
+log = { workspace = true }
 dotenvy = "^0.15"
 
 [build-dependencies]

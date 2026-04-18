@@ -10,21 +10,21 @@ migration = { path = "../migration" }
 service = { path = "../service" }
 actix-web = "^4"
 actix-web-lab = "^0.26"
-tokio = { version = "^1", features = ["full"] }
-reqwest = { version = "^0.12", features = ["rustls-tls", "json", "cookies", "socks"], default-features = false }
-sea-orm = { version = "~1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
-chrono = "^0.4"
-serde = { version = "^1", features = ["derive"] }
-serde_json = "^1"
-serde_repr = "^0.1"
-anyhow = "^1.0"
-thiserror = "^2"
-log = "^0.4"
+tokio = { workspace = true, features = ["full"] }
+reqwest = { workspace = true, features = ["rustls-tls", "json", "cookies", "socks"] }
+sea-orm = { workspace = true, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
+chrono = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_repr = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
 actix-governor = "^0.10"
-utoipa = { version = "~4", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
+utoipa = { workspace = true, features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
 utoipa-swagger-ui = { version = "~7", features = ["actix-web"] }
 uuid = "^1.10"
-derive_builder = "^0.20"
+derive_builder = { workspace = true }
 tokio-cron-scheduler = "^0.15"
 actix-web-prom = { version = "^0.10", features = ["process"] }
-redis = { version = "^1", features = ["tokio-rustls-comp"] }
+redis = { workspace = true, features = ["tokio-rustls-comp"] }

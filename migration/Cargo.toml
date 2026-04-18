@@ -9,8 +9,8 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-tokio = { version = "^1", features = ["macros", "rt-multi-thread"] }
-log = "^0.4"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+log = { workspace = true }
 entity = { path = "../entity" }
 
 [dependencies.sea-orm-migration]

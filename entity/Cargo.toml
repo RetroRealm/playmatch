@@ -4,6 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-sea-orm = { version = "~1" }
-serde = "^1"
-chrono = "^0.4"
+sea-orm = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
