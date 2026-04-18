@@ -1,4 +1,4 @@
-use crate::constants::http::REQWEST_DEFAULT_USER_AGENT;
+use crate::config::http::REQWEST_DEFAULT_USER_AGENT;
 use futures_util::future;
 use reqwest::{IntoUrl, Request, RequestBuilder, Response};
 use tower::retry::Policy;

@@ -10,7 +10,7 @@ use entity::{company, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
 
-use crate::constants::PARALLELISM;
+use crate::config::PARALLELISM;
 use entity::game::Model;
 use lazy_static::lazy_static;
 use regex::Regex;

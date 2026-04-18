@@ -1,4 +1,4 @@
-use crate::constants::http::REQWEST_DEFAULT_USER_AGENT;
+use crate::config::http::REQWEST_DEFAULT_USER_AGENT;
 use crate::http::abstraction::RetryPolicy;
 use crate::providers::igdb::constants::{
 	API_URL, IGDB_MAX_RETRIES, IGDB_RATELIMIT_AMOUNT, IGDB_RATELIMIT_DURATION_MS,

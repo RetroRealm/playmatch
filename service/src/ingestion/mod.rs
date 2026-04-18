@@ -1,4 +1,4 @@
-use crate::constants::PARALLELISM;
+use crate::config::PARALLELISM;
 use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
 use crate::fs;

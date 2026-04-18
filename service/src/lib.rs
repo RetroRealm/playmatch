@@ -1,6 +1,6 @@
 pub mod cache;
 pub mod company;
-pub mod constants;
+pub mod config;
 pub mod db;
 pub mod error;
 mod fs;

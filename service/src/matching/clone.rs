@@ -1,4 +1,4 @@
-use crate::constants::PARALLELISM;
+use crate::config::PARALLELISM;
 use crate::db::dat_file::find_all_dat_files;
 use crate::db::game::{
 	find_game_by_signature_group_internal_id_and_dat_file_id, get_dat_file_id_of_game,
