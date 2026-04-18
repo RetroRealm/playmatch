@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 
 static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
 static IDENTIFY_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
+static SERVICE_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -29,6 +30,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(identify_attempts)
 		.map_err(|_| anyhow::anyhow!("identify metrics already initialised"))?;
 
+	let service_errors = IntCounterVec::new(
+		Opts::new(
+			"api_service_errors_total",
+			"Errors returned to clients, labelled by collapsed variant",
+		),
+		&["variant"],
+	)?;
+	registry.register(Box::new(service_errors.clone()))?;
+	SERVICE_ERRORS
+		.set(service_errors)
+		.map_err(|_| anyhow::anyhow!("service error metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -49,5 +62,11 @@ pub fn record_identify_attempt(hash_type: &str, hit: bool) {
 		counter
 			.with_label_values(&[hash_type, if hit { "hit" } else { "no_match" }])
 			.inc();
+	}
+}
+
+pub fn record_service_error(variant: &str) {
+	if let Some(counter) = SERVICE_ERRORS.get() {
+		counter.with_label_values(&[variant]).inc();
 	}
 }

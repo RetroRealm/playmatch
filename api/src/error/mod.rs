@@ -26,6 +26,39 @@ pub enum Error {
 	RedisError(#[from] redis::RedisError),
 }
 
+impl Error {
+	fn metric_variant(&self) -> &'static str {
+		match self {
+			Self::InternalError(_) => "internal",
+			Self::DbError(_) => "db_error",
+			Self::InvalidAuth(_) => "invalid_auth",
+			Self::InvalidAuthPermission => "invalid_auth_permission",
+			Self::UserNotFound => "user_not_found",
+			Self::RedisError(_) => "redis_error",
+			Self::ServiceError(err) => match err {
+				ServiceError::GameNotFound => "game_not_found",
+				ServiceError::PlatformNotFound => "platform_not_found",
+				ServiceError::CompanyNotFound => "company_not_found",
+				ServiceError::UserNotFound => "user_not_found",
+				ServiceError::SuggestionAlreadyExists => "suggestion_exists",
+				ServiceError::SuggestionNotFound => "suggestion_not_found",
+				ServiceError::SignatureMetadataMappingInputBuilderError(_) => {
+					"mapping_builder_error"
+				}
+				ServiceError::UpdatedMatchResultBuilderError(_) => "updated_match_builder_error",
+				ServiceError::GameAndRelationsResultBuilderError(_) => {
+					"game_and_relations_builder_error"
+				}
+				ServiceError::DbError(_) => "db_error",
+				ServiceError::RedisError(_) => "redis_error",
+				ServiceError::JsonError(_) => "json_error",
+				ServiceError::ParseIntError(_) => "parse_int_error",
+				ServiceError::AnyhowError(_) => "anyhow_error",
+			},
+		}
+	}
+}
+
 impl ResponseError for Error {
 	fn status_code(&self) -> StatusCode {
 		match &self {
@@ -61,6 +94,7 @@ impl ResponseError for Error {
 	}
 
 	fn error_response(&self) -> HttpResponse {
+		service::metrics::record_service_error(self.metric_variant());
 		HttpResponse::build(self.status_code()).body(self.to_string())
 	}
 }
