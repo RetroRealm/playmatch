@@ -20,7 +20,7 @@ serde_repr = "^0.1"
 anyhow = "^1.0"
 thiserror = "^2"
 log = "^0.4"
-actix-governor = "^0.8"
+actix-governor = "^0.10"
 utoipa = { version = "~4", features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
 utoipa-swagger-ui = { version = "~7", features = ["actix-web"] }
 uuid = "^1.10"
