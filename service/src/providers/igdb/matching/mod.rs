@@ -2,7 +2,7 @@ mod company;
 mod game;
 mod platform;
 
-use crate::automatic_match::igdb::game::match_games_to_igdb;
+use self::game::match_games_to_igdb;
 use crate::providers::igdb::IgdbClient;
 use company::match_companies_to_igdb;
 use lazy_static::lazy_static;

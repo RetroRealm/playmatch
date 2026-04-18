@@ -1,5 +1,5 @@
 use crate::automatic_match::PAGE_SIZE;
-use crate::automatic_match::igdb::{IGDB_CHUNK_SIZE, clean_name};
+use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, clean_name};
 use crate::automatic_match::util::roman_to_int;
 use crate::db::game::{
 	find_game_parent, find_game_signature_metadata_mapping,

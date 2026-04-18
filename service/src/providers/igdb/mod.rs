@@ -46,6 +46,7 @@ use tower::{Service, ServiceBuilder, ServiceExt};
 
 pub mod cache;
 mod constants;
+pub mod matching;
 pub mod model;
 
 struct OAuth2Handler {

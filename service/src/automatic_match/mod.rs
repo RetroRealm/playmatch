@@ -1,5 +1,4 @@
 pub mod clone;
-pub mod igdb;
-mod util;
+pub(crate) mod util;
 
-const PAGE_SIZE: u64 = 100;
+pub(crate) const PAGE_SIZE: u64 = 100;

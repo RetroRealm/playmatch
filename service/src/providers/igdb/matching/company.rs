@@ -1,5 +1,5 @@
 use crate::automatic_match::PAGE_SIZE;
-use crate::automatic_match::igdb::IGDB_CHUNK_SIZE;
+use crate::providers::igdb::matching::IGDB_CHUNK_SIZE;
 use crate::db::company::get_unmatched_companies_with_limit;
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
