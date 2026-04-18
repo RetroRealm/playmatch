@@ -20,14 +20,5 @@ fn main() {
 		built_info::BUILT_TIME_UTC
 	);
 
-	unsafe {
-		std::env::set_var(
-			"REQWEST_DEFAULT_USER_AGENT",
-			format!("{}/{}", built_info::PKG_NAME, built_info::PKG_VERSION),
-		);
-
-		std::env::set_var("X_VERSION_HEADER_API", built_info::PKG_VERSION);
-	}
-
 	api::main();
 }

@@ -140,7 +140,7 @@ async fn start() -> anyhow::Result<()> {
 						Logger::new("%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T")
 							.log_level(Level::Debug),
 					)
-					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API.clone())))
+					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API)))
 					.configure(configure_api_routes),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(

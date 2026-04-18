@@ -41,6 +41,6 @@ pub trait RequestClientExt {
 impl RequestClientExt for reqwest::Client {
 	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder {
 		self.get(url)
-			.header("User-Agent", REQWEST_DEFAULT_USER_AGENT.as_str())
+			.header("User-Agent", REQWEST_DEFAULT_USER_AGENT)
 	}
 }

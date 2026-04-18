@@ -1,13 +1,17 @@
 [package]
 name = "playmatch"
-version = "0.2.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 build = "build.rs"
 authors = ["DevYukine <devyukine@gmx.de>"]
 description = "A simple matchmaking service"
 
 [workspace]
 members = [".", "api", "service", "entity", "migration"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
 
 [dependencies]
 api = { path = "api" }
