@@ -5,6 +5,7 @@ static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
 static IDENTIFY_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static SERVICE_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
+static IGDB_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -55,6 +56,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(igdb_auto_matches)
 		.map_err(|_| anyhow::anyhow!("igdb auto match metrics already initialised"))?;
 
+	let igdb_token_refreshes = IntCounterVec::new(
+		Opts::new(
+			"api_igdb_token_refresh_total",
+			"IGDB OAuth2 token refresh attempts by trigger and result",
+		),
+		&["trigger", "result"],
+	)?;
+	registry.register(Box::new(igdb_token_refreshes.clone()))?;
+	IGDB_TOKEN_REFRESHES
+		.set(igdb_token_refreshes)
+		.map_err(|_| anyhow::anyhow!("igdb token refresh metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -89,5 +102,11 @@ pub fn record_igdb_auto_match(entity_type: &str, result: &str, reason: &str) {
 		counter
 			.with_label_values(&[entity_type, result, reason])
 			.inc();
+	}
+}
+
+pub fn record_igdb_token_refresh(trigger: &str, result: &str) {
+	if let Some(counter) = IGDB_TOKEN_REFRESHES.get() {
+		counter.with_label_values(&[trigger, result]).inc();
 	}
 }

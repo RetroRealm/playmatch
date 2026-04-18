@@ -581,8 +581,7 @@ impl IgdbClient {
 
 		if oauth2_token.is_none() {
 			drop(oauth2);
-			self.refresh_token().await?;
-			return Ok(());
+			return self.refresh_token_instrumented("initial").await;
 		}
 
 		if let Some(token) = oauth2_token
@@ -593,11 +592,24 @@ impl IgdbClient {
 
 			if diff.num_seconds() + 60 > token.expires_in().unwrap_or_default().as_secs() as i64 {
 				drop(oauth2);
-				self.refresh_token().await?;
+				return self.refresh_token_instrumented("expired").await;
 			}
 		}
 
 		Ok(())
+	}
+
+	async fn refresh_token_instrumented(&self, trigger: &'static str) -> anyhow::Result<()> {
+		match self.refresh_token().await {
+			Ok(()) => {
+				crate::metrics::record_igdb_token_refresh(trigger, "success");
+				Ok(())
+			}
+			Err(e) => {
+				crate::metrics::record_igdb_token_refresh(trigger, "error");
+				Err(e)
+			}
+		}
 	}
 
 	async fn do_request_parsed<T: DeserializeOwned>(
