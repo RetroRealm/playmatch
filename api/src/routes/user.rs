@@ -5,8 +5,8 @@ use actix_web::web::{Data, Json, Path, Query};
 use actix_web::{HttpRequest, HttpResponse, Responder, get, patch, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use sea_orm::DatabaseConnection;
+use service::entities::user;
 use service::model::user::{CreateOrGetUserRequest, UpdateUserPermissionsRequest};
-use service::user;
 use uuid::Uuid;
 
 /// Find or Create a User by their Discord ID.

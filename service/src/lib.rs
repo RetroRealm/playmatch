@@ -1,7 +1,7 @@
 pub mod cache;
-pub mod company;
 pub mod config;
 pub mod db;
+pub mod entities;
 pub mod error;
 mod fs;
 pub mod http;
@@ -9,6 +9,4 @@ pub mod identification;
 pub mod ingestion;
 pub mod matching;
 pub mod model;
-pub mod platform;
 pub mod providers;
-pub mod user;
