@@ -3979,7 +3979,7 @@ dependencies = [
  "md-5 0.11.0",
  "num_cpus",
  "oauth2",
- "rand 0.9.4",
+ "rand 0.10.1",
  "redis",
  "regex",
  "reqwest",

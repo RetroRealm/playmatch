@@ -1,10 +1,5 @@
-use rand::Rng;
-use rand::distr::Alphanumeric;
+use rand::distr::{Alphanumeric, SampleString};
 
 pub fn random_sized_string(size: usize) -> String {
-	rand::rng()
-		.sample_iter(&Alphanumeric)
-		.take(size)
-		.map(char::from)
-		.collect()
+	Alphanumeric.sample_string(&mut rand::rng(), size)
 }
