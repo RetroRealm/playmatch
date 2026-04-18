@@ -7,6 +7,7 @@ use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, EntityTrait, IntoActiveModel, QueryFilter, TryIntoModel,
 };
 
+/// Parameters for [`create_or_update_dat_file`].
 pub struct DatFileCreateOrUpdateInput {
 	pub signature_group_id: Uuid,
 	pub sanitized_file_name: String,
@@ -17,10 +18,14 @@ pub struct DatFileCreateOrUpdateInput {
 	pub platform_id: Uuid,
 }
 
+/// Return every dat file known to playmatch.
 pub async fn find_all_dat_files(conn: &DbConn) -> anyhow::Result<Vec<dat_file::Model>> {
 	Ok(DatFile::find().all(conn).await?)
 }
 
+/// Look up a dat file by signature group, name, company and platform.
+/// If it exists and the current version differs, the version is updated in place.
+/// If it does not exist, a new row is inserted.
 pub async fn create_or_update_dat_file(
 	input: DatFileCreateOrUpdateInput,
 	conn: &DbConn,

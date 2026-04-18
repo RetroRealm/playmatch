@@ -14,6 +14,8 @@ use sea_orm::{
 	TryIntoModel,
 };
 
+/// Builder input for [`create_or_update_signature_metadata_mapping`]. Exactly one of
+/// `company_id`, `game_id`, `platform_id` should be set.
 #[derive(Debug, Clone, Builder)]
 pub struct SignatureMetadataMappingInput {
 	pub provider: MetadataProviderEnum,
@@ -38,6 +40,7 @@ pub struct SignatureMetadataMappingInput {
 	pub manually_matched_by: Option<Uuid>,
 }
 
+/// Look up the mapping that targets the given platform, game, company and provider tuple.
 pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provider(
 	platform_id: Option<Uuid>,
 	game_id: Option<Uuid>,
@@ -54,6 +57,8 @@ pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provid
 		.await
 }
 
+/// Upsert a signature metadata mapping. Looks up the existing row by its identifying tuple,
+/// updates it in place if found, or inserts a new row otherwise. Touches `updated_at` on every call.
 pub async fn create_or_update_signature_metadata_mapping(
 	input: SignatureMetadataMappingInput,
 	db_conn: &DbConn,

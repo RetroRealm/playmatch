@@ -10,6 +10,7 @@ use sea_orm::{
 	QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
 };
 
+/// Load a platform by id together with its company (if any) and every signature metadata mapping attached to it.
 pub async fn get_by_id_and_join_company_and_signature_metadata_mappings(
 	id: Uuid,
 	conn: &DbConn,
@@ -40,6 +41,7 @@ pub async fn get_by_id_and_join_company_and_signature_metadata_mappings(
 	}
 }
 
+/// Return every platform paired with its company (if any) and its signature metadata mappings.
 pub async fn find_all_and_join_company_and_signature_metadata_mappings(
 	conn: &DbConn,
 ) -> Result<
@@ -94,6 +96,7 @@ pub async fn find_all_and_join_company_and_signature_metadata_mappings(
 		.collect())
 }
 
+/// Find a platform by case-insensitive name, creating one with that name and optional company if it does not exist.
 pub async fn create_or_find_platform_by_name(
 	name: &str,
 	company_id: Option<Uuid>,
@@ -119,6 +122,8 @@ pub async fn create_or_find_platform_by_name(
 	}
 }
 
+/// Return up to `limit` platforms that have no IGDB metadata mapping yet (or one with match_type None).
+/// Returns `Ok(None)` when there is nothing left to process.
 pub async fn get_unmatched_platforms_with_limit(
 	limit: u64,
 	conn: &DbConn,
@@ -142,6 +147,7 @@ pub async fn get_unmatched_platforms_with_limit(
 	}
 }
 
+/// Resolve the platform a given game is attached to, via dat file and dat file import.
 pub async fn find_platform_of_game(
 	game_id: Uuid,
 	conn: &DbConn,
@@ -155,6 +161,7 @@ pub async fn find_platform_of_game(
 		.await
 }
 
+/// Return the IGDB signature metadata mapping attached to a platform, if any.
 pub async fn find_platform_related_signature_metadata_mapping(
 	model: &platform::Model,
 	conn: &DbConn,
@@ -166,6 +173,7 @@ pub async fn find_platform_related_signature_metadata_mapping(
 		.await
 }
 
+/// Find a platform by exact (case-sensitive) name.
 pub async fn find_platform_by_name(
 	name: &str,
 	conn: &DbConn,

@@ -2,6 +2,7 @@ use entity::signature_group;
 use entity::signature_group::Model as SignatureGroup;
 use sea_orm::{ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter};
 
+/// Find a signature group by exact (case-sensitive) name.
 pub async fn find_signature_group_by_name(
 	name: &str,
 	conn: &DbConn,

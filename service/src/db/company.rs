@@ -10,6 +10,7 @@ use sea_orm::{
 	QuerySelect, TryIntoModel,
 };
 
+/// Find a company by exact (case-sensitive) name.
 pub async fn find_company_by_name(
 	name: &str,
 	conn: &DbConn,
@@ -22,6 +23,7 @@ pub async fn find_company_by_name(
 	Ok(company)
 }
 
+/// Return the IGDB signature metadata mapping attached to a company, if any.
 pub async fn find_company_related_signature_metadata_mapping(
 	model: &company::Model,
 	conn: &DbConn,
@@ -33,6 +35,7 @@ pub async fn find_company_related_signature_metadata_mapping(
 		.await
 }
 
+/// Load a company by id together with all of its signature metadata mappings.
 pub async fn get_by_id_and_join_signature_metadata_mappings(
 	id: Uuid,
 	conn: &DbConn,
@@ -54,6 +57,7 @@ pub async fn get_by_id_and_join_signature_metadata_mappings(
 	}
 }
 
+/// Return every company paired with its signature metadata mappings.
 pub async fn find_all_and_join_signature_metadata_mapping(
 	conn: &DbConn,
 ) -> Result<Vec<(company::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
@@ -65,6 +69,7 @@ pub async fn find_all_and_join_signature_metadata_mapping(
 	Ok(companies_with_mappings)
 }
 
+/// Find a company by case-insensitive name, creating one with that name if it does not exist.
 pub async fn create_or_find_company_by_name(
 	name: &str,
 	conn: &DbConn,
@@ -88,6 +93,8 @@ pub async fn create_or_find_company_by_name(
 	}
 }
 
+/// Return up to `limit` companies that have no IGDB metadata mapping yet (or one with match_type None).
+/// Returns `Ok(None)` when there is nothing left to process.
 pub async fn get_unmatched_companies_with_limit(
 	limit: u64,
 	db_conn: &DbConn,

@@ -5,6 +5,7 @@ use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter};
 
+/// Insert a batch of game files for the given game in a single statement.
 pub async fn insert_game_file_bulk(
 	game_files: Vec<RomElement>,
 	game_id: Uuid,
@@ -23,6 +24,7 @@ pub async fn insert_game_file_bulk(
 	Ok(())
 }
 
+/// Insert a single game file for the given game and return the saved active model.
 pub async fn insert_game_file(
 	game_file: RomElement,
 	game_id: Uuid,
@@ -33,6 +35,7 @@ pub async fn insert_game_file(
 	game_file.save(conn).await.map_err(|e| e.into())
 }
 
+/// Return every game file associated with the given game id.
 pub async fn get_game_files_from_game_id(
 	game_id: Uuid,
 	conn: &DbConn,

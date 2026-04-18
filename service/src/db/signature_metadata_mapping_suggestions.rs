@@ -4,12 +4,14 @@ use entity::signature_metadata_mapping_suggestions::{ActiveModel, Column, Entity
 use sea_orm::prelude::Uuid;
 use sea_orm::{ColumnTrait, DbConn, DbErr, EntityTrait, PaginatorTrait, QueryFilter};
 
+/// Return every metadata match suggestion currently in the database.
 pub async fn get_all_suggestions(db_conn: &DbConn) -> Result<Vec<Model>, DbErr> {
 	let suggestions = Entity::find().all(db_conn).await?;
 
 	Ok(suggestions)
 }
 
+/// Check whether a matching suggestion already exists for the given entity, provider and provider id.
 pub async fn suggestion_exists(
 	game_id: Option<Uuid>,
 	platform_id: Option<Uuid>,
@@ -33,6 +35,7 @@ pub async fn suggestion_exists(
 	Ok(count > 0)
 }
 
+/// Insert a new metadata match suggestion and return the persisted row.
 pub async fn insert_suggestion(suggestion: ActiveModel, db_conn: &DbConn) -> Result<Model, DbErr> {
 	let suggestion = Entity::insert(suggestion)
 		.exec_with_returning(db_conn)
@@ -41,12 +44,14 @@ pub async fn insert_suggestion(suggestion: ActiveModel, db_conn: &DbConn) -> Res
 	Ok(suggestion)
 }
 
+/// Load a suggestion by its id.
 pub async fn get_suggestion_by_id(id: Uuid, db_conn: &DbConn) -> Result<Option<Model>, DbErr> {
 	let suggestion = Entity::find_by_id(id).one(db_conn).await?;
 
 	Ok(suggestion)
 }
 
+/// Permanently delete a suggestion row by id.
 pub async fn delete_suggestion_by_id(id: Uuid, db_conn: &DbConn) -> Result<(), DbErr> {
 	Entity::delete_by_id(id).exec(db_conn).await?;
 

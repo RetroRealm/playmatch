@@ -7,6 +7,7 @@ use sea_orm::{
 	TryIntoModel,
 };
 
+/// Check whether a dat file with the given MD5 hash has already been imported.
 pub async fn is_dat_already_in_history(md5_hash: &str, conn: &DbConn) -> Result<bool, DbErr> {
 	DatFileImport::find()
 		.filter(dat_file_import::Column::Md5.eq(md5_hash))
@@ -15,6 +16,7 @@ pub async fn is_dat_already_in_history(md5_hash: &str, conn: &DbConn) -> Result<
 		.map(|count| count > 0)
 }
 
+/// Record a new import of a dat file, identified by name, version and MD5.
 pub async fn create_dat_file_import(
 	file_name: &str,
 	md5_hash: &str,

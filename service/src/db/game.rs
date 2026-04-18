@@ -16,10 +16,13 @@ use sea_orm::{
 	sea_query::SimpleExpr,
 };
 
+/// Load a game by its internal UUID.
 pub async fn get_game_by_id(game_id: Uuid, conn: &DbConn) -> Result<Option<game::Model>, DbErr> {
 	Game::find_by_id(game_id).one(conn).await
 }
 
+/// Load the dat file import, dat file, signature group, platform, optional company and game files
+/// associated with the given game. Errors if any required relation is missing.
 pub async fn find_all_relations_of_game(
 	game: &game::Model,
 	conn: &DbConn,
@@ -74,6 +77,7 @@ pub async fn find_all_relations_of_game(
 	))
 }
 
+/// Insert a new game parsed from a dat file under the given import id.
 pub async fn insert_game(
 	dat_file_import_id: Uuid,
 	game: model::Game,
@@ -92,6 +96,7 @@ pub async fn insert_game(
 	game.save(conn).await?.try_into_model()
 }
 
+/// Look up a game by the dat-file-provider's internal id, scoped to a single dat file.
 pub async fn find_game_by_signature_group_internal_id_and_dat_file_id(
 	signature_group_internal_id: String,
 	dat_file_id: Uuid,
@@ -105,6 +110,7 @@ pub async fn find_game_by_signature_group_internal_id_and_dat_file_id(
 		.await
 }
 
+/// Look up a game by exact name, scoped to a single dat file.
 pub async fn find_game_by_name_and_dat_file_id(
 	name: &str,
 	dat_file_id: Uuid,
@@ -118,6 +124,7 @@ pub async fn find_game_by_name_and_dat_file_id(
 		.await
 }
 
+/// Load a game by id together with its primary signature metadata mapping, if any.
 pub async fn find_game_and_id_mapping_by_game_id(
 	game_id: Uuid,
 	conn: &DbConn,
@@ -139,6 +146,7 @@ pub async fn find_game_and_id_mapping_by_game_id(
 	}
 }
 
+/// Find a game via any game file whose MD5 matches (case-insensitive), together with its metadata mappings.
 pub async fn find_game_and_id_mapping_by_md5(
 	md5: &str,
 	conn: &DbConn,
@@ -150,6 +158,7 @@ pub async fn find_game_and_id_mapping_by_md5(
 	.await
 }
 
+/// Find a game via any game file whose SHA1 matches (case-insensitive), together with its metadata mappings.
 pub async fn find_game_and_id_mapping_by_sha1(
 	sha1: &str,
 	conn: &DbConn,
@@ -161,6 +170,7 @@ pub async fn find_game_and_id_mapping_by_sha1(
 	.await
 }
 
+/// Find a game via any game file whose SHA256 matches (case-insensitive), together with its metadata mappings.
 pub async fn find_game_and_id_mapping_by_sha256(
 	sha256: &str,
 	conn: &DbConn,
@@ -172,6 +182,7 @@ pub async fn find_game_and_id_mapping_by_sha256(
 	.await
 }
 
+/// Find a game via a game file whose name (case-insensitive) and exact size both match, together with its metadata mappings.
 pub async fn find_game_and_id_mapping_by_name_and_size(
 	name: &str,
 	size: i64,
@@ -186,6 +197,7 @@ pub async fn find_game_and_id_mapping_by_name_and_size(
 	.await
 }
 
+/// Return every game whose name matches exactly and whose dat file targets the given platform.
 pub async fn find_games_by_name_and_platform_id(
 	name: &str,
 	platform_id: Uuid,
@@ -207,6 +219,7 @@ pub async fn find_games_by_name_and_platform_id(
 		.await
 }
 
+/// Find a game whose file name matches exactly; if none, fall back to an exact match on the game name itself.
 pub async fn find_game_by_name_or_game_file_name(
 	name: &str,
 	conn: &DbConn,
@@ -255,6 +268,7 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 	}
 }
 
+/// Return every game that is a clone-of the given game.
 pub async fn find_all_children_of_game(
 	game: &game::Model,
 	conn: &DbConn,
@@ -265,6 +279,7 @@ pub async fn find_all_children_of_game(
 		.await
 }
 
+/// Return the parent game (the game this one is a clone-of), if any.
 pub async fn find_game_parent(
 	game: &game::Model,
 	conn: &DbConn,
@@ -280,6 +295,7 @@ pub async fn find_game_parent(
 	}
 }
 
+/// Return the signature metadata mapping attached to a game, if any.
 pub async fn find_game_signature_metadata_mapping(
 	game: &game::Model,
 	conn: &DbConn,
@@ -290,6 +306,7 @@ pub async fn find_game_signature_metadata_mapping(
 		.await
 }
 
+/// Resolve the dat file id this game was imported from via its dat file import record.
 pub async fn get_dat_file_id_of_game(game: &game::Model, conn: &DbConn) -> Result<Uuid, DbErr> {
 	let dat_file_import = dat_file_import::Entity::find()
 		.filter(dat_file_import::Column::Id.eq(game.dat_file_import_id))
@@ -303,6 +320,7 @@ pub async fn get_dat_file_id_of_game(game: &game::Model, conn: &DbConn) -> Resul
 		)),
 	}
 }
+/// Return every game that knows its signature-group-internal clone-of id but has no resolved `clone_of` UUID yet.
 pub async fn get_unpopulated_clone_of_games(
 	dat_file_id: Uuid,
 	conn: &DbConn,
@@ -320,6 +338,8 @@ pub async fn get_unpopulated_clone_of_games(
 		.await
 }
 
+/// Return up to `page_size` unmatched games that are not clones of any other game.
+/// Returns `Ok(None)` when there is nothing left to process.
 pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
 	page_size: u64,
 	conn: DbConn,
@@ -327,6 +347,8 @@ pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
 	get_unmatched_games_with_limit(true, page_size, conn)
 }
 
+/// Return up to `page_size` unmatched games that are clones of another game.
+/// Returns `Ok(None)` when there is nothing left to process.
 pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
 	page_size: u64,
 	conn: DbConn,
@@ -334,6 +356,8 @@ pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
 	get_unmatched_games_with_limit(false, page_size, conn)
 }
 
+/// Return up to `page_size` games whose last automatic match failed with `NoDirectMatch` more than 60 days ago.
+/// Used to retry stale failures. Returns `Ok(None)` when there is nothing left to process.
 pub fn get_automatic_match_failed_games_with_limit<'a>(
 	page_size: u64,
 	conn: DbConn,
