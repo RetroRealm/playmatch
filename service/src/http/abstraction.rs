@@ -38,7 +38,6 @@ pub trait RequestClientExt {
 	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder;
 }
 
-#[allow(static_mut_refs)]
 impl RequestClientExt for reqwest::Client {
 	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder {
 		self.get(url)
