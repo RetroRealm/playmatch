@@ -19,7 +19,7 @@ pub async fn calculate_md5(path: &Path) -> anyhow::Result<String> {
 		hasher.update(&buffer[..n]);
 	}
 
-	Ok(format!("{:x}", hasher.finalize()))
+	Ok(hex::encode(hasher.finalize()))
 }
 
 #[async_recursion]
