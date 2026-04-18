@@ -1,4 +1,5 @@
 use crate::error;
+use crate::routes::ok_or_not_found;
 use actix_web::web::{Data, Path};
 use actix_web::{HttpResponse, Responder, get};
 use sea_orm::DatabaseConnection;
@@ -46,9 +47,5 @@ pub async fn get_platform_by_id(
 	)
 	.await?;
 
-	if let Some(platform) = platform_response {
-		Ok(HttpResponse::Ok().json(platform))
-	} else {
-		Ok(HttpResponse::NotFound().finish())
-	}
+	Ok(ok_or_not_found(platform_response))
 }

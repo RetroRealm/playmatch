@@ -1,4 +1,5 @@
 use crate::error;
+use crate::routes::ok_or_not_found;
 use actix_web::web::{Data, Path};
 use actix_web::{HttpResponse, Responder, get};
 use sea_orm::DatabaseConnection;
@@ -41,9 +42,5 @@ pub async fn get_company_by_id(
 	let company_response =
 		get_company_by_id_and_external_metadata(id.into_inner(), db_conn.get_ref()).await?;
 
-	if let Some(company) = company_response {
-		Ok(HttpResponse::Ok().json(company))
-	} else {
-		Ok(HttpResponse::NotFound().finish())
-	}
+	Ok(ok_or_not_found(company_response))
 }

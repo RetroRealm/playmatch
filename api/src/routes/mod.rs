@@ -1,9 +1,10 @@
 use crate::error;
 use crate::error::Error::{InvalidAuth, InvalidAuthPermission};
-use actix_web::HttpRequest;
 use actix_web::web::Data;
+use actix_web::{HttpRequest, HttpResponse};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use sea_orm::DatabaseConnection;
+use serde::Serialize;
 use service::db::user::get_user_by_api_key;
 
 pub mod company;
@@ -73,5 +74,12 @@ async fn handle_auth_and_permissions(
 		}
 	} else {
 		Err(InvalidAuth("Invalid API token.".to_string()))
+	}
+}
+
+pub(crate) fn ok_or_not_found<T: Serialize>(opt: Option<T>) -> HttpResponse {
+	match opt {
+		Some(v) => HttpResponse::Ok().json(v),
+		None => HttpResponse::NotFound().finish(),
 	}
 }
