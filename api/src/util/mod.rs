@@ -4,7 +4,7 @@ use log::{error, info};
 use reqwest::Client;
 use sea_orm::DbConn;
 use serde::de::DeserializeOwned;
-use service::dat::download_and_parse_dats;
+use service::ingestion::download_and_parse_dats;
 use service::providers::igdb::IgdbClient;
 use service::providers::igdb::matching::match_db_to_igdb_entities;
 use std::sync::Arc;

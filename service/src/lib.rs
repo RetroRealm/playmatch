@@ -1,12 +1,12 @@
 pub mod cache;
 pub mod company;
 pub mod constants;
-pub mod dat;
 pub mod db;
 pub mod error;
 mod fs;
 pub mod http;
 pub mod identification;
+pub mod ingestion;
 pub mod matching;
 pub mod model;
 pub mod platform;

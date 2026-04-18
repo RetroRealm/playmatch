@@ -1,5 +1,5 @@
-use crate::dat::shared::model;
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
+use crate::ingestion::parser::model;
 use ::entity::{
 	game, game::Entity as Game, game_file, game_file::Entity as GameFile,
 	signature_metadata_mapping,

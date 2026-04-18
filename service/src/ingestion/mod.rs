@@ -1,12 +1,12 @@
 use crate::constants::PARALLELISM;
-use crate::dat::dats_site::download_dats_site_legacy_dats;
-use crate::dat::no_intro::download_no_intro_dats;
-use crate::dat::redump::{RedumpType, download_redump_dats};
-use crate::dat::shared::import::parse_and_import_dat_file;
 use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
 use crate::fs;
 use crate::fs::calculate_md5;
+use crate::ingestion::parser::import::parse_and_import_dat_file;
+use crate::ingestion::sources::{
+	RedumpType, download_dats_site_legacy_dats, download_no_intro_dats, download_redump_dats,
+};
 use crate::matching::clone::populate_all_clone_of_ids;
 use anyhow::anyhow;
 use fs::read_files_recursive;
@@ -15,14 +15,15 @@ use reqwest::Client;
 use sea_orm::DbConn;
 use std::path::PathBuf;
 
-mod dats_site;
-mod no_intro;
-mod redump;
-pub mod shared;
+pub mod archive;
+pub mod download;
+pub mod parser;
+pub mod sources;
 
-const DATS_PATH: &str = "dats";
-const TMP_PATH: &str = "tmp";
+pub(crate) const DATS_PATH: &str = "dats";
+pub(crate) const TMP_PATH: &str = "tmp";
 
+/// Download every DAT source, parse new files into the DB, and refresh clone-of relationships.
 pub async fn download_and_parse_dats(
 	client: &Client,
 	conn: &DbConn,

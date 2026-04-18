@@ -1,11 +1,11 @@
-use crate::dat::shared::model::{Datafile, Game};
-use crate::dat::shared::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{DatFileCreateOrUpdateInput, create_or_update_dat_file};
 use crate::db::dat_file_import::create_dat_file_import;
 use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
 use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
 use crate::db::platform::create_or_find_platform_by_name;
+use crate::ingestion::parser::model::{Datafile, Game};
+use crate::ingestion::parser::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
 use entity::{company, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
@@ -407,7 +407,7 @@ pub async fn update_dat_file_and_insert_dat_file_import(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::dat::shared::model::Header;
+	use crate::ingestion::parser::model::Header;
 
 	fn create_datafile(name: &str, subset: Option<&str>, version: &str) -> Datafile {
 		Datafile {

@@ -1,4 +1,4 @@
-use crate::dat::shared::model::RomElement;
+use crate::ingestion::parser::model::RomElement;
 use entity::game_file;
 use entity::game_file::ActiveModel;
 use sea_orm::ActiveValue::Set;

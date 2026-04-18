@@ -1,4 +1,4 @@
-use crate::dat::shared::download_and_extract_dats;
+use super::download_and_extract_dats;
 use reqwest::Client;
 
 const DATS_SITE_LEGACY_NAME: &str = "dats-site-legacy";

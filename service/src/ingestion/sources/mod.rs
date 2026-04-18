@@ -1,17 +1,19 @@
-use crate::dat::shared::download::{delete_old_and_move_new_files, download_dat};
-use crate::dat::shared::zip::extract_if_archived;
-use crate::dat::{DATS_PATH, TMP_PATH};
+mod dats_site;
+mod no_intro;
+mod redump;
+
+use crate::ingestion::archive::extract_if_archived;
+use crate::ingestion::download::{delete_old_and_move_new_files, download_dat};
+use crate::ingestion::{DATS_PATH, TMP_PATH};
 use log::error;
 use reqwest::Client;
 use tokio::fs;
 
-pub mod download;
-pub mod import;
-pub mod model;
-mod regex;
-pub mod zip;
+pub use self::dats_site::download_dats_site_legacy_dats;
+pub use self::no_intro::download_no_intro_dats;
+pub use self::redump::{RedumpType, download_redump_dats};
 
-pub async fn download_and_extract_dats(
+pub(super) async fn download_and_extract_dats(
 	client: &Client,
 	name: &str,
 	download_url: &str,
