@@ -1,4 +1,5 @@
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
+use crate::db::unmatched_entities_with_limit;
 use entity::company::ActiveModel;
 use entity::prelude::Company;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
@@ -93,27 +94,11 @@ pub async fn create_or_find_company_by_name(
 	}
 }
 
-/// Return up to `limit` companies that have no IGDB metadata mapping yet (or one with match_type None).
-/// Returns `Ok(None)` when there is nothing left to process.
-pub async fn get_unmatched_companies_with_limit(
-	limit: u64,
-	db_conn: &DbConn,
-) -> anyhow::Result<Option<Vec<company::Model>>> {
-	let found_companies = Company::find()
-		.left_join(signature_metadata_mapping::Entity)
-		.filter(
-			signature_metadata_mapping::Column::Id
-				.is_null()
-				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
-		)
-		.order_by_asc(company::Column::Id)
-		.limit(limit)
-		.all(db_conn)
-		.await?;
-
-	if found_companies.is_empty() {
-		Ok(None)
-	} else {
-		Ok(Some(found_companies))
-	}
+unmatched_entities_with_limit! {
+	/// Return up to `limit` companies that have no IGDB metadata mapping yet (or one with match_type None).
+	/// Returns `Ok(None)` when there is nothing left to process.
+	get_unmatched_companies_with_limit,
+	Company,
+	company::Model,
+	company::Column::Id
 }

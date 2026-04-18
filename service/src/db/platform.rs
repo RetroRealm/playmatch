@@ -1,4 +1,5 @@
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
+use crate::db::unmatched_entities_with_limit;
 use entity::platform::ActiveModel;
 use entity::prelude::Platform;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
@@ -122,29 +123,13 @@ pub async fn create_or_find_platform_by_name(
 	}
 }
 
-/// Return up to `limit` platforms that have no IGDB metadata mapping yet (or one with match_type None).
-/// Returns `Ok(None)` when there is nothing left to process.
-pub async fn get_unmatched_platforms_with_limit(
-	limit: u64,
-	conn: &DbConn,
-) -> anyhow::Result<Option<Vec<platform::Model>>> {
-	let res = Platform::find()
-		.left_join(signature_metadata_mapping::Entity)
-		.filter(
-			signature_metadata_mapping::Column::Id
-				.is_null()
-				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
-		)
-		.order_by_asc(platform::Column::Id)
-		.limit(limit)
-		.all(conn)
-		.await?;
-
-	if res.is_empty() {
-		Ok(None)
-	} else {
-		Ok(Some(res))
-	}
+unmatched_entities_with_limit! {
+	/// Return up to `limit` platforms that have no IGDB metadata mapping yet (or one with match_type None).
+	/// Returns `Ok(None)` when there is nothing left to process.
+	get_unmatched_platforms_with_limit,
+	Platform,
+	platform::Model,
+	platform::Column::Id
 }
 
 /// Resolve the platform a given game is attached to, via dat file and dat file import.
