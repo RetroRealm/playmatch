@@ -1,177 +1,85 @@
 use bigdecimal::BigDecimal;
-use chrono::serde::ts_seconds;
+use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Utc};
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum AgeRatingCategory {
-	Esrb = 1,
-	Pegi,
-	Cero,
-	Usk,
-	Grac,
-	Classind,
-	Acb,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum AgeRatingEnum {
-	Three = 1,
-	Seven,
-	Twelve,
-	Sixteen,
-	Eighteen,
-	RP,
-	EC,
-	E,
-	E10,
-	T,
-	M,
-	AO,
-	Ceroa,
-	Cerob,
-	Ceroc,
-	Cerod,
-	Ceroz,
-	USK0,
-	USK6,
-	USK12,
-	USK16,
-	USK18,
-	GRACAll,
-	GRAC12,
-	GRAC15,
-	GRAC18,
-	GRACTesting,
-	Gracindl,
-	GRACIND10,
-	GRACIND12,
-	GRACIND14,
-	GRACIND16,
-	GRACIND18,
-	Acbg,
-	Acbpg,
-	Acbm,
-	ACBMA15,
-	ACBR18,
-	Acbrc,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AgeRating {
 	pub id: i32,
-	pub category: AgeRatingCategory,
-	pub checksum: Uuid,
+	/// Deprecated by IGDB. Use `organization` instead.
+	#[schema(deprecated)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub content_descriptions: Option<Vec<i64>>,
-	pub rating: AgeRatingEnum,
+	pub category: Option<i32>,
+	pub checksum: Uuid,
+	/// Deprecated by IGDB. Use `rating_content_descriptions` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub content_descriptions: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub organization: Option<i32>,
+	/// Deprecated by IGDB. Use `rating_category` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub rating: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub rating_category: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub rating_content_descriptions: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub rating_cover_url: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub synopsis: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum AgeRatingContentCategory {
-	EsrbAlcoholReference = 1,
-	EsrbAnimatedBlood,
-	EsrbBlood,
-	EsrbBloodAndGore,
-	EsrbCartoonViolence,
-	EsrbComicMischief,
-	EsrbCrudeHumor,
-	EsrbDrugReference,
-	EsrbFantasyViolence,
-	EsrbIntenseViolence,
-	EsrbLanguage,
-	EsrbLyrics,
-	EsrbMatureHumor,
-	EsrbNudity,
-	EsrbPartialNudity,
-	EsrbRealGambling,
-	EsrbSexualContent,
-	EsrbSexualThemes,
-	EsrbSexualViolence,
-	EsrbSimulatedGambling,
-	EsrbStrongLanguage,
-	EsrbStrongLyrics,
-	EsrbStrongSexualContent,
-	EsrbSuggestiveThemes,
-	EsrbTobaccoReference,
-	EsrbUseOfAlcohol,
-	EsrbUseOfDrugs,
-	EsrbUseOfTobacco,
-	EsrbViolence,
-	EsrbViolentReferences,
-	EsrbAnimatedViolence,
-	EsrbMildLanguage,
-	EsrbMildViolence,
-	EsrbUseOfDrugsAndAlcohol,
-	EsrbDrugAndAlcoholReference,
-	EsrbMildSuggestiveThemes,
-	EsrbMildCartoonViolence,
-	EsrbMildBlood,
-	EsrbRealisticBloodAndGore,
-	EsrbRealisticViolence,
-	EsrbAlcoholAndTobaccoReference,
-	EsrbMatureSexualThemes,
-	EsrbMildAnimatedViolence,
-	EsrbMildSexualThemes,
-	EsrbUseOfAlcoholAndTobacco,
-	EsrbAnimatedBloodAndGore,
-	EsrbMildFantasyViolence,
-	EsrbMildLyrics,
-	EsrbRealisticBlood,
-	PegiViolence,
-	PegiSex,
-	PegiDrugs,
-	PegiFear,
-	PegiDiscrimination,
-	PegiBadLanguage,
-	PegiGambling,
-	PegiOnlineGameplay,
-	PegiInGamePurchases,
-	CeroLove,
-	CeroSexualContent,
-	CeroViolence,
-	CeroHorror,
-	CeroDrinkingSmoking,
-	CeroGambling,
-	CeroCrime,
-	CeroControlledSubstances,
-	CeroLanguagesAndOthers,
-	GracSexuality,
-	GracViolence,
-	GracFearHorrorThreatening,
-	GracLanguage,
-	GracAlcoholTobaccoDrug,
-	GracCrimeAntiSocial,
-	GracGambling,
-	ClassIndViolencia,
-	ClassIndViolenciaExtrema,
-	ClassIndConteudoSexual,
-	ClassIndNudez,
-	ClassIndSexo,
-	ClassIndSexoExplicito,
-	ClassIndDrogas,
-	ClassIndDrogasLicitas,
-	ClassIndDrogasIlicitas,
-	ClassIndLinguagemImpropria,
-	ClassIndAtosCriminosos,
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AgeRatingCategory {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub organization: i32,
+	pub rating: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AgeRatingContentDescription {
+pub struct AgeRatingContentDescriptionV2 {
 	pub id: i32,
-	pub category: AgeRatingContentCategory,
 	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
 	pub description: String,
+	pub description_type: i32,
+	pub organization: i32,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AgeRatingContentDescriptionType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	pub slug: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AgeRatingOrganization {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -191,6 +99,8 @@ pub struct Artwork {
 	pub alpha_channel: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub animated: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub artwork_type: Option<i32>,
 	pub checksum: Uuid,
 	pub game: i32,
 	pub height: i32,
@@ -199,42 +109,87 @@ pub struct Artwork {
 	pub width: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum CharacterGender {
-	Male = 0,
-	Female = 1,
-	Other = 2,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum CharacterSpecies {
-	Human = 1,
-	Alien = 2,
-	Animal = 3,
-	Android = 4,
-	Unknown = 5,
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ArtworkType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	pub slug: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Character {
 	pub id: i32,
-	pub akas: Vec<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub akas: Option<Vec<String>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub character_gender: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub character_species: Option<i32>,
 	pub checksum: Uuid,
-	pub country_name: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub country_name: Option<String>,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
-	pub description: String,
-	pub games: Vec<i32>,
-	pub gender: CharacterGender,
-	pub mug_shot: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub description: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub games: Option<Vec<i32>>,
+	/// Deprecated by IGDB. Use `character_gender` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub gender: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub mug_shot: Option<i32>,
 	pub name: String,
 	pub slug: String,
-	pub species: CharacterSpecies,
+	/// Deprecated by IGDB. Use `character_species` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub species: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CharacterMugShot {
+	pub id: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub alpha_channel: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub animated: Option<bool>,
+	pub checksum: Uuid,
+	pub height: i32,
+	pub image_id: String,
+	pub url: String,
+	pub width: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CharacterGender {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CharacterSpecies {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -322,55 +277,67 @@ pub struct CollectionType {
 	pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum CompanyChangeDateCategory {
-	YYYYMMMMDD = 0,
-	YYYYMMMM,
-	YYYY,
-	YYYYQ1,
-	YYYYQ2,
-	YYYYQ3,
-	YYYYQ4,
-	TBD,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum CompanyStartDateCategory {
-	YYYYMMMMDD = 0,
-	YYYYMMMM,
-	YYYY,
-	YYYYQ1,
-	YYYYQ2,
-	YYYYQ3,
-	YYYYQ4,
-	TBD,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Company {
 	pub id: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub change_date: Option<i64>,
-	pub change_date_category: Option<CompanyChangeDateCategory>,
+	/// Deprecated by IGDB. Use `change_date_format` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub change_date_category: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub change_date_format: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub changed_company_id: Option<i32>,
 	pub checksum: Uuid,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub company_size: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub company_type_histories: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub country: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub developed: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub logo: Option<i32>,
 	pub name: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub parent: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub published: Option<Vec<i32>>,
 	pub slug: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub start_date: Option<i64>,
-	pub start_date_category: Option<CompanyStartDateCategory>,
+	/// Deprecated by IGDB. Use `start_date_format` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub start_date_category: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub start_date_format: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub status: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub url: Option<String>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub websites: Option<Vec<i32>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CompanySize {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -387,35 +354,55 @@ pub struct CompanyLogo {
 	pub width: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum CompanyWebsiteCategory {
-	Official = 1,
-	Wikia,
-	Wikipedia,
-	Facebook,
-	Twitter,
-	Twitch,
-	Instagram = 8,
-	Youtube,
-	Iphone,
-	Ipad,
-	Android,
-	Steam,
-	Reddit,
-	Itch,
-	EpicGames,
-	Gog,
-	Discord,
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CompanyStatus {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CompanyType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CompanyTypeHistory {
+	pub id: i32,
+	pub checksum: Uuid,
+	pub company: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub company_type: Option<i32>,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub parent_company: Option<i32>,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CompanyWebsite {
 	pub id: i32,
-	pub category: CompanyWebsiteCategory,
+	/// Deprecated by IGDB. Use `type` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub trusted: Option<bool>,
+	#[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+	pub r#type: Option<i32>,
 	pub url: String,
 }
 
@@ -434,6 +421,30 @@ pub struct Cover {
 	pub image_id: String,
 	pub url: String,
 	pub width: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DateFormat {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub format: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EntityType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub description: Option<String>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -496,49 +507,27 @@ pub struct EventNetwork {
 	pub url: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum ExternalGameCategory {
-	Steam = 1,
-	Gog = 5,
-	Youtube = 10,
-	Microsoft = 11,
-	Apple = 13,
-	Twitch = 14,
-	Android = 15,
-	AmazonAsin = 20,
-	AmazonLuna = 22,
-	AmazonAdg = 23,
-	EpicGameStore = 26,
-	Oculus = 28,
-	Utomik = 29,
-	ItchIo = 30,
-	XboxMarketplace = 31,
-	Kartridge = 32,
-	PlaystationStoreUs = 36,
-	FocusEntertainment = 37,
-	XboxGamePassUltimateCloud = 54,
-	Gamejolt = 55,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum ExternalGameMedia {
-	Digital = 1,
-	Physical = 2,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExternalGame {
 	pub id: i32,
-	pub category: ExternalGameCategory,
+	/// Deprecated by IGDB. Use `external_game_source` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub countries: Option<Vec<i32>>,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub external_game_source: Option<i32>,
 	pub game: i32,
-	pub media: ExternalGameMedia,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub game_release_format: Option<i32>,
+	/// Deprecated by IGDB. Use `game_release_format` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub media: Option<i32>,
 	pub name: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform: Option<i32>,
@@ -548,6 +537,17 @@ pub struct ExternalGame {
 	pub url: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub year: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExternalGameSource {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -565,39 +565,6 @@ pub struct Franchise {
 	pub url: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum GameCategory {
-	MainGame = 0,
-	DlcAddon,
-	Expansion,
-	Bundle,
-	StandaloneExpansion,
-	Mod,
-	Episode,
-	Season,
-	Remake,
-	Remaster,
-	ExpandedGame,
-	Port,
-	Fork,
-	Pack,
-	Update,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum GameStatus {
-	Released = 0,
-	Alpha = 2,
-	Beta,
-	EarlyAccess,
-	Offline,
-	Cancelled,
-	Rumored,
-	Delisted,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Game {
 	pub id: i32,
@@ -613,8 +580,13 @@ pub struct Game {
 	pub artworks: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub bundles: Option<Vec<i32>>,
-	pub category: GameCategory,
+	/// Deprecated by IGDB. Use `game_type` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
+	/// Deprecated by IGDB. Use `collections` instead.
+	#[schema(deprecated)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub collection: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -633,6 +605,8 @@ pub struct Game {
 	pub external_games: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub first_release_date: Option<i64>,
+	/// Deprecated by IGDB. Scheduled for removal.
+	#[schema(deprecated)]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub follows: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -647,6 +621,10 @@ pub struct Game {
 	pub game_localizations: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub game_modes: Option<Vec<i32>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub game_status: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub game_type: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub genres: Option<Vec<i32>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -685,8 +663,10 @@ pub struct Game {
 	pub slug: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub standalone_expansions: Option<Vec<i32>>,
+	/// Deprecated by IGDB. Use `game_status` instead.
+	#[schema(deprecated)]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub status: Option<GameStatus>,
+	pub status: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub storyline: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -774,6 +754,59 @@ pub struct GameMode {
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GameReleaseFormat {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub format: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GameStatus {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub status: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GameTimeToBeat {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub completely: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i32>,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub game_id: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub hastily: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub normally: Option<i32>,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GameType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(rename = "type")]
+	pub r#type: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -954,17 +987,6 @@ pub struct NetworkType {
 	pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum PlatformCategory {
-	Console = 1,
-	Arcade = 2,
-	Platform = 3,
-	OperatingSystem = 4,
-	PortableConsole = 5,
-	Computer = 6,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Platform {
 	pub id: i32,
@@ -972,7 +994,10 @@ pub struct Platform {
 	pub abbreviation: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub alternative_name: Option<String>,
-	pub category: PlatformCategory,
+	/// Deprecated by IGDB. Use `platform_type` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
@@ -983,6 +1008,8 @@ pub struct Platform {
 	pub platform_family: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform_logo: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub platform_type: Option<i32>,
 	pub slug: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub summary: Option<String>,
@@ -1015,6 +1042,17 @@ pub struct PlatformLogo {
 	pub image_id: String,
 	pub url: String,
 	pub width: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PlatformType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -1067,82 +1105,46 @@ pub struct PlatformVersionCompany {
 	pub manufacturer: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum PlatformVersionReleaseDateCategory {
-	YYYYMMMMDD = 0,
-	YYYYMMMM = 1,
-	YYYY = 2,
-	YYYYQ1 = 3,
-	YYYYQ2 = 4,
-	YYYYQ3 = 5,
-	YYYYQ4 = 6,
-	TBD = 7,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum PlatformVersionReleaseDateRegion {
-	Europe = 1,
-	NorthAmerica = 2,
-	Australia = 3,
-	NewZealand = 4,
-	Japan = 5,
-	China = 6,
-	Asia = 7,
-	Worldwide = 8,
-	Korea = 9,
-	Brazil = 10,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PlatformVersionReleaseDate {
 	pub id: i32,
-	pub category: PlatformVersionReleaseDateCategory,
+	/// Deprecated by IGDB. Use `date_format` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
-	pub date: i64,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub date: Option<i64>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub date_format: Option<i32>,
 	pub human: String,
 	pub m: i32,
 	pub platform_version: i32,
-	pub region: PlatformVersionReleaseDateRegion,
+	/// Deprecated by IGDB. Use `release_region` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub release_region: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
 	pub y: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum PlatformWebsiteCategory {
-	Official = 1,
-	Wikia = 2,
-	Wikipedia = 3,
-	Facebook = 4,
-	Twitter = 5,
-	Twitch = 6,
-	Instagram = 8,
-	YouTube = 9,
-	IPhone = 10,
-	IPad = 11,
-	Android = 12,
-	Steam = 13,
-	Reddit = 14,
-	Discord = 15,
-	GooglePlus = 16,
-	Tumblr = 17,
-	LinkedIn = 18,
-	Pinterest = 19,
-	SoundCloud = 20,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PlatformWebsite {
 	pub id: i32,
-	pub category: PlatformWebsiteCategory,
+	/// Deprecated by IGDB. Use `type` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub trusted: Option<bool>,
+	#[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+	pub r#type: Option<i32>,
 	pub url: String,
 }
 
@@ -1159,12 +1161,6 @@ pub struct PlayerPerspective {
 	pub url: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u16)]
-pub enum PopularitySource {
-	Igdb = 121,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PopularityPrimitive {
 	pub id: i32,
@@ -1173,8 +1169,13 @@ pub struct PopularityPrimitive {
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub external_popularity_source: Option<i32>,
 	pub game_id: i32,
-	pub popularity_source: PopularitySource,
+	/// Deprecated by IGDB. Use `external_popularity_source` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub popularity_source: Option<i32>,
 	pub popularity_type: i32,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
@@ -1188,8 +1189,13 @@ pub struct PopularityType {
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub external_popularity_source: Option<i32>,
 	pub name: String,
-	pub popularity_source: PopularitySource,
+	/// Deprecated by IGDB. Use `external_popularity_source` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub popularity_source: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
 }
@@ -1207,52 +1213,48 @@ pub struct Region {
 	pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum ReleaseDateCategory {
-	YYYYMMMMDD = 0,
-	YYYYMMMM = 1,
-	YYYY = 2,
-	YYYYQ1 = 3,
-	YYYYQ2 = 4,
-	YYYYQ3 = 5,
-	YYYYQ4 = 6,
-	TBD = 7,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum ReleaseDateRegion {
-	Europe = 1,
-	NorthAmerica = 2,
-	Australia = 3,
-	NewZealand = 4,
-	Japan = 5,
-	China = 6,
-	Asia = 7,
-	Worldwide = 8,
-	Korea = 9,
-	Brazil = 10,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ReleaseDate {
 	pub id: i32,
-	pub category: ReleaseDateCategory,
+	/// Deprecated by IGDB. Use `date_format` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
-	#[serde(with = "ts_seconds")]
-	pub date: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub d: Option<i32>,
+	#[serde(default, skip_serializing_if = "Option::is_none", with = "ts_seconds_option")]
+	pub date: Option<DateTime<Utc>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub date_format: Option<i32>,
 	pub game: i32,
 	pub human: String,
 	pub m: i32,
 	pub platform: i32,
-	pub region: ReleaseDateRegion,
-	pub status: i32,
+	/// Deprecated by IGDB. Use `release_region` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub release_region: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub status: Option<i32>,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
 	pub y: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReleaseDateRegion {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	pub region: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -1262,6 +1264,35 @@ pub struct ReleaseDateStatus {
 	#[serde(with = "ts_seconds")]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
+	pub name: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct Report {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub entity_type: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub report_type: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub source_item_id: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub target_item_id: Option<i32>,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReportType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
 	pub updated_at: DateTime<Utc>,
@@ -1295,35 +1326,31 @@ pub struct Theme {
 	pub url: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, ToSchema)]
-#[repr(u8)]
-pub enum WebsiteCategory {
-	Official = 1,
-	Wikia = 2,
-	Wikipedia = 3,
-	Facebook = 4,
-	Twitter = 5,
-	Twitch = 6,
-	Instagram = 8,
-	YouTube = 9,
-	IPhone = 10,
-	IPad = 11,
-	Android = 12,
-	Steam = 13,
-	Reddit = 14,
-	Itch = 15,
-	EpicGames = 16,
-	Gog = 17,
-	Discord = 18,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Website {
 	pub id: i32,
-	pub category: WebsiteCategory,
+	/// Deprecated by IGDB. Use `type` instead.
+	#[schema(deprecated)]
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub category: Option<i32>,
 	pub checksum: Uuid,
-	pub game: i32,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub game: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub trusted: Option<bool>,
+	#[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+	pub r#type: Option<i32>,
 	pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct WebsiteType {
+	pub id: i32,
+	pub checksum: Uuid,
+	#[serde(with = "ts_seconds")]
+	pub created_at: DateTime<Utc>,
+	#[serde(rename = "type")]
+	pub r#type: String,
+	#[serde(with = "ts_seconds")]
+	pub updated_at: DateTime<Utc>,
 }

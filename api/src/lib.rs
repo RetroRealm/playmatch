@@ -4,12 +4,33 @@ use crate::routes::game::{get_playmatch_game_by_id, get_playmatch_game_with_rela
 use crate::routes::health::{health, ready};
 use crate::routes::identify::{identify_game_and_relations, identify_game_with_metadata_ids};
 use crate::routes::igdb::{
-	get_igdb_age_rating_by_id, get_igdb_age_ratings_by_ids, get_igdb_alternative_name_by_id,
-	get_igdb_alternative_names_by_ids, get_igdb_artwork_by_id, get_igdb_artworks_by_ids,
-	get_igdb_collection_by_id, get_igdb_collections_by_ids, get_igdb_cover_by_id,
-	get_igdb_covers_by_ids, get_igdb_external_game_by_id, get_igdb_external_games_by_ids,
-	get_igdb_franchise_by_id, get_igdb_franchises_by_ids, get_igdb_game_by_id,
-	get_igdb_games_by_ids, get_igdb_genre_by_id, get_igdb_genres_by_ids, search_igdb_game_by_name,
+	get_igdb_age_rating_by_id, get_igdb_age_rating_categories_by_ids,
+	get_igdb_age_rating_category_by_id, get_igdb_age_rating_content_description_type_by_id,
+	get_igdb_age_rating_content_description_types_by_ids,
+	get_igdb_age_rating_content_description_v2_by_id,
+	get_igdb_age_rating_content_descriptions_v2_by_ids, get_igdb_age_rating_organization_by_id,
+	get_igdb_age_rating_organizations_by_ids, get_igdb_age_ratings_by_ids,
+	get_igdb_alternative_name_by_id, get_igdb_alternative_names_by_ids, get_igdb_artwork_by_id,
+	get_igdb_artwork_type_by_id, get_igdb_artwork_types_by_ids, get_igdb_artworks_by_ids,
+	get_igdb_character_mug_shot_by_id, get_igdb_character_mug_shots_by_ids,
+	get_igdb_collection_by_id, get_igdb_collections_by_ids, get_igdb_company_size_by_id,
+	get_igdb_company_sizes_by_ids, get_igdb_company_status_by_id, get_igdb_company_statuses_by_ids,
+	get_igdb_company_type_by_id, get_igdb_company_type_histories_by_ids,
+	get_igdb_company_type_history_by_id, get_igdb_company_types_by_ids, get_igdb_cover_by_id,
+	get_igdb_covers_by_ids, get_igdb_date_format_by_id, get_igdb_date_formats_by_ids,
+	get_igdb_entity_type_by_id, get_igdb_entity_types_by_ids, get_igdb_external_game_by_id,
+	get_igdb_external_game_source_by_id, get_igdb_external_game_sources_by_ids,
+	get_igdb_external_games_by_ids, get_igdb_franchise_by_id, get_igdb_franchises_by_ids,
+	get_igdb_game_by_id, get_igdb_game_release_format_by_id,
+	get_igdb_game_release_formats_by_ids, get_igdb_game_status_by_id,
+	get_igdb_game_statuses_by_ids, get_igdb_game_time_to_beat_by_id,
+	get_igdb_game_time_to_beats_by_ids, get_igdb_game_type_by_id, get_igdb_game_types_by_ids,
+	get_igdb_games_by_ids, get_igdb_genre_by_id, get_igdb_genres_by_ids,
+	get_igdb_platform_type_by_id, get_igdb_platform_types_by_ids,
+	get_igdb_release_date_region_by_id, get_igdb_release_date_regions_by_ids,
+	get_igdb_report_by_id, get_igdb_report_type_by_id, get_igdb_report_types_by_ids,
+	get_igdb_reports_by_ids, get_igdb_website_type_by_id, get_igdb_website_types_by_ids,
+	search_igdb_game_by_name,
 };
 use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
@@ -163,7 +184,51 @@ async fn start() -> anyhow::Result<()> {
 					.service(get_igdb_franchise_by_id)
 					.service(get_igdb_franchises_by_ids)
 					.service(get_igdb_genre_by_id)
-					.service(get_igdb_genres_by_ids),
+					.service(get_igdb_genres_by_ids)
+					.service(get_igdb_age_rating_category_by_id)
+					.service(get_igdb_age_rating_categories_by_ids)
+					.service(get_igdb_age_rating_content_description_v2_by_id)
+					.service(get_igdb_age_rating_content_descriptions_v2_by_ids)
+					.service(get_igdb_age_rating_content_description_type_by_id)
+					.service(get_igdb_age_rating_content_description_types_by_ids)
+					.service(get_igdb_age_rating_organization_by_id)
+					.service(get_igdb_age_rating_organizations_by_ids)
+					.service(get_igdb_company_status_by_id)
+					.service(get_igdb_company_statuses_by_ids)
+					.service(get_igdb_date_format_by_id)
+					.service(get_igdb_date_formats_by_ids)
+					.service(get_igdb_external_game_source_by_id)
+					.service(get_igdb_external_game_sources_by_ids)
+					.service(get_igdb_game_release_format_by_id)
+					.service(get_igdb_game_release_formats_by_ids)
+					.service(get_igdb_game_status_by_id)
+					.service(get_igdb_game_statuses_by_ids)
+					.service(get_igdb_game_type_by_id)
+					.service(get_igdb_game_types_by_ids)
+					.service(get_igdb_platform_type_by_id)
+					.service(get_igdb_platform_types_by_ids)
+					.service(get_igdb_release_date_region_by_id)
+					.service(get_igdb_release_date_regions_by_ids)
+					.service(get_igdb_website_type_by_id)
+					.service(get_igdb_website_types_by_ids)
+					.service(get_igdb_artwork_type_by_id)
+					.service(get_igdb_artwork_types_by_ids)
+					.service(get_igdb_character_mug_shot_by_id)
+					.service(get_igdb_character_mug_shots_by_ids)
+					.service(get_igdb_company_size_by_id)
+					.service(get_igdb_company_sizes_by_ids)
+					.service(get_igdb_company_type_by_id)
+					.service(get_igdb_company_types_by_ids)
+					.service(get_igdb_company_type_history_by_id)
+					.service(get_igdb_company_type_histories_by_ids)
+					.service(get_igdb_entity_type_by_id)
+					.service(get_igdb_entity_types_by_ids)
+					.service(get_igdb_game_time_to_beat_by_id)
+					.service(get_igdb_game_time_to_beats_by_ids)
+					.service(get_igdb_report_by_id)
+					.service(get_igdb_reports_by_ids)
+					.service(get_igdb_report_type_by_id)
+					.service(get_igdb_report_types_by_ids),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),
