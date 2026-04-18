@@ -9,7 +9,8 @@ pub const IGDB_ROUTE_AGE_RATINGS: &str = "age_ratings";
 pub const IGDB_ROUTE_AGE_RATING_CATEGORIES: &str = "age_rating_categories";
 pub const IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTION_TYPES: &str =
 	"age_rating_content_description_types";
-pub const IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTIONS_V2: &str = "age_rating_content_descriptions_v2";
+pub const IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTIONS_V2: &str =
+	"age_rating_content_descriptions_v2";
 pub const IGDB_ROUTE_AGE_RATING_ORGANIZATIONS: &str = "age_rating_organizations";
 pub const IGDB_ROUTE_ALTERNATIVE_NAMES: &str = "alternative_names";
 pub const IGDB_ROUTE_ARTWORKS: &str = "artworks";

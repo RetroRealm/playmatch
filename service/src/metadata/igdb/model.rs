@@ -1225,7 +1225,11 @@ pub struct ReleaseDate {
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub d: Option<i32>,
-	#[serde(default, skip_serializing_if = "Option::is_none", with = "ts_seconds_option")]
+	#[serde(
+		default,
+		skip_serializing_if = "Option::is_none",
+		with = "ts_seconds_option"
+	)]
 	pub date: Option<DateTime<Utc>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date_format: Option<i32>,

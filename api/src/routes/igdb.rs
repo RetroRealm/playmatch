@@ -655,17 +655,16 @@ pub async fn get_igdb_age_rating_categories_by_ids(
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
-	let response =
-		igdb_route_mutli_id_helper::<AgeRatingCategory>(query.into_inner().ids, |id| {
-			tokio::spawn({
-				let client = igdb_client.clone();
-				let mut redis_conn = redis_conn.clone();
-				async move {
-					get_age_rating_category_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-				}
-			})
+	let response = igdb_route_mutli_id_helper::<AgeRatingCategory>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			let mut redis_conn = redis_conn.clone();
+			async move {
+				get_age_rating_category_by_id_cached(client.as_ref(), &mut redis_conn, id).await
+			}
 		})
-		.await?;
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -718,9 +717,8 @@ pub async fn get_igdb_age_rating_content_descriptions_v2_by_ids(
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
-	let response = igdb_route_mutli_id_helper::<AgeRatingContentDescriptionV2>(
-		query.into_inner().ids,
-		|id| {
+	let response =
+		igdb_route_mutli_id_helper::<AgeRatingContentDescriptionV2>(query.into_inner().ids, |id| {
 			tokio::spawn({
 				let client = igdb_client.clone();
 				let mut redis_conn = redis_conn.clone();
@@ -733,9 +731,8 @@ pub async fn get_igdb_age_rating_content_descriptions_v2_by_ids(
 					.await
 				}
 			})
-		},
-	)
-	.await?;
+		})
+		.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -926,9 +923,7 @@ pub async fn get_igdb_company_statuses_by_ids(
 		tokio::spawn({
 			let client = igdb_client.clone();
 			let mut redis_conn = redis_conn.clone();
-			async move {
-				get_company_status_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-			}
+			async move { get_company_status_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -1044,18 +1039,16 @@ pub async fn get_igdb_external_game_sources_by_ids(
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
-	let response =
-		igdb_route_mutli_id_helper::<ExternalGameSource>(query.into_inner().ids, |id| {
-			tokio::spawn({
-				let client = igdb_client.clone();
-				let mut redis_conn = redis_conn.clone();
-				async move {
-					get_external_game_source_by_id_cached(client.as_ref(), &mut redis_conn, id)
-						.await
-				}
-			})
+	let response = igdb_route_mutli_id_helper::<ExternalGameSource>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			let mut redis_conn = redis_conn.clone();
+			async move {
+				get_external_game_source_by_id_cached(client.as_ref(), &mut redis_conn, id).await
+			}
 		})
-		.await?;
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -1108,17 +1101,16 @@ pub async fn get_igdb_game_release_formats_by_ids(
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
-	let response =
-		igdb_route_mutli_id_helper::<GameReleaseFormat>(query.into_inner().ids, |id| {
-			tokio::spawn({
-				let client = igdb_client.clone();
-				let mut redis_conn = redis_conn.clone();
-				async move {
-					get_game_release_format_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-				}
-			})
+	let response = igdb_route_mutli_id_helper::<GameReleaseFormat>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			let mut redis_conn = redis_conn.clone();
+			async move {
+				get_game_release_format_by_id_cached(client.as_ref(), &mut redis_conn, id).await
+			}
 		})
-		.await?;
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -1295,9 +1287,7 @@ pub async fn get_igdb_platform_types_by_ids(
 		tokio::spawn({
 			let client = igdb_client.clone();
 			let mut redis_conn = redis_conn.clone();
-			async move {
-				get_platform_type_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-			}
+			async move { get_platform_type_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -1353,17 +1343,16 @@ pub async fn get_igdb_release_date_regions_by_ids(
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
-	let response =
-		igdb_route_mutli_id_helper::<ReleaseDateRegion>(query.into_inner().ids, |id| {
-			tokio::spawn({
-				let client = igdb_client.clone();
-				let mut redis_conn = redis_conn.clone();
-				async move {
-					get_release_date_region_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-				}
-			})
+	let response = igdb_route_mutli_id_helper::<ReleaseDateRegion>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			let mut redis_conn = redis_conn.clone();
+			async move {
+				get_release_date_region_by_id_cached(client.as_ref(), &mut redis_conn, id).await
+			}
 		})
-		.await?;
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -1420,9 +1409,7 @@ pub async fn get_igdb_website_types_by_ids(
 		tokio::spawn({
 			let client = igdb_client.clone();
 			let mut redis_conn = redis_conn.clone();
-			async move {
-				get_website_type_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-			}
+			async move { get_website_type_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;
@@ -1720,18 +1707,16 @@ pub async fn get_igdb_company_type_histories_by_ids(
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
-	let response =
-		igdb_route_mutli_id_helper::<CompanyTypeHistory>(query.into_inner().ids, |id| {
-			tokio::spawn({
-				let client = igdb_client.clone();
-				let mut redis_conn = redis_conn.clone();
-				async move {
-					get_company_type_history_by_id_cached(client.as_ref(), &mut redis_conn, id)
-						.await
-				}
-			})
+	let response = igdb_route_mutli_id_helper::<CompanyTypeHistory>(query.into_inner().ids, |id| {
+		tokio::spawn({
+			let client = igdb_client.clone();
+			let mut redis_conn = redis_conn.clone();
+			async move {
+				get_company_type_history_by_id_cached(client.as_ref(), &mut redis_conn, id).await
+			}
 		})
-		.await?;
+	})
+	.await?;
 
 	Ok(HttpResponse::Ok().json(response))
 }
@@ -1848,9 +1833,7 @@ pub async fn get_igdb_game_time_to_beats_by_ids(
 		tokio::spawn({
 			let client = igdb_client.clone();
 			let mut redis_conn = redis_conn.clone();
-			async move {
-				get_game_time_to_beat_by_id_cached(client.as_ref(), &mut redis_conn, id).await
-			}
+			async move { get_game_time_to_beat_by_id_cached(client.as_ref(), &mut redis_conn, id).await }
 		})
 	})
 	.await?;

@@ -66,10 +66,10 @@ use service::metadata::igdb::model::{
 	GameType, GameVersion, GameVersionFeature, GameVersionFeatureCategory, GameVersionFeatureValue,
 	GameVersionFeatureValueEnum, GameVideo, Genre, InvolvedCompany, Keyword, Language,
 	LanguageSupport, LanguageSupportType, MultiplayerMode, NetworkType, Platform, PlatformFamily,
-	PlatformLogo, PlatformType, PlatformVersion, PlatformVersionCompany, PlatformVersionReleaseDate,
-	PlatformWebsite, PlayerPerspective, PopularityPrimitive, PopularityType, Region, ReleaseDate,
-	ReleaseDateRegion, ReleaseDateStatus, Report, ReportType, Screenshot, Theme, Website,
-	WebsiteType,
+	PlatformLogo, PlatformType, PlatformVersion, PlatformVersionCompany,
+	PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective, PopularityPrimitive,
+	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
+	Screenshot, Theme, Website, WebsiteType,
 };
 use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
 use service::model::suggestion::{
