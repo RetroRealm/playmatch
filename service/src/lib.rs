@@ -14,5 +14,4 @@ pub mod model;
 pub mod platform;
 pub mod suggestion;
 pub mod user;
-mod util;
 mod zip;

@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use crate::http::abstraction::RequestClientExt;
-use crate::util::random_sized_string;
 use futures_util::stream::StreamExt;
 use lazy_static::lazy_static;
 use log::debug;
+use rand::distr::{Alphanumeric, SampleString};
 use regex::Regex;
 use reqwest::Client;
 use tokio::fs::File;
@@ -44,7 +44,7 @@ pub async fn download_file(
 	}
 
 	let file_name_final = match &file_name {
-		None => &random_sized_string(16),
+		None => &Alphanumeric.sample_string(&mut rand::rng(), 16),
 		Some(file_name) => file_name,
 	};
 
