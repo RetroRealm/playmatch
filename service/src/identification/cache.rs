@@ -47,6 +47,16 @@ impl CacheKey for IdentifyCacheType {
 	}
 }
 
+impl IdentifyCacheType {
+	fn metric_label(&self) -> &'static str {
+		match self {
+			IdentifyCacheType::IdentifySha256 => "sha256",
+			IdentifyCacheType::IdentifySha1 => "sha1",
+			IdentifyCacheType::IdentifyMd5 => "md5",
+		}
+	}
+}
+
 pub async fn delete_identify_cache(
 	hash: &str,
 	r#type: IdentifyCacheType,
@@ -100,6 +110,7 @@ async fn find_game_and_metadata_ids_cached(
 
 	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 		debug!("Cache hit for key: {hash}");
+		crate::metrics::record_cache_hit("identify", r#type.metric_label());
 		redis_conn
 			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
 			.await?;
@@ -108,6 +119,7 @@ async fn find_game_and_metadata_ids_cached(
 	}
 
 	debug!("Cache miss for key: {hash}");
+	crate::metrics::record_cache_miss("identify", r#type.metric_label());
 
 	let entry = match r#type {
 		IdentifyCacheType::IdentifySha256 => {

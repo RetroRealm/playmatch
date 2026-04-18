@@ -31,4 +31,5 @@ hex = "^0.4"
 num_cpus = "^1.16"
 bigdecimal = { version = "^0.4", features = ["serde-json"] }
 redis = { workspace = true, features = ["tokio-rustls-comp", "aio"] }
+prometheus = { workspace = true }
 sea-orm = { workspace = true, features = ["debug-print", "runtime-tokio-rustls", "sqlx-postgres"] }

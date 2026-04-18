@@ -28,6 +28,7 @@ macro_rules! cached_lookup {
 
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} with id: {}", $label, id);
+				$crate::metrics::record_cache_hit("igdb", $label);
 				redis_conn
 					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
 					.await?;
@@ -35,6 +36,7 @@ macro_rules! cached_lookup {
 				return Ok(deserialized);
 			}
 			debug!("igdb Cache miss for {} with id: {}", $label, id);
+			$crate::metrics::record_cache_miss("igdb", $label);
 
 			let value = igdb_client.$fetch(id).await?;
 
@@ -62,6 +64,7 @@ macro_rules! cached_lookup_by_slug {
 
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} with slug: {}", $label, slug);
+				$crate::metrics::record_cache_hit("igdb", $label);
 				redis_conn
 					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
 					.await?;
@@ -69,6 +72,7 @@ macro_rules! cached_lookup_by_slug {
 				return Ok(deserialized);
 			}
 			debug!("igdb Cache miss for {} with slug: {}", $label, slug);
+			$crate::metrics::record_cache_miss("igdb", $label);
 
 			let value = igdb_client.$fetch(&slug).await?;
 
@@ -96,6 +100,7 @@ macro_rules! cached_search {
 
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} query: {}", $label, query);
+				$crate::metrics::record_cache_hit("igdb", $label);
 				redis_conn
 					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
 					.await?;
@@ -103,6 +108,7 @@ macro_rules! cached_search {
 				return Ok(deserialized);
 			}
 			debug!("igdb Cache miss for {} query: {}", $label, query);
+			$crate::metrics::record_cache_miss("igdb", $label);
 
 			let values = igdb_client.$fetch(&query).await?;
 

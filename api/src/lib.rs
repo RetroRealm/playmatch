@@ -119,6 +119,8 @@ async fn start() -> anyhow::Result<()> {
 		.build()
 		.map_err(|e| anyhow!(e))?;
 
+	service::metrics::init(&prometheus.registry)?;
+
 	let conn_arc = Arc::new(conn);
 	let client_arc = Arc::new(client);
 	let igdb_client_arc = Arc::new(igdb_client);

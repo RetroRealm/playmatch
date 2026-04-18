@@ -27,6 +27,7 @@ thiserror = "^2"
 utoipa = "~4"
 derive_builder = "^0.20"
 redis = "^1"
+prometheus = "^0.14"
 
 [dependencies]
 api = { path = "api" }

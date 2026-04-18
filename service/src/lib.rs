@@ -8,5 +8,6 @@ pub mod http;
 pub mod identification;
 pub mod ingestion;
 pub mod matching;
+pub mod metrics;
 pub mod model;
 pub mod providers;
