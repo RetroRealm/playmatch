@@ -331,14 +331,14 @@ fn parse_company_and_platform(
 		static ref PS_REGEX: Regex = Regex::new(r"^PS(\d+)(?:\s*-\s*.*)?$").unwrap();
 	}
 
-	if let Some(captures) = PS_REGEX.captures(&platform) {
-		if let Some(number_match) = captures.get(1) {
-			let number_str = number_match.as_str();
-			let number = number_str.parse::<u32>().unwrap_or(1);
+	if let Some(captures) = PS_REGEX.captures(&platform)
+		&& let Some(number_match) = captures.get(1)
+	{
+		let number_str = number_match.as_str();
+		let number = number_str.parse::<u32>().unwrap_or(1);
 
-			// Convert PS1, PS2, PS3, etc. to PlayStation 1, PlayStation 2, etc.
-			platform = format!("PlayStation {number}");
-		}
+		// Convert PS1, PS2, PS3, etc. to PlayStation 1, PlayStation 2, etc.
+		platform = format!("PlayStation {number}");
 	}
 
 	Ok((company, platform, tags))

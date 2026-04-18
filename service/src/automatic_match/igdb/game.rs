@@ -115,50 +115,48 @@ fn match_clone_of_game_to_igdb<'a>(
 			let parent_game_igdb_mapping =
 				find_game_signature_metadata_mapping(&parent_game, &db_conn).await?;
 
-			if let Some(parent_game_igdb_mapping) = &parent_game_igdb_mapping {
-				if parent_game_igdb_mapping.match_type == MatchTypeEnum::Automatic
-					|| parent_game_igdb_mapping.match_type == MatchTypeEnum::Manual
-				{
-					debug!(
-						"Matched Game \"{}\" to IGDB Game ID {} (Via Parent)",
-						&game.name,
-						parent_game_igdb_mapping.provider_id.clone().unwrap()
-					);
+			if let Some(parent_game_igdb_mapping) = &parent_game_igdb_mapping
+				&& (parent_game_igdb_mapping.match_type == MatchTypeEnum::Automatic
+					|| parent_game_igdb_mapping.match_type == MatchTypeEnum::Manual)
+			{
+				debug!(
+					"Matched Game \"{}\" to IGDB Game ID {} (Via Parent)",
+					&game.name,
+					parent_game_igdb_mapping.provider_id.clone().unwrap()
+				);
 
-					create_or_update_signature_metadata_mapping_success(
-						parent_game_igdb_mapping.provider_id.clone().unwrap(),
-						game.id,
-						AutomaticMatchReasonEnum::ViaParent,
-						&db_conn,
-					)
-					.await?;
+				create_or_update_signature_metadata_mapping_success(
+					parent_game_igdb_mapping.provider_id.clone().unwrap(),
+					game.id,
+					AutomaticMatchReasonEnum::ViaParent,
+					&db_conn,
+				)
+				.await?;
 
-					return Ok(());
-				}
+				return Ok(());
 			}
 
 			match_game_to_igdb(game.clone(), igdb_client.clone(), db_conn.clone()).await?;
 
 			let mapping = find_game_signature_metadata_mapping(&game, &db_conn).await?;
 
-			if let Some(mapping) = mapping {
-				if mapping.match_type == MatchTypeEnum::Automatic
-					|| mapping.match_type == MatchTypeEnum::Manual
-				{
-					debug!(
-						"Matched Game with parent which is not matched, overriding parent mapping... (Via Child)"
-					);
+			if let Some(mapping) = mapping
+				&& (mapping.match_type == MatchTypeEnum::Automatic
+					|| mapping.match_type == MatchTypeEnum::Manual)
+			{
+				debug!(
+					"Matched Game with parent which is not matched, overriding parent mapping... (Via Child)"
+				);
 
-					create_or_update_signature_metadata_mapping_success(
-						mapping.provider_id.unwrap(),
-						parent_game.id,
-						AutomaticMatchReasonEnum::ViaChild,
-						&db_conn,
-					)
-					.await?;
+				create_or_update_signature_metadata_mapping_success(
+					mapping.provider_id.unwrap(),
+					parent_game.id,
+					AutomaticMatchReasonEnum::ViaChild,
+					&db_conn,
+				)
+				.await?;
 
-					return Ok(());
-				}
+				return Ok(());
 			}
 		}
 
@@ -308,10 +306,10 @@ pub fn normalize_title(input: &str) -> String {
 	s = RE_ROMAN
 		.replace_all(&s, |caps: &regex::Captures| {
 			let roman = &caps[0];
-			if !roman.is_empty() {
-				if let Some(val) = roman_to_int(roman) {
-					return val.to_string();
-				}
+			if !roman.is_empty()
+				&& let Some(val) = roman_to_int(roman)
+			{
+				return val.to_string();
 			}
 			roman.to_string()
 		})

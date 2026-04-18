@@ -32,16 +32,15 @@ pub async fn download_file(
 
 	let mut file_name = None;
 
-	if let Some(content_disposition) = content_disposition {
-		if let Ok(content_disposition) = content_disposition.to_str() {
-			if let Some(filename) = extract_filename(content_disposition) {
-				debug!(
-					"Filename extracted from Content-Disposition header: {:?}",
-					&filename
-				);
-				file_name = Some(filename);
-			}
-		}
+	if let Some(content_disposition) = content_disposition
+		&& let Ok(content_disposition) = content_disposition.to_str()
+		&& let Some(filename) = extract_filename(content_disposition)
+	{
+		debug!(
+			"Filename extracted from Content-Disposition header: {:?}",
+			&filename
+		);
+		file_name = Some(filename);
 	}
 
 	let file_name_final = match &file_name {

@@ -41,14 +41,15 @@ pub async fn apply_manual_company_match(
 			// TODO: decide how to notify the user that this entry is already matched
 		}
 
-		if let Some(provider_id) = &mapping.provider_id {
-			if provider_id == &r#match.provider_id && mapping.provider == r#match.provider.into() {
-				debug!("No update needed for company: {}", company.id);
-				return Ok(UpdatedMatchResultBuilder::default()
-					.id(company.id)
-					.external_metadata(mapping.into())
-					.build()?);
-			}
+		if let Some(provider_id) = &mapping.provider_id
+			&& provider_id == &r#match.provider_id
+			&& mapping.provider == r#match.provider.into()
+		{
+			debug!("No update needed for company: {}", company.id);
+			return Ok(UpdatedMatchResultBuilder::default()
+				.id(company.id)
+				.external_metadata(mapping.into())
+				.build()?);
 		}
 	}
 
@@ -91,14 +92,15 @@ pub async fn apply_manual_platform_match(
 			// TODO: decide how to notify the user that this entry is already matched
 		}
 
-		if let Some(provider_id) = &mapping.provider_id {
-			if provider_id == &r#match.provider_id && mapping.provider == r#match.provider.into() {
-				debug!("No update needed for platform: {}", platform.id);
-				return Ok(UpdatedMatchResultBuilder::default()
-					.id(platform.id)
-					.external_metadata(mapping.into())
-					.build()?);
-			}
+		if let Some(provider_id) = &mapping.provider_id
+			&& provider_id == &r#match.provider_id
+			&& mapping.provider == r#match.provider.into()
+		{
+			debug!("No update needed for platform: {}", platform.id);
+			return Ok(UpdatedMatchResultBuilder::default()
+				.id(platform.id)
+				.external_metadata(mapping.into())
+				.build()?);
 		}
 	}
 
@@ -207,13 +209,12 @@ pub async fn apply_manual_game_match_by_game(
 				// TODO: decide how to notify the user that this entry is already matched
 			}
 
-			if let Some(provider_id) = &mapping.provider_id {
-				if provider_id == &r#match.provider_id
-					&& mapping.provider == r#match.provider.into()
-				{
-					debug!("No update needed for game: {}", game.id);
-					continue;
-				}
+			if let Some(provider_id) = &mapping.provider_id
+				&& provider_id == &r#match.provider_id
+				&& mapping.provider == r#match.provider.into()
+			{
+				debug!("No update needed for game: {}", game.id);
+				continue;
 			}
 		}
 

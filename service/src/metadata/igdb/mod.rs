@@ -317,10 +317,7 @@ impl IgdbClient {
 			.await
 	}
 
-	pub async fn get_company_status_by_id(
-		&self,
-		id: i32,
-	) -> anyhow::Result<Option<CompanyStatus>> {
+	pub async fn get_company_status_by_id(&self, id: i32) -> anyhow::Result<Option<CompanyStatus>> {
 		self.get_single_by_id(IGDB_ROUTE_COMPANY_STATUSES, id).await
 	}
 
@@ -387,10 +384,7 @@ impl IgdbClient {
 		self.get_vec_by_ids(IGDB_ROUTE_GAME_TYPES, ids).await
 	}
 
-	pub async fn get_platform_type_by_id(
-		&self,
-		id: i32,
-	) -> anyhow::Result<Option<PlatformType>> {
+	pub async fn get_platform_type_by_id(&self, id: i32) -> anyhow::Result<Option<PlatformType>> {
 		self.get_single_by_id(IGDB_ROUTE_PLATFORM_TYPES, id).await
 	}
 
@@ -589,16 +583,15 @@ impl IgdbClient {
 			return Ok(());
 		}
 
-		if let Some(token) = oauth2_token {
-			if let Some(last_request) = oauth2_last_token_request {
-				let now = Utc::now();
-				let diff = now - last_request;
+		if let Some(token) = oauth2_token
+			&& let Some(last_request) = oauth2_last_token_request
+		{
+			let now = Utc::now();
+			let diff = now - last_request;
 
-				if diff.num_seconds() + 60 > token.expires_in().unwrap_or_default().as_secs() as i64
-				{
-					drop(oauth2);
-					self.refresh_token().await?;
-				}
+			if diff.num_seconds() + 60 > token.expires_in().unwrap_or_default().as_secs() as i64 {
+				drop(oauth2);
+				self.refresh_token().await?;
 			}
 		}
 
@@ -642,10 +635,10 @@ impl IgdbClient {
 			.build()?;
 
 		debug!("Request: {req:?}");
-		if let Some(body) = req.body() {
-			if let Some(bytes) = body.as_bytes() {
-				debug!("Request body: {:?}", std::str::from_utf8(bytes)?);
-			}
+		if let Some(body) = req.body()
+			&& let Some(bytes) = body.as_bytes()
+		{
+			debug!("Request body: {:?}", std::str::from_utf8(bytes)?);
 		}
 
 		let rate_limited_future = self.service.lock().await.ready().await?.call(req);

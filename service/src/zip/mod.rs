@@ -20,10 +20,10 @@ pub fn extract_zip_to_directory(zip_path: &Path, out_dir: &Path) -> anyhow::Resu
 		if file.is_dir() {
 			fs::create_dir_all(&out_path)?;
 		} else {
-			if let Some(p) = out_path.parent() {
-				if !p.exists() {
-					fs::create_dir_all(p)?;
-				}
+			if let Some(p) = out_path.parent()
+				&& !p.exists()
+			{
+				fs::create_dir_all(p)?;
 			}
 			let mut outfile = File::create(&out_path)?;
 			io::copy(&mut file, &mut outfile)?;
