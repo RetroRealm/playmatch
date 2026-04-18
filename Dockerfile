@@ -18,7 +18,7 @@ RUN cargo build --release --locked --bin playmatch
 FROM alpine:3.20 AS runtime
 WORKDIR /playmatch
 COPY --from=builder /playmatch/target/release/playmatch /usr/local/bin
-RUN adduser -D -H playmatch
+RUN adduser -D -H playmatch && chown playmatch:playmatch /playmatch
 USER playmatch
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/playmatch"]
