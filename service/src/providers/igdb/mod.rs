@@ -620,6 +620,23 @@ impl IgdbClient {
 		where_clause: Option<&str>,
 		limit_clause: Option<&str>,
 	) -> anyhow::Result<T> {
+		let started = std::time::Instant::now();
+		let result = self
+			.do_request_parsed_inner::<T>(method, path, fields_clause, where_clause, limit_clause)
+			.await;
+		let outcome = if result.is_ok() { "success" } else { "error" };
+		crate::metrics::record_igdb_request(path, outcome, started.elapsed().as_secs_f64());
+		result
+	}
+
+	async fn do_request_parsed_inner<T: DeserializeOwned>(
+		&self,
+		method: Method,
+		path: &str,
+		fields_clause: Option<&str>,
+		where_clause: Option<&str>,
+		limit_clause: Option<&str>,
+	) -> anyhow::Result<T> {
 		self.refresh_token_if_needed().await?;
 
 		let mut headers = HeaderMap::new();

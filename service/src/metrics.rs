@@ -8,6 +8,8 @@ static IGDB_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_RUNS: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_DURATION: OnceLock<HistogramVec> = OnceLock::new();
+static IGDB_REQUESTS: OnceLock<IntCounterVec> = OnceLock::new();
+static IGDB_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -97,6 +99,33 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(background_job_duration)
 		.map_err(|_| anyhow::anyhow!("background job duration metrics already initialised"))?;
 
+	let igdb_requests = IntCounterVec::new(
+		Opts::new(
+			"api_igdb_request_total",
+			"IGDB outbound requests by endpoint and result",
+		),
+		&["endpoint", "result"],
+	)?;
+	registry.register(Box::new(igdb_requests.clone()))?;
+	IGDB_REQUESTS
+		.set(igdb_requests)
+		.map_err(|_| anyhow::anyhow!("igdb request metrics already initialised"))?;
+
+	let igdb_request_duration = HistogramVec::new(
+		HistogramOpts::new(
+			"api_igdb_request_duration_seconds",
+			"IGDB outbound request duration in seconds",
+		)
+		.buckets(vec![
+			0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0,
+		]),
+		&["endpoint"],
+	)?;
+	registry.register(Box::new(igdb_request_duration.clone()))?;
+	IGDB_REQUEST_DURATION
+		.set(igdb_request_duration)
+		.map_err(|_| anyhow::anyhow!("igdb request duration metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -147,6 +176,17 @@ pub fn record_background_job(job: &str, result: &str, duration_seconds: f64) {
 	if let Some(histogram) = BACKGROUND_JOB_DURATION.get() {
 		histogram
 			.with_label_values(&[job])
+			.observe(duration_seconds);
+	}
+}
+
+pub fn record_igdb_request(endpoint: &str, result: &str, duration_seconds: f64) {
+	if let Some(counter) = IGDB_REQUESTS.get() {
+		counter.with_label_values(&[endpoint, result]).inc();
+	}
+	if let Some(histogram) = IGDB_REQUEST_DURATION.get() {
+		histogram
+			.with_label_values(&[endpoint])
 			.observe(duration_seconds);
 	}
 }
