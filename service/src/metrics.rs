@@ -10,6 +10,8 @@ static BACKGROUND_JOB_RUNS: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 static IGDB_REQUESTS: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
+static DAT_INGESTION_FILES: OnceLock<IntCounterVec> = OnceLock::new();
+static CLONE_OF_RESOLUTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -126,6 +128,30 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(igdb_request_duration)
 		.map_err(|_| anyhow::anyhow!("igdb request duration metrics already initialised"))?;
 
+	let dat_ingestion_files = IntCounterVec::new(
+		Opts::new(
+			"api_dat_ingestion_files_total",
+			"DAT files processed during ingestion by source and outcome",
+		),
+		&["source", "outcome"],
+	)?;
+	registry.register(Box::new(dat_ingestion_files.clone()))?;
+	DAT_INGESTION_FILES
+		.set(dat_ingestion_files)
+		.map_err(|_| anyhow::anyhow!("dat ingestion metrics already initialised"))?;
+
+	let clone_of_resolutions = IntCounterVec::new(
+		Opts::new(
+			"api_clone_of_resolutions_total",
+			"Clone-of relationship resolution outcomes",
+		),
+		&["result"],
+	)?;
+	registry.register(Box::new(clone_of_resolutions.clone()))?;
+	CLONE_OF_RESOLUTIONS
+		.set(clone_of_resolutions)
+		.map_err(|_| anyhow::anyhow!("clone-of metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -188,5 +214,17 @@ pub fn record_igdb_request(endpoint: &str, result: &str, duration_seconds: f64) 
 		histogram
 			.with_label_values(&[endpoint])
 			.observe(duration_seconds);
+	}
+}
+
+pub fn record_dat_ingestion_file(source: &str, outcome: &str) {
+	if let Some(counter) = DAT_INGESTION_FILES.get() {
+		counter.with_label_values(&[source, outcome]).inc();
+	}
+}
+
+pub fn record_clone_of_resolution(result: &str) {
+	if let Some(counter) = CLONE_OF_RESOLUTIONS.get() {
+		counter.with_label_values(&[result]).inc();
 	}
 }

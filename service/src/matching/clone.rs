@@ -61,6 +61,9 @@ async fn try_match_parent(game: game::Model, conn: DbConn) -> anyhow::Result<()>
 			game_active_model.clone_of = Set(Some(game_parent.id));
 
 			game_active_model.save(&conn).await?;
+			crate::metrics::record_clone_of_resolution("matched");
+		} else {
+			crate::metrics::record_clone_of_resolution("unresolved");
 		}
 	}
 

@@ -94,40 +94,33 @@ pub async fn download_and_parse_dats(
 			debug!(
 				"Skipping file: {file_name:?}, either has no .dat file extension or contains BIOS"
 			);
+			crate::metrics::record_dat_ingestion_file("unknown", "skipped_non_dat");
 			continue;
 		}
+
+		let path_canonical = file.canonicalize()?;
+		let parent = path_canonical.to_str().unwrap_or_default();
+
+		let (signature_group, source_label) = if parent.contains("no-intro") {
+			(Some("No-Intro"), "no_intro")
+		} else if parent.contains("redump") {
+			(Some("Redump"), "redump")
+		} else if parent.contains("tosec") {
+			(Some("TOSEC"), "tosec")
+		} else if parent.contains("mame") {
+			(Some("MAME"), "mame")
+		} else if parent.contains("dats-site") {
+			(Some("DatsSite-Legacy"), "dats_site_legacy")
+		} else {
+			(None, "unknown")
+		};
 
 		let already_imported = is_dat_already_in_history(&hash, conn).await?;
 
 		if already_imported && !force_import {
 			debug!("Dat file already imported: {file:?}");
+			crate::metrics::record_dat_ingestion_file(source_label, "skipped_duplicate");
 			continue;
-		}
-
-		let path_canonical = file.canonicalize()?;
-
-		let parent = path_canonical.to_str().unwrap_or_default();
-
-		let mut signature_group = None;
-
-		if parent.contains("no-intro") {
-			signature_group = Some("No-Intro");
-		}
-
-		if parent.contains("redump") {
-			signature_group = Some("Redump");
-		}
-
-		if parent.contains("tosec") {
-			signature_group = Some("TOSEC");
-		}
-
-		if parent.contains("mame") {
-			signature_group = Some("MAME");
-		}
-
-		if parent.contains("dats-site") {
-			signature_group = Some("DatsSite-Legacy");
 		}
 
 		let signature_group_entity = match signature_group {
@@ -141,8 +134,14 @@ pub async fn download_and_parse_dats(
 
 		debug!("Importing DAT file: {file:?}");
 		match parse_and_import_dat_file(&file, signature_group_entity.id, &hash, conn).await {
-			Ok(_) => info!("Imported DAT file: {}", file.display()),
-			Err(e) => error!("Failed to parse and import dat file: {file:?}, {e}"),
+			Ok(_) => {
+				info!("Imported DAT file: {}", file.display());
+				crate::metrics::record_dat_ingestion_file(source_label, "imported");
+			}
+			Err(e) => {
+				error!("Failed to parse and import dat file: {file:?}, {e}");
+				crate::metrics::record_dat_ingestion_file(source_label, "parse_error");
+			}
 		}
 	}
 	info!("Finished importing all DAT files");
