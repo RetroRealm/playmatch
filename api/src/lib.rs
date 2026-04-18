@@ -85,7 +85,7 @@ async fn start() -> anyhow::Result<()> {
 		.key_extractor(ReverProxyExtractor)
 		.burst_size(20)
 		.finish()
-		.unwrap();
+		.expect("governor config is valid by construction");
 
 	let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
 	opt.max_connections(
