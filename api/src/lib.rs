@@ -113,6 +113,9 @@ async fn start() -> anyhow::Result<()> {
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.endpoint("/metrics")
+		.mask_unmatched_patterns("UNKNOWN")
+		.exclude("/metrics")
+		.exclude_regex(r"^/swagger-ui(/|$)")
 		.build()
 		.map_err(|e| anyhow!(e))?;
 
