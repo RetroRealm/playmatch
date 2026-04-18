@@ -12,6 +12,7 @@ static IGDB_REQUESTS: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 static DAT_INGESTION_FILES: OnceLock<IntCounterVec> = OnceLock::new();
 static CLONE_OF_RESOLUTIONS: OnceLock<IntCounterVec> = OnceLock::new();
+static USER_ACTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -152,6 +153,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(clone_of_resolutions)
 		.map_err(|_| anyhow::anyhow!("clone-of metrics already initialised"))?;
 
+	let user_actions = IntCounterVec::new(
+		Opts::new(
+			"api_user_action_total",
+			"User-triggered actions on matches and suggestions",
+		),
+		&["entity_type", "action"],
+	)?;
+	registry.register(Box::new(user_actions.clone()))?;
+	USER_ACTIONS
+		.set(user_actions)
+		.map_err(|_| anyhow::anyhow!("user action metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -226,5 +239,11 @@ pub fn record_dat_ingestion_file(source: &str, outcome: &str) {
 pub fn record_clone_of_resolution(result: &str) {
 	if let Some(counter) = CLONE_OF_RESOLUTIONS.get() {
 		counter.with_label_values(&[result]).inc();
+	}
+}
+
+pub fn record_user_action(entity_type: &str, action: &str) {
+	if let Some(counter) = USER_ACTIONS.get() {
+		counter.with_label_values(&[entity_type, action]).inc();
 	}
 }

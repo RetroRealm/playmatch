@@ -98,7 +98,7 @@ pub async fn add_game_suggestion(
 		..Default::default()
 	};
 
-	finalize_suggestion_insert(
+	let result = finalize_suggestion_insert(
 		suggestion,
 		Some(game.id),
 		None,
@@ -107,7 +107,9 @@ pub async fn add_game_suggestion(
 		request.provider_id,
 		conn,
 	)
-	.await
+	.await?;
+	crate::metrics::record_user_action("game", "suggestion_create");
+	Ok(result)
 }
 
 pub async fn add_platform_suggestion(
@@ -128,7 +130,7 @@ pub async fn add_platform_suggestion(
 		..Default::default()
 	};
 
-	finalize_suggestion_insert(
+	let result = finalize_suggestion_insert(
 		suggestion,
 		None,
 		Some(platform.id),
@@ -137,7 +139,9 @@ pub async fn add_platform_suggestion(
 		request.provider_id,
 		conn,
 	)
-	.await
+	.await?;
+	crate::metrics::record_user_action("platform", "suggestion_create");
+	Ok(result)
 }
 
 pub async fn add_company_suggestion(
@@ -158,7 +162,7 @@ pub async fn add_company_suggestion(
 		..Default::default()
 	};
 
-	finalize_suggestion_insert(
+	let result = finalize_suggestion_insert(
 		suggestion,
 		None,
 		None,
@@ -167,7 +171,9 @@ pub async fn add_company_suggestion(
 		request.provider_id,
 		conn,
 	)
-	.await
+	.await?;
+	crate::metrics::record_user_action("company", "suggestion_create");
+	Ok(result)
 }
 
 pub async fn accept_suggestion(
@@ -178,6 +184,7 @@ pub async fn accept_suggestion(
 	let suggestion_opt = get_suggestion_by_id(id, db_conn).await?;
 
 	let suggestion = suggestion_opt.ok_or(ServiceError::SuggestionNotFound)?;
+	let entity_type = suggestion_entity_type(&suggestion);
 
 	let updated = if let Some(game_id) = suggestion.game_id {
 		let game_opt = crate::db::game::get_game_by_id(game_id, db_conn).await?;
@@ -222,16 +229,33 @@ pub async fn accept_suggestion(
 	};
 
 	suggestion.delete(db_conn).await?;
+	crate::metrics::record_user_action(entity_type, "suggestion_approve");
 
 	Ok(updated)
+}
+
+fn suggestion_entity_type(
+	row: &entity::signature_metadata_mapping_suggestions::Model,
+) -> &'static str {
+	if row.game_id.is_some() {
+		"game"
+	} else if row.platform_id.is_some() {
+		"platform"
+	} else if row.company_id.is_some() {
+		"company"
+	} else {
+		"unknown"
+	}
 }
 
 pub async fn decline_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<()> {
 	let suggestion_opt = get_suggestion_by_id(id, db_conn).await?;
 
 	let suggestion = suggestion_opt.ok_or(ServiceError::SuggestionNotFound)?;
+	let entity_type = suggestion_entity_type(&suggestion);
 
 	suggestion.delete(db_conn).await?;
+	crate::metrics::record_user_action(entity_type, "suggestion_decline");
 
 	Ok(())
 }

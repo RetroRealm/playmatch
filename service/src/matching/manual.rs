@@ -68,6 +68,7 @@ pub async fn apply_manual_company_match(
 		conn,
 	)
 	.await?;
+	crate::metrics::record_user_action("company", "manual_match");
 
 	Ok(UpdatedMatchResultBuilder::default()
 		.id(company.id)
@@ -119,6 +120,7 @@ pub async fn apply_manual_platform_match(
 		conn,
 	)
 	.await?;
+	crate::metrics::record_user_action("platform", "manual_match");
 
 	Ok(UpdatedMatchResultBuilder::default()
 		.id(platform.id)
@@ -151,7 +153,10 @@ pub async fn apply_manual_game_match(
 
 	let game = found_game.ok_or(ServiceError::GameNotFound)?;
 
-	apply_manual_game_match_by_game(game, r#match.into(), db_conn, redis_conn).await
+	let results =
+		apply_manual_game_match_by_game(game, r#match.into(), db_conn, redis_conn).await?;
+	crate::metrics::record_user_action("game", "manual_match");
+	Ok(results)
 }
 
 pub async fn apply_manual_game_match_by_game(
