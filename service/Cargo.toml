@@ -19,7 +19,7 @@ rand = "^0.10"
 regex = "^1"
 lazy_static = "^1"
 futures-util = "^0.3"
-zip = "^4"
+zip = "^8"
 async-recursion = "^1.1"
 strum = { version = "^0.28", features = ["derive"] }
 derive_builder = "^0.20"
