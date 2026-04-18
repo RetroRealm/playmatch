@@ -64,6 +64,7 @@ async fn match_company_to_igdb(
 				&db_conn,
 			)
 			.await?;
+			crate::metrics::record_igdb_auto_match("company", "matched", "direct_name");
 
 			return Ok(());
 		}
@@ -80,6 +81,7 @@ async fn match_company_to_igdb(
 		&db_conn,
 	)
 	.await?;
+	crate::metrics::record_igdb_auto_match("company", "failed", "no_direct_match");
 
 	Ok(())
 }

@@ -131,6 +131,7 @@ fn match_clone_of_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
+				crate::metrics::record_igdb_auto_match("game", "matched", "via_parent");
 
 				return Ok(());
 			}
@@ -154,6 +155,7 @@ fn match_clone_of_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
+				crate::metrics::record_igdb_auto_match("game", "matched", "via_child");
 
 				return Ok(());
 			}
@@ -192,6 +194,7 @@ fn match_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
+				crate::metrics::record_igdb_auto_match("game", "matched", "direct_name");
 
 				return Ok(());
 			}
@@ -211,6 +214,7 @@ fn match_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
+				crate::metrics::record_igdb_auto_match("game", "matched", "normalized_name");
 
 				return Ok(());
 			}
@@ -240,6 +244,11 @@ fn match_game_to_igdb<'a>(
 							&db_conn,
 						)
 						.await?;
+						crate::metrics::record_igdb_auto_match(
+							"game",
+							"matched",
+							"alternative_name",
+						);
 
 						return Ok(());
 					}
@@ -258,6 +267,11 @@ fn match_game_to_igdb<'a>(
 							&db_conn,
 						)
 						.await?;
+						crate::metrics::record_igdb_auto_match(
+							"game",
+							"matched",
+							"normalized_alternative_name",
+						);
 
 						return Ok(());
 					}
@@ -276,6 +290,7 @@ fn match_game_to_igdb<'a>(
 			&db_conn,
 		)
 		.await?;
+		crate::metrics::record_igdb_auto_match("game", "failed", "no_direct_match");
 
 		Ok(())
 	})
