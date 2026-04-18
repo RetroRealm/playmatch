@@ -57,7 +57,7 @@ pub struct ExternalMetadata {
 	pub provider_id: Option<String>,
 
 	/// Type of how this game was matched to this Provider
-	pub match_type: MatchType,
+	pub match_type: MetadataMatchType,
 
 	/// Optional Comment about the match.
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -85,7 +85,7 @@ pub enum MetadataProvider {
 
 /// Match types for a game
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum MatchType {
+pub enum MetadataMatchType {
 	/// The game was automatically matched.
 	Automatic,
 
@@ -184,24 +184,24 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 	}
 }
 
-impl From<MatchTypeEnum> for MatchType {
+impl From<MatchTypeEnum> for MetadataMatchType {
 	fn from(match_type: MatchTypeEnum) -> Self {
 		match match_type {
-			MatchTypeEnum::Automatic => MatchType::Automatic,
-			MatchTypeEnum::Failed => MatchType::Failed,
-			MatchTypeEnum::Manual => MatchType::Manual,
-			MatchTypeEnum::None => MatchType::None,
+			MatchTypeEnum::Automatic => MetadataMatchType::Automatic,
+			MatchTypeEnum::Failed => MetadataMatchType::Failed,
+			MatchTypeEnum::Manual => MetadataMatchType::Manual,
+			MatchTypeEnum::None => MetadataMatchType::None,
 		}
 	}
 }
 
-impl From<MatchType> for MatchTypeEnum {
-	fn from(match_type: MatchType) -> Self {
+impl From<MetadataMatchType> for MatchTypeEnum {
+	fn from(match_type: MetadataMatchType) -> Self {
 		match match_type {
-			MatchType::Automatic => MatchTypeEnum::Automatic,
-			MatchType::Failed => MatchTypeEnum::Failed,
-			MatchType::Manual => MatchTypeEnum::Manual,
-			MatchType::None => MatchTypeEnum::None,
+			MetadataMatchType::Automatic => MatchTypeEnum::Automatic,
+			MetadataMatchType::Failed => MatchTypeEnum::Failed,
+			MetadataMatchType::Manual => MatchTypeEnum::Manual,
+			MetadataMatchType::None => MatchTypeEnum::None,
 		}
 	}
 }

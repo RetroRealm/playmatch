@@ -82,9 +82,9 @@ use service::model::user::{
 use service::model::{
 	AutomaticMatchReason, CompanyMetadataResponse, ExternalMetadata, FailedMatchReason,
 	GameAndRelationMatchResult, GameAndRelationsResult, GameMatchType, GameMetadataMatchResult,
-	ManualMatchMode, MatchType, MetadataProvider, PlatformMetadataResponse, PlaymatchCompany,
-	PlaymatchDatFile, PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile, PlaymatchPlatform,
-	PlaymatchSignatureGroup, UpdatedMatchResult,
+	ManualMatchMode, MetadataMatchType, MetadataProvider, PlatformMetadataResponse,
+	PlaymatchCompany, PlaymatchDatFile, PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile,
+	PlaymatchPlatform, PlaymatchSignatureGroup, UpdatedMatchResult,
 };
 use utoipa::OpenApi;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
@@ -187,7 +187,7 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		PlatformMetadataResponse,
 		GameMatchType,
 		ExternalMetadata,
-		MatchType,
+		MetadataMatchType,
 		ManualMatchMode,
 		FailedMatchReason,
 		MetadataProvider,
