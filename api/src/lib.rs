@@ -1,3 +1,4 @@
+use crate::middleware::user_agent_metric;
 use crate::openapi::create_openapi;
 use crate::routes::company::{get_all_companies, get_company_by_id};
 use crate::routes::game::{get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id};
@@ -44,7 +45,7 @@ use crate::routes::user::{
 };
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
-use actix_web::middleware::{Compress, DefaultHeaders, Logger};
+use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
 use actix_web::web::{Data, ServiceConfig, scope};
 use actix_web::{App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
@@ -64,6 +65,7 @@ use util::http::ReverProxyExtractor;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 pub mod error;
+mod middleware;
 pub mod model;
 mod openapi;
 pub mod routes;
@@ -141,6 +143,7 @@ async fn start() -> anyhow::Result<()> {
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))
+					.wrap(from_fn(user_agent_metric))
 					.wrap(
 						Logger::new("%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T")
 							.log_level(Level::Debug),

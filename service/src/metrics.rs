@@ -13,6 +13,7 @@ static IGDB_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 static DAT_INGESTION_FILES: OnceLock<IntCounterVec> = OnceLock::new();
 static CLONE_OF_RESOLUTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_ACTIONS: OnceLock<IntCounterVec> = OnceLock::new();
+static USER_AGENTS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -165,6 +166,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(user_actions)
 		.map_err(|_| anyhow::anyhow!("user action metrics already initialised"))?;
 
+	let user_agents = IntCounterVec::new(
+		Opts::new(
+			"api_user_agent_total",
+			"Incoming requests by classified user agent and version",
+		),
+		&["product", "version"],
+	)?;
+	registry.register(Box::new(user_agents.clone()))?;
+	USER_AGENTS
+		.set(user_agents)
+		.map_err(|_| anyhow::anyhow!("user agent metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -245,5 +258,11 @@ pub fn record_clone_of_resolution(result: &str) {
 pub fn record_user_action(entity_type: &str, action: &str) {
 	if let Some(counter) = USER_ACTIONS.get() {
 		counter.with_label_values(&[entity_type, action]).inc();
+	}
+}
+
+pub fn record_user_agent(product: &str, version: &str) {
+	if let Some(counter) = USER_AGENTS.get() {
+		counter.with_label_values(&[product, version]).inc();
 	}
 }
