@@ -17,10 +17,38 @@ use crate::model::matching::GameMatchData;
 use crate::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
 };
-use entity::sea_orm_active_enums::{ManualMatchModeEnum, MatchTypeEnum};
+use entity::sea_orm_active_enums::{ManualMatchModeEnum, MatchTypeEnum, MetadataProviderEnum};
 use redis::aio::MultiplexedConnection;
 use sea_orm::prelude::Uuid;
 use sea_orm::{DatabaseConnection, ModelTrait, Set};
+
+async fn finalize_suggestion_insert(
+	active_model: entity::signature_metadata_mapping_suggestions::ActiveModel,
+	game_id: Option<Uuid>,
+	platform_id: Option<Uuid>,
+	company_id: Option<Uuid>,
+	provider: MetadataProviderEnum,
+	provider_id: String,
+	conn: &DatabaseConnection,
+) -> ServiceResult<Suggestion> {
+	let already_exists = suggestion_exists(
+		game_id,
+		platform_id,
+		company_id,
+		provider,
+		provider_id,
+		conn,
+	)
+	.await?;
+
+	if already_exists {
+		return Err(ServiceError::SuggestionAlreadyExists);
+	}
+
+	let created = insert_suggestion(active_model, conn).await?;
+
+	Ok(created.into())
+}
 
 pub async fn get_suggestions(db_conn: &DatabaseConnection) -> ServiceResult<Vec<Suggestion>> {
 	let suggestions = get_all_suggestions(db_conn).await?;
@@ -59,105 +87,87 @@ pub async fn add_game_suggestion(
 	};
 
 	let game = found_game.ok_or(ServiceError::GameNotFound)?;
+	let provider: MetadataProviderEnum = request.provider.into();
 
 	let suggestion = entity::signature_metadata_mapping_suggestions::ActiveModel {
 		game_id: Set(Some(game.id)),
-		provider: Set(request.provider.into()),
+		provider: Set(provider),
 		provider_id: Set(request.provider_id.clone()),
 		comment: Set(request.comment),
 		created_by: Set(request.user_id),
 		..Default::default()
 	};
 
-	let already_exists = suggestion_exists(
+	finalize_suggestion_insert(
+		suggestion,
 		Some(game.id),
 		None,
 		None,
-		request.provider.into(),
+		provider,
 		request.provider_id,
 		conn,
 	)
-	.await?;
-
-	if already_exists {
-		return Err(ServiceError::SuggestionAlreadyExists);
-	}
-
-	let created = insert_suggestion(suggestion, conn).await?;
-
-	Ok(created.into())
+	.await
 }
 
 pub async fn add_platform_suggestion(
 	request: CompanyOrPlatformSuggestionRequest,
 	conn: &DatabaseConnection,
 ) -> ServiceResult<Suggestion> {
-	let found_platform = find_platform_by_name(request.name.as_str(), conn).await?;
-
-	let platform = found_platform.ok_or(ServiceError::PlatformNotFound)?;
+	let platform = find_platform_by_name(request.name.as_str(), conn)
+		.await?
+		.ok_or(ServiceError::PlatformNotFound)?;
+	let provider: MetadataProviderEnum = request.provider.into();
 
 	let suggestion = entity::signature_metadata_mapping_suggestions::ActiveModel {
 		platform_id: Set(Some(platform.id)),
-		provider: Set(request.provider.into()),
+		provider: Set(provider),
 		provider_id: Set(request.provider_id.clone()),
 		comment: Set(request.comment),
 		created_by: Set(request.user_id),
 		..Default::default()
 	};
 
-	let already_exists = suggestion_exists(
+	finalize_suggestion_insert(
+		suggestion,
 		None,
 		Some(platform.id),
 		None,
-		request.provider.into(),
+		provider,
 		request.provider_id,
 		conn,
 	)
-	.await?;
-
-	if already_exists {
-		return Err(ServiceError::SuggestionAlreadyExists);
-	}
-
-	let created = insert_suggestion(suggestion, conn).await?;
-
-	Ok(created.into())
+	.await
 }
 
 pub async fn add_company_suggestion(
 	request: CompanyOrPlatformSuggestionRequest,
 	conn: &DatabaseConnection,
 ) -> ServiceResult<Suggestion> {
-	let found_company = find_company_by_name(request.name.as_str(), conn).await?;
-
-	let company = found_company.ok_or(ServiceError::CompanyNotFound)?;
+	let company = find_company_by_name(request.name.as_str(), conn)
+		.await?
+		.ok_or(ServiceError::CompanyNotFound)?;
+	let provider: MetadataProviderEnum = request.provider.into();
 
 	let suggestion = entity::signature_metadata_mapping_suggestions::ActiveModel {
 		company_id: Set(Some(company.id)),
-		provider: Set(request.provider.into()),
+		provider: Set(provider),
 		provider_id: Set(request.provider_id.clone()),
 		comment: Set(request.comment),
 		created_by: Set(request.user_id),
 		..Default::default()
 	};
 
-	let already_exists = suggestion_exists(
+	finalize_suggestion_insert(
+		suggestion,
 		None,
 		None,
 		Some(company.id),
-		request.provider.into(),
+		provider,
 		request.provider_id,
 		conn,
 	)
-	.await?;
-
-	if already_exists {
-		return Err(ServiceError::SuggestionAlreadyExists);
-	}
-
-	let created = insert_suggestion(suggestion, conn).await?;
-
-	Ok(created.into())
+	.await
 }
 
 pub async fn accept_suggestion(
