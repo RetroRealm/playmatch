@@ -1,11 +1,11 @@
 use sea_orm::sea_query::{Expr, Func, SimpleExpr};
 use sea_orm::{ColumnTrait, Value};
 
-pub trait ColumnNullTrait<E> {
+pub(crate) trait ColumnNullTrait<E> {
 	fn eq_null(self, option: Option<E>) -> SimpleExpr;
 }
 
-pub trait ColumnEqIgnoreCaseTrait<E> {
+pub(crate) trait ColumnEqIgnoreCaseTrait<E> {
 	fn eq_ignore_case(self, value: E) -> SimpleExpr;
 }
 
