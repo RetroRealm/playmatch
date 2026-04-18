@@ -1,4 +1,4 @@
-use prometheus::{IntCounterVec, Opts, Registry};
+use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, Opts, Registry};
 use std::sync::OnceLock;
 
 static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -6,6 +6,8 @@ static IDENTIFY_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static SERVICE_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
+static BACKGROUND_JOB_RUNS: OnceLock<IntCounterVec> = OnceLock::new();
+static BACKGROUND_JOB_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -68,6 +70,33 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(igdb_token_refreshes)
 		.map_err(|_| anyhow::anyhow!("igdb token refresh metrics already initialised"))?;
 
+	let background_job_runs = IntCounterVec::new(
+		Opts::new(
+			"api_background_job_total",
+			"Background job completions by job and result",
+		),
+		&["job", "result"],
+	)?;
+	registry.register(Box::new(background_job_runs.clone()))?;
+	BACKGROUND_JOB_RUNS
+		.set(background_job_runs)
+		.map_err(|_| anyhow::anyhow!("background job run metrics already initialised"))?;
+
+	let background_job_duration = HistogramVec::new(
+		HistogramOpts::new(
+			"api_background_job_duration_seconds",
+			"Background job runtime in seconds",
+		)
+		.buckets(vec![
+			1.0, 10.0, 30.0, 60.0, 300.0, 900.0, 1800.0, 3600.0, 7200.0, 14400.0,
+		]),
+		&["job"],
+	)?;
+	registry.register(Box::new(background_job_duration.clone()))?;
+	BACKGROUND_JOB_DURATION
+		.set(background_job_duration)
+		.map_err(|_| anyhow::anyhow!("background job duration metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -108,5 +137,16 @@ pub fn record_igdb_auto_match(entity_type: &str, result: &str, reason: &str) {
 pub fn record_igdb_token_refresh(trigger: &str, result: &str) {
 	if let Some(counter) = IGDB_TOKEN_REFRESHES.get() {
 		counter.with_label_values(&[trigger, result]).inc();
+	}
+}
+
+pub fn record_background_job(job: &str, result: &str, duration_seconds: f64) {
+	if let Some(counter) = BACKGROUND_JOB_RUNS.get() {
+		counter.with_label_values(&[job, result]).inc();
+	}
+	if let Some(histogram) = BACKGROUND_JOB_DURATION.get() {
+		histogram
+			.with_label_values(&[job])
+			.observe(duration_seconds);
 	}
 }
