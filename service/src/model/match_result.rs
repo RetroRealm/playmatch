@@ -47,6 +47,18 @@ pub enum GameMatchType {
 	NoMatch,
 }
 
+impl GameMatchType {
+	pub fn metric_label(&self) -> &'static str {
+		match self {
+			GameMatchType::SHA256 => "sha256",
+			GameMatchType::SHA1 => "sha1",
+			GameMatchType::MD5 => "md5",
+			GameMatchType::FileNameAndSize => "filename",
+			GameMatchType::NoMatch => "no_match",
+		}
+	}
+}
+
 /// Result of a manual match.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]

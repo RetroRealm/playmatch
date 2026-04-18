@@ -114,36 +114,42 @@ async fn identify_game(
 	let mut cached_but_empty = 0;
 
 	for match_type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
-		let type_result = match match_type {
+		let (attempted, type_result) = match match_type {
 			GameMatchType::SHA256 => match &search.sha256 {
-				Some(hash) => {
-					find_game_and_metadata_ids_by_sha256_cached(hash, redis_conn, db_conn).await?
-				}
-				None => NonCached(None),
+				Some(hash) => (
+					true,
+					find_game_and_metadata_ids_by_sha256_cached(hash, redis_conn, db_conn).await?,
+				),
+				None => (false, NonCached(None)),
 			},
 			GameMatchType::SHA1 => match &search.sha1 {
-				Some(hash) => {
-					find_game_and_metadata_ids_by_sha1_cached(hash, redis_conn, db_conn).await?
-				}
-				None => NonCached(None),
+				Some(hash) => (
+					true,
+					find_game_and_metadata_ids_by_sha1_cached(hash, redis_conn, db_conn).await?,
+				),
+				None => (false, NonCached(None)),
 			},
 			GameMatchType::MD5 => match &search.md5 {
-				Some(hash) => {
-					find_game_and_metadata_ids_by_md5_cached(hash, redis_conn, db_conn).await?
-				}
-				None => NonCached(None),
+				Some(hash) => (
+					true,
+					find_game_and_metadata_ids_by_md5_cached(hash, redis_conn, db_conn).await?,
+				),
+				None => (false, NonCached(None)),
 			},
-			GameMatchType::FileNameAndSize => NonCached(
-				find_game_and_id_mapping_by_name_and_size(
-					&search.file_name,
-					search.file_size,
-					db_conn,
-				)
-				.await?
-				.map(|(game, metadata_mappings)| IdentifyEntry {
-					game,
-					metadata_mappings,
-				}),
+			GameMatchType::FileNameAndSize => (
+				true,
+				NonCached(
+					find_game_and_id_mapping_by_name_and_size(
+						&search.file_name,
+						search.file_size,
+						db_conn,
+					)
+					.await?
+					.map(|(game, metadata_mappings)| IdentifyEntry {
+						game,
+						metadata_mappings,
+					}),
+				),
 			),
 			GameMatchType::NoMatch => unreachable!(),
 		};
@@ -151,14 +157,26 @@ async fn identify_game(
 		match type_result {
 			Cached(Some(entry)) => {
 				debug!("Cache hit for game match ({match_type:?}): {entry:?}");
+				crate::metrics::record_identify_attempt(match_type.metric_label(), true);
 				return Ok(Cached(Some((match_type, entry))));
 			}
 			NonCached(Some(entry)) => {
 				debug!("Cache miss for game match ({match_type:?}): {entry:?}");
+				crate::metrics::record_identify_attempt(match_type.metric_label(), true);
 				return Ok(NonCached(Some((match_type, entry))));
 			}
-			Cached(None) => cached_but_empty += 1,
-			NonCached(None) => continue,
+			Cached(None) => {
+				if attempted {
+					crate::metrics::record_identify_attempt(match_type.metric_label(), false);
+				}
+				cached_but_empty += 1;
+			}
+			NonCached(None) => {
+				if attempted {
+					crate::metrics::record_identify_attempt(match_type.metric_label(), false);
+				}
+				continue;
+			}
 		}
 	}
 
