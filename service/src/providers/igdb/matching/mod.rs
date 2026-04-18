@@ -1,6 +1,7 @@
 mod company;
 mod game;
 mod platform;
+pub(crate) mod util;
 
 use self::game::match_games_to_igdb;
 use crate::providers::igdb::IgdbClient;
@@ -12,6 +13,7 @@ use regex::Regex;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
+pub(crate) const PAGE_SIZE: u64 = 100;
 const IGDB_CHUNK_SIZE: usize = 4;
 
 lazy_static! {

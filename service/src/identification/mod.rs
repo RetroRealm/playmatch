@@ -10,7 +10,7 @@ use crate::identification::cache::{
 	IdentifyEntry, find_game_and_metadata_ids_by_md5_cached,
 	find_game_and_metadata_ids_by_sha1_cached, find_game_and_metadata_ids_by_sha256_cached,
 };
-use crate::manual_match::build_result;
+use crate::matching::manual::build_result;
 use crate::model::{
 	GameAndRelationMatchResult, GameAndRelationMatchResultBuilder, GameAndRelationsResult,
 	GameAndRelationsResultBuilder, GameFileMatchSearch, GameMatchType, GameMetadataMatchResult,

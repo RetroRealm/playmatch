@@ -11,7 +11,7 @@ use crate::db::signature_metadata_mapping_suggestions::{
 	get_all_suggestions, get_suggestion_by_id, insert_suggestion, suggestion_exists,
 };
 use crate::error::{ServiceError, ServiceResult};
-use crate::manual_match::apply_manual_game_match_by_game;
+use crate::matching::manual::apply_manual_game_match_by_game;
 use crate::model::ManualMatchMode;
 use crate::model::matching::GameMatchData;
 use crate::model::suggestion::{

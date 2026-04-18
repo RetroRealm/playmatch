@@ -1,10 +1,9 @@
-use crate::automatic_match::PAGE_SIZE;
-use crate::providers::igdb::matching::IGDB_CHUNK_SIZE;
 use crate::db::platform::get_unmatched_platforms_with_limit;
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::providers::igdb::IgdbClient;
+use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, PAGE_SIZE};
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };

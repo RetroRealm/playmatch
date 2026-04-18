@@ -1,4 +1,3 @@
-pub mod automatic_match;
 pub mod cache;
 pub mod company;
 pub mod constants;
@@ -8,9 +7,8 @@ pub mod error;
 mod fs;
 pub mod http;
 pub mod identification;
-pub mod manual_match;
+pub mod matching;
 pub mod model;
 pub mod platform;
 pub mod providers;
-pub mod suggestion;
 pub mod user;

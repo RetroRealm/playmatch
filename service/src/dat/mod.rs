@@ -1,4 +1,3 @@
-use crate::automatic_match::clone::populate_all_clone_of_ids;
 use crate::constants::PARALLELISM;
 use crate::dat::dats_site::download_dats_site_legacy_dats;
 use crate::dat::no_intro::download_no_intro_dats;
@@ -8,6 +7,7 @@ use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
 use crate::fs;
 use crate::fs::calculate_md5;
+use crate::matching::clone::populate_all_clone_of_ids;
 use anyhow::anyhow;
 use fs::read_files_recursive;
 use log::{debug, error, info};

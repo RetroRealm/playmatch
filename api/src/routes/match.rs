@@ -5,7 +5,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use log::debug;
 use sea_orm::DatabaseConnection;
-use service::manual_match::{
+use service::matching::manual::{
 	apply_manual_company_match, apply_manual_game_match, apply_manual_platform_match,
 };
 use service::model::ManualMatchMode;

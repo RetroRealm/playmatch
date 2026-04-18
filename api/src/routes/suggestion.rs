@@ -4,13 +4,13 @@ use actix_web::web::{Data, Json, Path};
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use sea_orm::DatabaseConnection;
+use service::matching::suggestions::{
+	accept_suggestion, add_company_suggestion, add_game_suggestion, add_platform_suggestion,
+	decline_suggestion, get_suggestion, get_suggestions,
+};
 use service::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest,
 	UpdatedMetadataMatchesFromSuggestionResponse,
-};
-use service::suggestion::{
-	accept_suggestion, add_company_suggestion, add_game_suggestion, add_platform_suggestion,
-	decline_suggestion, get_suggestion, get_suggestions,
 };
 use uuid::Uuid;
 
