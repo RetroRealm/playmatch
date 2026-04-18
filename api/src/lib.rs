@@ -55,7 +55,7 @@ use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::constants::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
-use service::metadata::igdb::IgdbClient;
+use service::providers::igdb::IgdbClient;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;

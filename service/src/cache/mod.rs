@@ -2,8 +2,6 @@ use crate::error::ServiceResult;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-pub mod igdb;
-
 pub const CACHE_PREFIX: &str = "playmatch";
 
 #[derive(Debug, Clone)]

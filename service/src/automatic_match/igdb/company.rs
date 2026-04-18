@@ -4,7 +4,7 @@ use crate::db::company::get_unmatched_companies_with_limit;
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
-use crate::metadata::igdb::IgdbClient;
+use crate::providers::igdb::IgdbClient;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };

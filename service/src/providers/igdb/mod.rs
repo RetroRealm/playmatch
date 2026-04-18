@@ -1,6 +1,6 @@
 use crate::constants::http::REQWEST_DEFAULT_USER_AGENT;
 use crate::http::abstraction::RetryPolicy;
-use crate::metadata::igdb::constants::{
+use crate::providers::igdb::constants::{
 	API_URL, IGDB_MAX_RETRIES, IGDB_RATELIMIT_AMOUNT, IGDB_RATELIMIT_DURATION_MS,
 	IGDB_ROUTE_AGE_RATING_CATEGORIES, IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTION_TYPES,
 	IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTIONS_V2, IGDB_ROUTE_AGE_RATING_ORGANIZATIONS,
@@ -15,7 +15,7 @@ use crate::metadata::igdb::constants::{
 	IGDB_ROUTE_RELEASE_DATE_REGIONS, IGDB_ROUTE_REPORT_TYPES, IGDB_ROUTE_REPORTS,
 	IGDB_ROUTE_WEBSITE_TYPES,
 };
-use crate::metadata::igdb::model::{
+use crate::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
 	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, CharacterMugShot, Collection,
 	Company, CompanySize, CompanyStatus, CompanyType, CompanyTypeHistory, Cover, DateFormat,
@@ -44,6 +44,7 @@ use tower::limit::{RateLimit, RateLimitLayer};
 use tower::retry::Retry;
 use tower::{Service, ServiceBuilder, ServiceExt};
 
+pub mod cache;
 mod constants;
 pub mod model;
 

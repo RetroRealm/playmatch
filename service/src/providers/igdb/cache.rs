@@ -1,8 +1,8 @@
 use crate::cache::{
 	CACHE_PREFIX, CacheKey, deserialize_option_redis_value, serialize_option_redis_value,
 };
-use crate::metadata::igdb::IgdbClient;
-use crate::metadata::igdb::model::{
+use crate::providers::igdb::IgdbClient;
+use crate::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
 	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, CharacterMugShot, Collection,
 	CompanySize, CompanyStatus, CompanyType, CompanyTypeHistory, Cover, DateFormat, EntityType,

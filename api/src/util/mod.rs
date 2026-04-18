@@ -6,7 +6,7 @@ use sea_orm::DbConn;
 use serde::de::DeserializeOwned;
 use service::automatic_match::igdb::match_db_to_igdb_entities;
 use service::dat::download_and_parse_dats;
-use service::metadata::igdb::IgdbClient;
+use service::providers::igdb::IgdbClient;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 

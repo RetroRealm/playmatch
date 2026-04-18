@@ -4,7 +4,8 @@ use crate::util::igdb_route_mutli_id_helper;
 use actix_web::web::Data;
 use actix_web::{HttpResponse, Responder, get};
 use actix_web_lab::extract::Query;
-use service::cache::igdb::{
+use service::providers::igdb::IgdbClient;
+use service::providers::igdb::cache::{
 	get_age_rating_by_id_cached, get_age_rating_category_by_id_cached,
 	get_age_rating_content_description_type_by_id_cached,
 	get_age_rating_content_description_v2_by_id_cached, get_age_rating_organization_by_id_cached,
@@ -19,8 +20,7 @@ use service::cache::igdb::{
 	get_platform_type_by_id_cached, get_release_date_region_by_id_cached, get_report_by_id_cached,
 	get_report_type_by_id_cached, get_website_type_by_id_cached, search_game_by_name_cached,
 };
-use service::metadata::igdb::IgdbClient;
-use service::metadata::igdb::model::{
+use service::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
 	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, CharacterMugShot, Collection,
 	CompanySize, CompanyStatus, CompanyType, CompanyTypeHistory, Cover, DateFormat, EntityType,

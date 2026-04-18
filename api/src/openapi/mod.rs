@@ -55,22 +55,6 @@ use crate::routes::user::{
 	__path_create_or_get_by_discord_id, __path_get_user, __path_get_user_by_discord_id,
 	__path_update_user_permission_level,
 };
-use service::metadata::igdb::model::{
-	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
-	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, Character, CharacterGender,
-	CharacterMugShot, CharacterSpecies, Collection, CollectionMembership, CollectionMembershipType,
-	CollectionRelation, CollectionRelationType, CollectionType, Company, CompanyLogo, CompanySize,
-	CompanyStatus, CompanyType, CompanyTypeHistory, CompanyWebsite, Cover, DateFormat, EntityType,
-	Event, EventLogo, EventNetwork, ExternalGame, ExternalGameSource, Franchise, Game, GameEngine,
-	GameEngineLogo, GameLocalization, GameMode, GameReleaseFormat, GameStatus, GameTimeToBeat,
-	GameType, GameVersion, GameVersionFeature, GameVersionFeatureCategory, GameVersionFeatureValue,
-	GameVersionFeatureValueEnum, GameVideo, Genre, InvolvedCompany, Keyword, Language,
-	LanguageSupport, LanguageSupportType, MultiplayerMode, NetworkType, Platform, PlatformFamily,
-	PlatformLogo, PlatformType, PlatformVersion, PlatformVersionCompany,
-	PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective, PopularityPrimitive,
-	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
-	Screenshot, Theme, Website, WebsiteType,
-};
 use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
 use service::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest, Suggestion,
@@ -85,6 +69,22 @@ use service::model::{
 	ManualMatchMode, MetadataMatchType, MetadataProvider, PlatformMetadataResponse,
 	PlaymatchCompany, PlaymatchDatFile, PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile,
 	PlaymatchPlatform, PlaymatchSignatureGroup, UpdatedMatchResult,
+};
+use service::providers::igdb::model::{
+	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
+	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, Character, CharacterGender,
+	CharacterMugShot, CharacterSpecies, Collection, CollectionMembership, CollectionMembershipType,
+	CollectionRelation, CollectionRelationType, CollectionType, Company, CompanyLogo, CompanySize,
+	CompanyStatus, CompanyType, CompanyTypeHistory, CompanyWebsite, Cover, DateFormat, EntityType,
+	Event, EventLogo, EventNetwork, ExternalGame, ExternalGameSource, Franchise, Game, GameEngine,
+	GameEngineLogo, GameLocalization, GameMode, GameReleaseFormat, GameStatus, GameTimeToBeat,
+	GameType, GameVersion, GameVersionFeature, GameVersionFeatureCategory, GameVersionFeatureValue,
+	GameVersionFeatureValueEnum, GameVideo, Genre, InvolvedCompany, Keyword, Language,
+	LanguageSupport, LanguageSupportType, MultiplayerMode, NetworkType, Platform, PlatformFamily,
+	PlatformLogo, PlatformType, PlatformVersion, PlatformVersionCompany,
+	PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective, PopularityPrimitive,
+	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
+	Screenshot, Theme, Website, WebsiteType,
 };
 use utoipa::OpenApi;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
