@@ -47,7 +47,7 @@ use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
-use actix_web::web::{Data, ServiceConfig, scope};
+use actix_web::web::{Data, JsonConfig, PayloadConfig, ServiceConfig, scope};
 use actix_web::{App, HttpResponse, HttpServer, web};
 use actix_web_prom::PrometheusMetricsBuilder;
 use anyhow::anyhow;
@@ -142,6 +142,8 @@ async fn start() -> anyhow::Result<()> {
 		App::new()
 			.wrap(Compress::default())
 			.wrap(prometheus.clone())
+			.app_data(JsonConfig::default().limit(64 * 1024))
+			.app_data(PayloadConfig::default().limit(256 * 1024))
 			.app_data(conn_data.clone())
 			.app_data(client_data.clone())
 			.app_data(igdb_data.clone())

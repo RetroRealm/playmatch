@@ -38,8 +38,13 @@ pub async fn identify_game_with_metadata_ids(
 	db_conn: Data<DatabaseConnection>,
 	redis_client: Data<redis::Client>,
 ) -> error::Result<impl Responder> {
+	let query = query.into_inner();
+	if let Err(msg) = query.validate() {
+		return Ok(HttpResponse::BadRequest().body(msg));
+	}
+
 	let identify_result = identify_game_and_metadata_mappings(
-		query.into_inner(),
+		query,
 		&mut redis_client.get_multiplexed_async_connection().await?,
 		db_conn.get_ref(),
 	)
@@ -67,8 +72,13 @@ pub async fn identify_game_and_relations(
 	db_conn: Data<DatabaseConnection>,
 	redis_client: Data<redis::Client>,
 ) -> error::Result<impl Responder> {
+	let query = query.into_inner();
+	if let Err(msg) = query.validate() {
+		return Ok(HttpResponse::BadRequest().body(msg));
+	}
+
 	let identify_result = identify_game_and_get_relations(
-		query.into_inner(),
+		query,
 		&mut redis_client.get_multiplexed_async_connection().await?,
 		db_conn.get_ref(),
 	)

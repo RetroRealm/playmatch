@@ -19,6 +19,9 @@ pub enum Error {
 	#[error("User was not found")]
 	UserNotFound,
 
+	#[error("{0}")]
+	BadRequest(String),
+
 	#[error(transparent)]
 	ServiceError(#[from] ServiceError),
 
@@ -34,6 +37,7 @@ impl Error {
 			Self::InvalidAuth(_) => "invalid_auth",
 			Self::InvalidAuthPermission => "invalid_auth_permission",
 			Self::UserNotFound => "user_not_found",
+			Self::BadRequest(_) => "bad_request",
 			Self::RedisError(_) => "redis_error",
 			Self::ServiceError(err) => match err {
 				ServiceError::GameNotFound => "game_not_found",
@@ -89,6 +93,7 @@ impl ResponseError for Error {
 			Error::InvalidAuth(_) => StatusCode::UNAUTHORIZED,
 			Error::UserNotFound => StatusCode::NOT_FOUND,
 			Error::InvalidAuthPermission => StatusCode::FORBIDDEN,
+			Error::BadRequest(_) => StatusCode::BAD_REQUEST,
 			Error::RedisError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 		}
 	}

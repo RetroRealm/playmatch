@@ -1,4 +1,4 @@
-use crate::model::{ManualMatchMode, MetadataProvider};
+use crate::model::{MAX_NAME_INPUT_LEN, ManualMatchMode, MetadataProvider, validate_optional_hex};
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -76,6 +76,20 @@ pub struct CompanyOrPlatformMatchRequest {
 	pub user_id: Option<Uuid>,
 }
 
+impl CompanyOrPlatformMatchRequest {
+	pub fn validate(&self) -> Result<(), String> {
+		if self.name.chars().count() > MAX_NAME_INPUT_LEN {
+			return Err(format!("name exceeds {MAX_NAME_INPUT_LEN} characters"));
+		}
+		if self.provider_id.chars().count() > MAX_NAME_INPUT_LEN {
+			return Err(format!(
+				"providerId exceeds {MAX_NAME_INPUT_LEN} characters"
+			));
+		}
+		Ok(())
+	}
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameMatchRequest {
@@ -105,6 +119,25 @@ pub struct GameMatchRequest {
 
 	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
 	pub user_id: Option<Uuid>,
+}
+
+impl GameMatchRequest {
+	pub fn validate(&self) -> Result<(), String> {
+		if let Some(name) = &self.name
+			&& name.chars().count() > MAX_NAME_INPUT_LEN
+		{
+			return Err(format!("name exceeds {MAX_NAME_INPUT_LEN} characters"));
+		}
+		if self.provider_id.chars().count() > MAX_NAME_INPUT_LEN {
+			return Err(format!(
+				"providerId exceeds {MAX_NAME_INPUT_LEN} characters"
+			));
+		}
+		validate_optional_hex(&self.md5, 32, "md5")?;
+		validate_optional_hex(&self.sha1, 40, "sha1")?;
+		validate_optional_hex(&self.sha256, 64, "sha256")?;
+		Ok(())
+	}
 }
 
 #[derive(Debug)]

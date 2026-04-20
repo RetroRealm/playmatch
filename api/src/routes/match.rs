@@ -44,6 +44,10 @@ pub async fn manually_match_game(
 	)
 	.await?;
 
+	if let Err(msg) = match_request.validate() {
+		return Ok(HttpResponse::BadRequest().body(msg));
+	}
+
 	if match_request.name.is_none()
 		&& match_request.md5.is_none()
 		&& match_request.sha1.is_none()
@@ -94,6 +98,10 @@ pub async fn manually_match_platform(
 	)
 	.await?;
 
+	if let Err(msg) = match_request.validate() {
+		return Ok(HttpResponse::BadRequest().body(msg));
+	}
+
 	let updated = apply_manual_platform_match(match_request, db_conn.get_ref()).await?;
 
 	Ok(HttpResponse::Ok().json(updated))
@@ -129,6 +137,10 @@ pub async fn manually_match_company(
 		db_conn.clone(),
 	)
 	.await?;
+
+	if let Err(msg) = match_request.validate() {
+		return Ok(HttpResponse::BadRequest().body(msg));
+	}
 
 	let updated = apply_manual_company_match(match_request, db_conn.get_ref()).await?;
 

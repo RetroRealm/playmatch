@@ -3,6 +3,7 @@ use crate::model::playmatch::{
 	PlaymatchCompany, PlaymatchDatFile, PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile,
 	PlaymatchPlatform, PlaymatchSignatureGroup,
 };
+use crate::model::{MAX_NAME_INPUT_LEN, validate_optional_hex};
 use derive_builder::Builder;
 use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,21 @@ pub struct GameFileMatchSearch {
 
 	/// Optional SHA256 hash of the game file.
 	pub sha256: Option<String>,
+}
+
+impl GameFileMatchSearch {
+	pub fn validate(&self) -> Result<(), String> {
+		if self.file_name.chars().count() > MAX_NAME_INPUT_LEN {
+			return Err(format!("file_name exceeds {MAX_NAME_INPUT_LEN} characters"));
+		}
+		if self.file_size < 0 {
+			return Err("file_size must be non-negative".to_string());
+		}
+		validate_optional_hex(&self.md5, 32, "md5")?;
+		validate_optional_hex(&self.sha1, 40, "sha1")?;
+		validate_optional_hex(&self.sha256, 64, "sha256")?;
+		Ok(())
+	}
 }
 
 /// Type of match for this game.
