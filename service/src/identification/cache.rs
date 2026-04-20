@@ -20,6 +20,17 @@ use std::time::Duration;
 
 const IDENTIFY_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24 * 7).as_secs(); // 7 days
 
+fn spawn_cache_write(mut redis_conn: MultiplexedConnection, cache_key: String, payload: String) {
+	tokio::spawn(async move {
+		if let Err(e) = redis_conn
+			.set_ex(&cache_key, payload, IDENTIFY_CACHE_LIFETIME)
+			.await
+		{
+			warn!("cache write failed for {cache_key}: {e}");
+		}
+	});
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IdentifyEntry {
 	pub game: game::Model,
@@ -161,16 +172,8 @@ pub async fn find_game_and_metadata_ids_by_filename_size_cached(
 			metadata_mappings: mappings,
 		});
 
-	if let Err(e) = redis_conn
-		.set_ex(
-			&cache_key,
-			serialize_option_redis_value(entry.clone())?,
-			IDENTIFY_CACHE_LIFETIME,
-		)
-		.await
-	{
-		warn!("cache write failed for {cache_key}: {e}");
-	}
+	let payload = serialize_option_redis_value(entry.clone())?;
+	spawn_cache_write(redis_conn.clone(), cache_key, payload);
 
 	Ok(NonCached(entry))
 }
@@ -214,16 +217,8 @@ async fn find_game_and_metadata_ids_cached(
 		metadata_mappings: mappings,
 	});
 
-	if let Err(e) = redis_conn
-		.set_ex(
-			&cache_key,
-			serialize_option_redis_value(entry.clone())?,
-			IDENTIFY_CACHE_LIFETIME,
-		)
-		.await
-	{
-		warn!("cache write failed for {cache_key}: {e}");
-	}
+	let payload = serialize_option_redis_value(entry.clone())?;
+	spawn_cache_write(redis_conn.clone(), cache_key, payload);
 
 	Ok(NonCached(entry))
 }

@@ -25,6 +25,20 @@ use std::time::Duration;
 
 const IGDB_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24).as_secs(); // 1 day
 
+/// Fire-and-forget a SET_EX on a detached task so the request path is not
+/// blocked by the cache write. Errors are logged at warn level; the caller
+/// already has the value.
+fn spawn_cache_write(mut redis_conn: MultiplexedConnection, cache_key: String, payload: String) {
+	tokio::spawn(async move {
+		if let Err(e) = redis_conn
+			.set_ex(&cache_key, payload, IGDB_CACHE_LIFETIME)
+			.await
+		{
+			warn!("cache write failed for {cache_key}: {e}");
+		}
+	});
+}
+
 macro_rules! cached_lookup {
 	($fn_name:ident, $ty:ty, $fetch:ident, $variant:ident, $label:literal) => {
 		pub async fn $fn_name(
@@ -51,16 +65,12 @@ macro_rules! cached_lookup {
 
 			let value = igdb_client.$fetch(id).await?;
 
-			if let Err(e) = redis_conn
-				.set_ex(
-					&cache_key,
-					serialize_option_redis_value(value.clone())?,
-					IGDB_CACHE_LIFETIME,
-				)
-				.await
-			{
-				warn!("cache write failed for {}: {e}", cache_key);
-			}
+			let payload = serialize_option_redis_value(value.clone())?;
+			$crate::providers::igdb::cache::spawn_cache_write(
+				redis_conn.clone(),
+				cache_key,
+				payload,
+			);
 
 			Ok(value)
 		}
@@ -93,16 +103,12 @@ macro_rules! cached_lookup_by_slug {
 
 			let value = igdb_client.$fetch(&slug).await?;
 
-			if let Err(e) = redis_conn
-				.set_ex(
-					&cache_key,
-					serialize_option_redis_value(value.clone())?,
-					IGDB_CACHE_LIFETIME,
-				)
-				.await
-			{
-				warn!("cache write failed for {}: {e}", cache_key);
-			}
+			let payload = serialize_option_redis_value(value.clone())?;
+			$crate::providers::igdb::cache::spawn_cache_write(
+				redis_conn.clone(),
+				cache_key,
+				payload,
+			);
 
 			Ok(value)
 		}
@@ -135,16 +141,12 @@ macro_rules! cached_search {
 
 			let values = igdb_client.$fetch(&query).await?;
 
-			if let Err(e) = redis_conn
-				.set_ex(
-					&cache_key,
-					serde_json::to_string(&values)?,
-					IGDB_CACHE_LIFETIME,
-				)
-				.await
-			{
-				warn!("cache write failed for {}: {e}", cache_key);
-			}
+			let payload = serde_json::to_string(&values)?;
+			$crate::providers::igdb::cache::spawn_cache_write(
+				redis_conn.clone(),
+				cache_key,
+				payload,
+			);
 
 			Ok(values)
 		}
