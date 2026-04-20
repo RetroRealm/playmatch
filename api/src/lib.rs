@@ -47,11 +47,12 @@ use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
 use actix_web::web::{Data, ServiceConfig, scope};
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpResponse, HttpServer, web};
 use actix_web_prom::PrometheusMetricsBuilder;
 use anyhow::anyhow;
 use log::{Level, LevelFilter, debug, error, info};
 use migration::{Migrator, MigratorTrait};
+use prometheus::{Encoder, Registry, TextEncoder};
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
@@ -118,14 +119,14 @@ async fn start() -> anyhow::Result<()> {
 	info!("Connected to Redis");
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
-		.endpoint("/metrics")
 		.mask_unmatched_patterns("UNKNOWN")
-		.exclude("/metrics")
 		.exclude_regex(r"^/swagger-ui(/|$)")
 		.build()
 		.map_err(|e| anyhow!(e))?;
 
 	service::metrics::init(&prometheus.registry)?;
+
+	let metrics_registry = Data::new(prometheus.registry.clone());
 
 	let conn_arc = Arc::new(conn);
 	let client_arc = Arc::new(client);
@@ -222,10 +223,35 @@ async fn start() -> anyhow::Result<()> {
 	sched.start().await?;
 	debug!("Scheduler started");
 
+	// Metrics run on a separate listener bound to an internal port so `/metrics` is never
+	// exposed via the public listener.
+	let metrics_port = env::var("METRICS_PORT").unwrap_or_else(|_| "9090".to_string());
+	let metrics_serv = HttpServer::new(move || {
+		App::new()
+			.app_data(metrics_registry.clone())
+			.route("/metrics", web::get().to(metrics_handler))
+	})
+	.bind(format!("0.0.0.0:{metrics_port}"))?
+	.shutdown_timeout(5)
+	.workers(1)
+	.run();
+
 	info!("Starting server on port {port}");
-	serv.await?;
+	info!("Starting metrics server on port {metrics_port}");
+	tokio::try_join!(serv, metrics_serv)?;
 
 	Ok(())
+}
+
+async fn metrics_handler(registry: Data<Registry>) -> HttpResponse {
+	let encoder = TextEncoder::new();
+	let mut buffer = Vec::new();
+	if encoder.encode(&registry.gather(), &mut buffer).is_err() {
+		return HttpResponse::InternalServerError().finish();
+	}
+	HttpResponse::Ok()
+		.content_type(encoder.format_type())
+		.body(buffer)
 }
 
 pub fn main() {

@@ -27,4 +27,5 @@ uuid = "^1.10"
 derive_builder = { workspace = true }
 tokio-cron-scheduler = "^0.15"
 actix-web-prom = { version = "^0.10", features = ["process"] }
+prometheus = { workspace = true }
 redis = { workspace = true, features = ["tokio-rustls-comp"] }

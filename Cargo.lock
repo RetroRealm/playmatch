@@ -416,6 +416,7 @@ dependencies = [
  "entity",
  "log",
  "migration",
+ "prometheus",
  "redis",
  "reqwest",
  "sea-orm",
