@@ -21,20 +21,21 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 - [x] Automatically daily downloads and updates dat files
 - [x] Hash dat files to skip daily import if nothing changed
 - [x] Support for IGDB as metadata provider
+- [x] Full IGDB entity endpoints exposed through a caching proxy
 
 ### Planned
 
 - [ ] Support for more dat files sources (TOSEC, MAME, GoodTools, etc)
 - [ ] Support for more metadata providers (MobyGames, ScreenScraper, SteamGridDB, Launchbox, etc)
-- [ ] Add all IGDB endpoints to proxy
 - [ ] Support bios and other non-game files, which you can also hash and verify this way
 
 ## Getting Started
 
 ### Prerequisites
 
-1. Rust 1.88+ from [here](https://www.rust-lang.org/tools/install)
-2. PostgreSQL 13+ from [here](https://www.postgresql.org/download/)
+1. Rust 1.95+ from [here](https://www.rust-lang.org/tools/install)
+2. PostgreSQL 18+ from [here](https://www.postgresql.org/download/)
+3. A Redis-compatible server such as [Redis](https://redis.io/download), [Valkey](https://valkey.io/), or [DragonflyDB](https://www.dragonflydb.io/)
 
 ### Development
 
@@ -54,6 +55,7 @@ Docker images are available [Here](https://github.com/RetroRealm/playmatch/pkgs/
 * [serde](https://serde.rs/) - Serialization/Deserialization
 * [actix-web](https://github.com/actix/actix-web) - The web framework used
 * [SeaORM](https://www.sea-ql.org/SeaORM/) - The Database ORM used
+* [Redis](https://redis.io/) / [Valkey](https://valkey.io/) / [DragonflyDB](https://www.dragonflydb.io/) - Used for caching and rate limiting
 
 ## Contributing
 
