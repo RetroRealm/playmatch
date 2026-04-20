@@ -108,12 +108,18 @@ async fn start() -> anyhow::Result<()> {
 	Migrator::up(&conn, None).await?;
 
 	let sched = JobScheduler::new().await?;
-	let client = Client::builder().cookie_store(true).build()?;
+
+	let igdb_http_client = Client::builder().cookie_store(true).build()?;
 	let igdb_client = IgdbClient::new(
 		env::var("IGDB_CLIENT_ID")?,
 		env::var("IGDB_CLIENT_SECRET")?,
-		client.clone(),
+		igdb_http_client,
 	)?;
+
+	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
+	// would replay on subsequent requests to the same host.
+	let dat_http_client = Client::builder().cookie_store(false).build()?;
+
 	let redis_client = redis::Client::open(env::var("REDIS_URL")?)?;
 
 	redis_client.get_multiplexed_async_connection().await?;
@@ -130,12 +136,11 @@ async fn start() -> anyhow::Result<()> {
 	let metrics_registry = Data::new(prometheus.registry.clone());
 
 	let conn_arc = Arc::new(conn);
-	let client_arc = Arc::new(client);
+	let dat_http_client_arc = Arc::new(dat_http_client);
 	let igdb_client_arc = Arc::new(igdb_client);
 
 	let redis_client_data = Data::new(redis_client);
 	let conn_data = Data::from(conn_arc.clone());
-	let client_data = Data::from(client_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
 	let serv = HttpServer::new(move || {
@@ -145,7 +150,6 @@ async fn start() -> anyhow::Result<()> {
 			.app_data(JsonConfig::default().limit(64 * 1024))
 			.app_data(PayloadConfig::default().limit(256 * 1024))
 			.app_data(conn_data.clone())
-			.app_data(client_data.clone())
 			.app_data(igdb_data.clone())
 			.app_data(redis_client_data.clone())
 			.service(
@@ -190,22 +194,22 @@ async fn start() -> anyhow::Result<()> {
 	.run();
 
 	let conn = conn_arc.clone();
-	let client = client_arc.clone();
+	let dat_client = dat_http_client_arc.clone();
 	let igdb_client = igdb_client_arc.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
-			let client = client.clone();
+			let dat_client = dat_client.clone();
 			let igdb_client = igdb_client.clone();
 			Box::pin(async move {
-				wrap_download_and_parse_dats(client, conn.clone(), false).await;
+				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
 				wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
 			})
 		})?)
 		.await?;
 
 	let conn = conn_arc.clone();
-	let http_client = client_arc.clone();
+	let http_client = dat_http_client_arc.clone();
 	let igdb_client = igdb_client_arc.clone();
 
 	let initial_data_init = env::var("INITIAL_DATA_INIT")
