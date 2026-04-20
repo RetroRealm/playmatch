@@ -1,7 +1,16 @@
 [advisories]
 version = 2
 yanked = "warn"
-ignore = []
+ignore = [
+	# rsa timing sidechannel. Pulled in transitively via sqlx-mysql through
+	# sea-orm-migration -> sea-schema -> sqlx. Playmatch only talks to
+	# Postgres; the mysql code path is never executed.
+	"RUSTSEC-2023-0071",
+	# proc-macro-error unmaintained. Pulled in transitively via utoipa 4.x
+	# -> utoipa-gen. No safe upgrade path until utoipa 5 lands across our
+	# dependent crates.
+	"RUSTSEC-2024-0370",
+]
 
 [licenses]
 version = 2
@@ -10,6 +19,7 @@ confidence-threshold = 0.8
 [bans]
 multiple-versions = "allow"
 wildcards = "warn"
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "warn"
