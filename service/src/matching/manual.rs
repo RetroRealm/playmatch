@@ -12,7 +12,7 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
-use crate::identification::cache::{IdentifyCacheType, delete_identify_cache};
+use crate::identification::cache::{IdentifyCacheType, delete_identify_cache, filename_size_key};
 use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchData, GameMatchRequest};
 use crate::model::{
 	GameMatchType, GameMetadataMatchResult, GameMetadataMatchResultBuilder, UpdatedMatchResult,
@@ -242,8 +242,15 @@ pub async fn apply_manual_game_match_by_game(
 		// Bust the cache for the hashes of the game files associated with this game so that the next time it is queried, it will return the updated mapping
 		let game_files = get_game_files_from_game_id(game.id, db_conn).await?;
 		for game_file in game_files {
-			bust_cache_for_hashes(game_file.sha256, game_file.sha1, game_file.md5, redis_conn)
-				.await?
+			bust_cache_for_hashes(
+				game_file.sha256,
+				game_file.sha1,
+				game_file.md5,
+				game_file.file_name,
+				game_file.file_size_in_bytes,
+				redis_conn,
+			)
+			.await?
 		}
 
 		results.push(
@@ -263,6 +270,8 @@ async fn bust_cache_for_hashes(
 	sha256: Option<String>,
 	sha1: Option<String>,
 	md5: Option<String>,
+	file_name: String,
+	file_size: Option<i64>,
 	redis_conn: &mut MultiplexedConnection,
 ) -> ServiceResult<()> {
 	if let Some(sha256) = &sha256 {
@@ -273,6 +282,10 @@ async fn bust_cache_for_hashes(
 	}
 	if let Some(md5) = &md5 {
 		delete_identify_cache(md5, IdentifyCacheType::IdentifyMd5, redis_conn).await?;
+	}
+	if let Some(size) = file_size {
+		let key = filename_size_key(&file_name, size);
+		delete_identify_cache(&key, IdentifyCacheType::IdentifyFilenameSize, redis_conn).await?;
 	}
 	debug!("Cache busted for hashes: sha256: {sha256:?}, sha1: {sha1:?}, md5: {md5:?}");
 

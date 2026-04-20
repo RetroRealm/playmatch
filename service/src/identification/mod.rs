@@ -2,13 +2,12 @@ pub mod cache;
 
 use crate::cache::CacheStatus;
 use crate::cache::CacheStatus::{Cached, NonCached};
-use crate::db::game::{
-	find_all_relations_of_game, find_game_and_id_mapping_by_name_and_size, get_game_by_id,
-};
+use crate::db::game::{find_all_relations_of_game, get_game_by_id};
 use crate::error::{ServiceError, ServiceResult};
 use crate::identification::cache::{
-	IdentifyEntry, find_game_and_metadata_ids_by_md5_cached,
-	find_game_and_metadata_ids_by_sha1_cached, find_game_and_metadata_ids_by_sha256_cached,
+	IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
+	find_game_and_metadata_ids_by_md5_cached, find_game_and_metadata_ids_by_sha1_cached,
+	find_game_and_metadata_ids_by_sha256_cached,
 };
 use crate::matching::manual::build_result;
 use crate::model::{
@@ -138,18 +137,13 @@ async fn identify_game(
 			},
 			GameMatchType::FileNameAndSize => (
 				true,
-				NonCached(
-					find_game_and_id_mapping_by_name_and_size(
-						&search.file_name,
-						search.file_size,
-						db_conn,
-					)
-					.await?
-					.map(|(game, metadata_mappings)| IdentifyEntry {
-						game,
-						metadata_mappings,
-					}),
-				),
+				find_game_and_metadata_ids_by_filename_size_cached(
+					&search.file_name,
+					search.file_size,
+					redis_conn,
+					db_conn,
+				)
+				.await?,
 			),
 			GameMatchType::NoMatch => unreachable!(),
 		};

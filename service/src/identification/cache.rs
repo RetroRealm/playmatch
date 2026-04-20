@@ -4,16 +4,18 @@ use crate::cache::{
 	serialize_option_redis_value,
 };
 use crate::db::game::{
-	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
-	find_game_and_id_mapping_by_sha256,
+	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
+	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
 };
 use crate::error::ServiceResult;
 use entity::{game, signature_metadata_mapping};
+use hex::encode as hex_encode;
 use log::{debug, warn};
 use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::time::Duration;
 
 const IDENTIFY_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24 * 7).as_secs(); // 7 days
@@ -29,6 +31,7 @@ pub enum IdentifyCacheType {
 	IdentifySha256,
 	IdentifySha1,
 	IdentifyMd5,
+	IdentifyFilenameSize,
 }
 
 impl CacheKey for IdentifyCacheType {
@@ -43,6 +46,11 @@ impl CacheKey for IdentifyCacheType {
 			IdentifyCacheType::IdentifyMd5 => {
 				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:md5:{identifier}")
 			}
+			IdentifyCacheType::IdentifyFilenameSize => {
+				format!(
+					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:filename_size:{identifier}"
+				)
+			}
 		}
 	}
 }
@@ -53,8 +61,21 @@ impl IdentifyCacheType {
 			IdentifyCacheType::IdentifySha256 => "sha256",
 			IdentifyCacheType::IdentifySha1 => "sha1",
 			IdentifyCacheType::IdentifyMd5 => "md5",
+			IdentifyCacheType::IdentifyFilenameSize => "filename_size",
 		}
 	}
+}
+
+/// Produce the opaque identifier segment used in the filename+size identify
+/// cache key. Null-byte separator guarantees `("a", 12)` and `("a1", 2)` do
+/// not collide, and lowercasing the filename matches the case-insensitive
+/// database lookup.
+pub fn filename_size_key(file_name: &str, file_size: i64) -> String {
+	let mut hasher = Sha256::new();
+	hasher.update(file_name.to_lowercase().as_bytes());
+	hasher.update(b"\0");
+	hasher.update(file_size.to_string().as_bytes());
+	hex_encode(hasher.finalize())
 }
 
 pub async fn delete_identify_cache(
@@ -102,6 +123,58 @@ pub async fn find_game_and_metadata_ids_by_md5_cached(
 		.await
 }
 
+pub async fn find_game_and_metadata_ids_by_filename_size_cached(
+	file_name: &str,
+	file_size: i64,
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
+	let key = filename_size_key(file_name, file_size);
+	let cache_key = IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key);
+
+	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+		debug!("Cache hit for filename+size");
+		crate::metrics::record_cache_hit(
+			"identify",
+			IdentifyCacheType::IdentifyFilenameSize.metric_label(),
+		);
+		if let Err(e) = redis_conn
+			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
+			.await
+		{
+			warn!("cache ttl refresh failed for {cache_key}: {e}");
+		}
+		let deserialized = deserialize_option_redis_value(cached_val)?;
+		return Ok(Cached(deserialized));
+	}
+
+	debug!("Cache miss for filename+size");
+	crate::metrics::record_cache_miss(
+		"identify",
+		IdentifyCacheType::IdentifyFilenameSize.metric_label(),
+	);
+
+	let entry = find_game_and_id_mapping_by_name_and_size(file_name, file_size, db_conn)
+		.await?
+		.map(|(game, mappings)| IdentifyEntry {
+			game,
+			metadata_mappings: mappings,
+		});
+
+	if let Err(e) = redis_conn
+		.set_ex(
+			&cache_key,
+			serialize_option_redis_value(entry.clone())?,
+			IDENTIFY_CACHE_LIFETIME,
+		)
+		.await
+	{
+		warn!("cache write failed for {cache_key}: {e}");
+	}
+
+	Ok(NonCached(entry))
+}
+
 async fn find_game_and_metadata_ids_cached(
 	hash: &str,
 	r#type: IdentifyCacheType,
@@ -132,6 +205,9 @@ async fn find_game_and_metadata_ids_cached(
 		}
 		IdentifyCacheType::IdentifySha1 => find_game_and_id_mapping_by_sha1(hash, db_conn).await?,
 		IdentifyCacheType::IdentifyMd5 => find_game_and_id_mapping_by_md5(hash, db_conn).await?,
+		IdentifyCacheType::IdentifyFilenameSize => {
+			unreachable!("filename+size has a dedicated cached wrapper")
+		}
 	}
 	.map(|(game, mappings)| IdentifyEntry {
 		game,
