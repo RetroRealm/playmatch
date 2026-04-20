@@ -4,6 +4,7 @@ use actix_web::web::{Data, Json};
 use actix_web::{HttpRequest, HttpResponse, Responder, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use log::debug;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DatabaseConnection;
 use service::matching::manual::{
 	apply_manual_company_match, apply_manual_game_match, apply_manual_platform_match,
@@ -32,7 +33,7 @@ use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest, 
 pub async fn manually_match_game(
 	match_request: Json<GameMatchRequest>,
 	db_conn: Data<DatabaseConnection>,
-	redis_client: Data<redis::Client>,
+	redis_conn: Data<MultiplexedConnection>,
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	let mut match_request = match_request.into_inner();
@@ -57,12 +58,9 @@ pub async fn manually_match_game(
 			.body("At least one of file_name, md5, sha1 or sha256 must be provided."));
 	}
 
-	let updated = apply_manual_game_match(
-		match_request,
-		db_conn.get_ref(),
-		&mut redis_client.get_multiplexed_async_connection().await?,
-	)
-	.await?;
+	let mut redis_conn = redis_conn.get_ref().clone();
+	let updated =
+		apply_manual_game_match(match_request, db_conn.get_ref(), &mut redis_conn).await?;
 
 	Ok(HttpResponse::Ok().json(updated))
 }

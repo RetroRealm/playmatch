@@ -2,6 +2,7 @@ use crate::error;
 use actix_web::web::Data;
 use actix_web::{HttpResponse, Responder, get, web};
 use log::debug;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use service::cache::CacheStatus;
@@ -36,19 +37,16 @@ fn cache_status_response<T: Serialize>(status: CacheStatus<T>, log_label: &str) 
 pub async fn identify_game_with_metadata_ids(
 	query: Query<GameFileMatchSearch>,
 	db_conn: Data<DatabaseConnection>,
-	redis_client: Data<redis::Client>,
+	redis_conn: Data<MultiplexedConnection>,
 ) -> error::Result<impl Responder> {
 	let query = query.into_inner();
 	if let Err(msg) = query.validate() {
 		return Ok(HttpResponse::BadRequest().body(msg));
 	}
 
-	let identify_result = identify_game_and_metadata_mappings(
-		query,
-		&mut redis_client.get_multiplexed_async_connection().await?,
-		db_conn.get_ref(),
-	)
-	.await?;
+	let mut redis_conn = redis_conn.get_ref().clone();
+	let identify_result =
+		identify_game_and_metadata_mappings(query, &mut redis_conn, db_conn.get_ref()).await?;
 
 	Ok(cache_status_response(
 		identify_result,
@@ -70,19 +68,16 @@ pub async fn identify_game_with_metadata_ids(
 pub async fn identify_game_and_relations(
 	query: Query<GameFileMatchSearch>,
 	db_conn: Data<DatabaseConnection>,
-	redis_client: Data<redis::Client>,
+	redis_conn: Data<MultiplexedConnection>,
 ) -> error::Result<impl Responder> {
 	let query = query.into_inner();
 	if let Err(msg) = query.validate() {
 		return Ok(HttpResponse::BadRequest().body(msg));
 	}
 
-	let identify_result = identify_game_and_get_relations(
-		query,
-		&mut redis_client.get_multiplexed_async_connection().await?,
-		db_conn.get_ref(),
-	)
-	.await?;
+	let mut redis_conn = redis_conn.get_ref().clone();
+	let identify_result =
+		identify_game_and_get_relations(query, &mut redis_conn, db_conn.get_ref()).await?;
 
 	Ok(cache_status_response(
 		identify_result,

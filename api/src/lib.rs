@@ -158,7 +158,7 @@ async fn start() -> anyhow::Result<()> {
 
 	let redis_client = redis::Client::open(env::var("REDIS_URL")?)?;
 
-	redis_client.get_multiplexed_async_connection().await?;
+	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
 	info!("Connected to Redis");
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
@@ -176,6 +176,7 @@ async fn start() -> anyhow::Result<()> {
 	let igdb_client_arc = Arc::new(igdb_client);
 
 	let redis_client_data = Data::new(redis_client);
+	let redis_conn_data = Data::new(redis_conn);
 	let conn_data = Data::from(conn_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
 
@@ -188,6 +189,7 @@ async fn start() -> anyhow::Result<()> {
 			.app_data(conn_data.clone())
 			.app_data(igdb_data.clone())
 			.app_data(redis_client_data.clone())
+			.app_data(redis_conn_data.clone())
 			.service(
 				scope("/api")
 					.wrap(Governor::new(&governor_conf))

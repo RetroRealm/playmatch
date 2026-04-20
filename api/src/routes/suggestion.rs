@@ -3,6 +3,7 @@ use crate::routes::handle_auth_and_permissions;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DatabaseConnection;
 use service::matching::suggestions::{
 	accept_suggestion, add_company_suggestion, add_game_suggestion, add_platform_suggestion,
@@ -170,17 +171,13 @@ pub async fn create_company_suggestion(
 pub async fn approve_suggestion(
 	id: Path<Uuid>,
 	db_conn: Data<DatabaseConnection>,
-	redis_client: Data<redis::Client>,
+	redis_conn: Data<MultiplexedConnection>,
 	req: HttpRequest,
 ) -> error::Result<impl Responder> {
 	handle_auth_and_permissions(&UserPermissionsEnum::Automation, req, db_conn.clone()).await?;
 
-	let updated = accept_suggestion(
-		id.into_inner(),
-		db_conn.get_ref(),
-		&mut redis_client.get_multiplexed_async_connection().await?,
-	)
-	.await?;
+	let mut redis_conn = redis_conn.get_ref().clone();
+	let updated = accept_suggestion(id.into_inner(), db_conn.get_ref(), &mut redis_conn).await?;
 
 	Ok(HttpResponse::Ok().json(UpdatedMetadataMatchesFromSuggestionResponse { updated }))
 }
