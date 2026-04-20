@@ -100,7 +100,7 @@ async fn start() -> anyhow::Result<()> {
 	let sqlx_log_level = env::var("DATABASE_SQL_LOG_LEVEL")
 		.ok()
 		.and_then(|v| v.parse::<LevelFilter>().ok())
-		.unwrap_or(LevelFilter::Info);
+		.unwrap_or(LevelFilter::Debug);
 	opt.sqlx_logging_level(sqlx_log_level);
 	opt.sqlx_slow_statements_logging_settings(LevelFilter::Warn, Duration::from_secs(15));
 
