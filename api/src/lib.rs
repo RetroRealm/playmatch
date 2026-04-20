@@ -149,11 +149,29 @@ async fn start() -> anyhow::Result<()> {
 					.wrap(Governor::new(&governor_conf))
 					.wrap(from_fn(user_agent_metric))
 					.wrap(
-						Logger::new("%{r}a %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T")
+						Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
 							.log_level(Level::Debug),
 					)
-					.wrap(DefaultHeaders::new().add(("X-Version", X_VERSION_HEADER_API)))
-					.configure(configure_api_routes),
+					.wrap(
+						DefaultHeaders::new()
+							.add(("X-Version", X_VERSION_HEADER_API))
+							.add((
+								"Strict-Transport-Security",
+								"max-age=31536000; includeSubDomains",
+							))
+							.add(("X-Content-Type-Options", "nosniff"))
+							.add(("Referrer-Policy", "no-referrer")),
+					)
+					.configure(configure_public_api_routes)
+					.service(
+						scope("")
+							.wrap(
+								DefaultHeaders::new()
+									.add(("Cache-Control", "no-store"))
+									.add(("Vary", "Authorization")),
+							)
+							.configure(configure_authenticated_api_routes),
+					),
 			)
 			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 				Url::new("playmatch API", "/api-docs/openapi.json"),
@@ -218,7 +236,7 @@ pub fn main() {
 	}
 }
 
-fn configure_api_routes(cfg: &mut ServiceConfig) {
+fn configure_public_api_routes(cfg: &mut ServiceConfig) {
 	cfg.service(health)
 		.service(ready)
 		.service(get_all_companies)
@@ -227,22 +245,8 @@ fn configure_api_routes(cfg: &mut ServiceConfig) {
 		.service(get_platform_by_id)
 		.service(identify_game_with_metadata_ids)
 		.service(identify_game_and_relations)
-		.service(manually_match_game)
-		.service(manually_match_platform)
-		.service(manually_match_company)
 		.service(get_playmatch_game_by_id)
 		.service(get_playmatch_game_with_relations_by_id)
-		.service(get_suggestion_by_id)
-		.service(get_all_suggestions)
-		.service(create_game_suggestion)
-		.service(create_company_suggestion)
-		.service(create_platform_suggestion)
-		.service(approve_suggestion)
-		.service(delete_suggestion)
-		.service(create_or_get_by_discord_id)
-		.service(get_user_by_discord_id)
-		.service(get_user)
-		.service(update_user_permission_level)
 		.service(get_igdb_game_by_id)
 		.service(get_igdb_games_by_ids)
 		.service(search_igdb_game_by_name)
@@ -306,4 +310,21 @@ fn configure_api_routes(cfg: &mut ServiceConfig) {
 		.service(get_igdb_reports_by_ids)
 		.service(get_igdb_report_type_by_id)
 		.service(get_igdb_report_types_by_ids);
+}
+
+fn configure_authenticated_api_routes(cfg: &mut ServiceConfig) {
+	cfg.service(manually_match_game)
+		.service(manually_match_platform)
+		.service(manually_match_company)
+		.service(get_suggestion_by_id)
+		.service(get_all_suggestions)
+		.service(create_game_suggestion)
+		.service(create_company_suggestion)
+		.service(create_platform_suggestion)
+		.service(approve_suggestion)
+		.service(delete_suggestion)
+		.service(create_or_get_by_discord_id)
+		.service(get_user_by_discord_id)
+		.service(get_user)
+		.service(update_user_permission_level);
 }
