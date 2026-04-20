@@ -44,6 +44,7 @@ use crate::routes::user::{
 	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
 };
 use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
+use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
 use actix_web::web::{Data, ServiceConfig, scope};
@@ -161,8 +162,10 @@ async fn start() -> anyhow::Result<()> {
 								"max-age=31536000; includeSubDomains",
 							))
 							.add(("X-Content-Type-Options", "nosniff"))
-							.add(("Referrer-Policy", "no-referrer")),
+							.add(("Referrer-Policy", "no-referrer"))
+							.add(("Vary", "Origin")),
 					)
+					.wrap(Cors::permissive())
 					.configure(configure_public_api_routes)
 					.service(
 						scope("")
