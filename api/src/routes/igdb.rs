@@ -1,5 +1,5 @@
 use crate::error;
-use crate::model::igdb::{IdQuery, IdsQuery, SearchQuery, SlugIdQuery};
+use crate::model::igdb::{IdQuery, IdsQuery, SearchQuery, SlugIdQuery, validate_search_literal};
 use crate::util::igdb_route_mutli_id_helper;
 use actix_web::web::Data;
 use actix_web::{HttpResponse, Responder, get};
@@ -52,6 +52,9 @@ pub async fn get_igdb_game_by_id(
 	let response = if let Some(id) = query.id {
 		get_game_by_id_cached(igdb_client.as_ref(), redis_conn, id).await?
 	} else if let Some(slug) = query.slug {
+		if let Err(resp) = validate_search_literal(&slug) {
+			return Ok(resp);
+		}
 		get_game_by_slug_cached(igdb_client.as_ref(), redis_conn, slug).await?
 	} else {
 		return Ok(HttpResponse::BadRequest().body("Either slug or id must be provided"));
@@ -110,10 +113,15 @@ pub async fn search_igdb_game_by_name(
 	redis_client: Data<redis::Client>,
 	igdb_client: Data<IgdbClient>,
 ) -> error::Result<impl Responder> {
+	let query = query.into_inner().query;
+	if let Err(resp) = validate_search_literal(&query) {
+		return Ok(resp);
+	}
+
 	let response = search_game_by_name_cached(
 		igdb_client.as_ref(),
 		&mut redis_client.get_multiplexed_async_connection().await?,
-		query.into_inner().query,
+		query,
 	)
 	.await?;
 

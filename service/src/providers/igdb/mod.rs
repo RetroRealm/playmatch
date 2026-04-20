@@ -44,6 +44,7 @@ use tower::limit::{RateLimit, RateLimitLayer};
 use tower::retry::Retry;
 use tower::{Service, ServiceBuilder, ServiceExt};
 
+mod apicalypse;
 pub mod cache;
 mod constants;
 pub mod matching;
@@ -110,22 +111,24 @@ impl IgdbClient {
 	}
 
 	pub async fn search_company_by_name(&self, name: &str) -> anyhow::Result<Vec<Company>> {
+		let literal = apicalypse::quote(name)?;
 		self.do_request_parsed::<Vec<Company>>(
 			Method::POST,
 			IGDB_ROUTE_COMPANIES,
 			None,
-			Some(&format!("where name = \"{name}\";")),
+			Some(&format!("where name = {literal};")),
 			Some(""),
 		)
 		.await
 	}
 
 	pub async fn search_platforms_by_name(&self, name: &str) -> anyhow::Result<Vec<Platform>> {
+		let literal = apicalypse::quote(name)?;
 		self.do_request_parsed::<Vec<Platform>>(
 			Method::POST,
 			IGDB_ROUTE_PLATFORMS,
 			None,
-			Some(&format!("search \"{name}\";")),
+			Some(&format!("search {literal};")),
 			Some(""),
 		)
 		.await
@@ -136,12 +139,13 @@ impl IgdbClient {
 	}
 
 	pub async fn get_game_by_slug(&self, slug: &str) -> anyhow::Result<Option<Game>> {
+		let literal = apicalypse::quote(slug)?;
 		let mut res = self
 			.do_request_parsed::<Vec<Game>>(
 				Method::POST,
 				IGDB_ROUTE_GAMES,
 				None,
-				Some(&format!("where slug = \"{slug}\";")),
+				Some(&format!("where slug = {literal};")),
 				Some("limit 1;"),
 			)
 			.await?;
@@ -154,11 +158,12 @@ impl IgdbClient {
 	}
 
 	pub async fn search_game_by_name(&self, name: &str) -> anyhow::Result<Vec<Game>> {
+		let literal = apicalypse::quote(name)?;
 		self.do_request_parsed::<Vec<Game>>(
 			Method::POST,
 			IGDB_ROUTE_GAMES,
 			None,
-			Some(&format!("search \"{name}\";")),
+			Some(&format!("search {literal};")),
 			Some(""),
 		)
 		.await
@@ -169,12 +174,13 @@ impl IgdbClient {
 		name: &str,
 		platform_id: i32,
 	) -> anyhow::Result<Vec<Game>> {
+		let literal = apicalypse::quote(name)?;
 		self.do_request_parsed::<Vec<Game>>(
 			Method::POST,
 			IGDB_ROUTE_GAMES,
 			None,
 			Some(&format!(
-				"where platforms = ({platform_id}); search \"{name}\";"
+				"where platforms = ({platform_id}); search {literal};"
 			)),
 			Some(""),
 		)
