@@ -30,20 +30,6 @@ const IGDB_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24).as_secs(); //
 const L1_MAX_CAPACITY: u64 = 10_000;
 const L1_TIME_TO_IDLE: Duration = Duration::from_secs(15 * 60);
 
-/// Fire-and-forget a SET_EX on a detached task so the request path is not
-/// blocked by the cache write. Errors are logged at warn level; the caller
-/// already has the value.
-fn spawn_cache_write(mut redis_conn: MultiplexedConnection, cache_key: String, payload: String) {
-	tokio::spawn(async move {
-		if let Err(e) = redis_conn
-			.set_ex(&cache_key, payload, IGDB_CACHE_LIFETIME)
-			.await
-		{
-			warn!("cache write failed for {cache_key}: {e}");
-		}
-	});
-}
-
 /// Like `cached_lookup!` but adds a per-worker in-process L1 (moka) in front
 /// of Redis. Reserved for small, rarely-changing reference entities where the
 /// cost of keeping a cloned copy per worker is negligible and the call volume
@@ -92,10 +78,11 @@ macro_rules! cached_reference_lookup {
 
 			l1.insert(id, value.clone()).await;
 			let payload = serialize_option_redis_value(value.clone())?;
-			$crate::providers::igdb::cache::spawn_cache_write(
+			$crate::cache::spawn_cache_write(
 				redis_conn.clone(),
 				cache_key,
 				payload,
+				IGDB_CACHE_LIFETIME,
 			);
 
 			Ok(value)
@@ -130,10 +117,11 @@ macro_rules! cached_lookup {
 			let value = igdb_client.$fetch(id).await?;
 
 			let payload = serialize_option_redis_value(value.clone())?;
-			$crate::providers::igdb::cache::spawn_cache_write(
+			$crate::cache::spawn_cache_write(
 				redis_conn.clone(),
 				cache_key,
 				payload,
+				IGDB_CACHE_LIFETIME,
 			);
 
 			Ok(value)
@@ -168,10 +156,11 @@ macro_rules! cached_lookup_by_slug {
 			let value = igdb_client.$fetch(&slug).await?;
 
 			let payload = serialize_option_redis_value(value.clone())?;
-			$crate::providers::igdb::cache::spawn_cache_write(
+			$crate::cache::spawn_cache_write(
 				redis_conn.clone(),
 				cache_key,
 				payload,
+				IGDB_CACHE_LIFETIME,
 			);
 
 			Ok(value)
@@ -206,10 +195,11 @@ macro_rules! cached_search {
 			let values = igdb_client.$fetch(&query).await?;
 
 			let payload = serde_json::to_string(&values)?;
-			$crate::providers::igdb::cache::spawn_cache_write(
+			$crate::cache::spawn_cache_write(
 				redis_conn.clone(),
 				cache_key,
 				payload,
+				IGDB_CACHE_LIFETIME,
 			);
 
 			Ok(values)
@@ -846,315 +836,96 @@ enum IgdbCacheType {
 	GetWebsiteById,
 }
 
+impl IgdbCacheType {
+	fn segment(&self) -> &'static str {
+		match self {
+			Self::GetAgeRatingById => "age_rating",
+			Self::GetAgeRatingCategoryById => "age_rating_category",
+			Self::GetAgeRatingContentDescriptionTypeById => "age_rating_content_description_type",
+			Self::GetAgeRatingContentDescriptionV2ById => "age_rating_content_description_v2",
+			Self::GetAgeRatingOrganizationById => "age_rating_organization",
+			Self::GetAlternativeNameById => "alternative_name",
+			Self::GetArtworkById => "artwork",
+			Self::GetArtworkTypeById => "artwork_type",
+			Self::GetCharacterMugShotById => "character_mug_shot",
+			Self::GetCollectionById => "collection",
+			Self::GetCompanySizeById => "company_size",
+			Self::GetCompanyStatusById => "company_status",
+			Self::GetCompanyTypeById => "company_type",
+			Self::GetCompanyTypeHistoryById => "company_type_history",
+			Self::GetCoverById => "cover",
+			Self::GetDateFormatById => "date_format",
+			Self::GetEntityTypeById => "entity_type",
+			Self::GetExternalGameById => "external_game",
+			Self::GetExternalGameSourceById => "external_game_source",
+			Self::GetFranchiseById => "franchise",
+			Self::GetGameById => "game",
+			Self::GetGameBySlug => "game:slug",
+			Self::SearchGameByName => "game:search",
+			Self::GetGameReleaseFormatById => "game_release_format",
+			Self::GetGameStatusById => "game_status",
+			Self::GetGameTimeToBeatById => "game_time_to_beat",
+			Self::GetGameTypeById => "game_type",
+			Self::GetGenreById => "genre",
+			Self::GetPlatformTypeById => "platform_type",
+			Self::GetReleaseDateRegionById => "release_date_region",
+			Self::GetReportById => "report",
+			Self::GetReportTypeById => "report_type",
+			Self::GetWebsiteTypeById => "website_type",
+			Self::GetCharacterById => "character",
+			Self::GetCharacterGenderById => "character_gender",
+			Self::GetCharacterSpeciesById => "character_species",
+			Self::GetCollectionMembershipById => "collection_membership",
+			Self::GetCollectionMembershipTypeById => "collection_membership_type",
+			Self::GetCollectionRelationById => "collection_relation",
+			Self::GetCollectionRelationTypeById => "collection_relation_type",
+			Self::GetCollectionTypeById => "collection_type",
+			Self::GetCompanyById => "company",
+			Self::GetCompanyLogoById => "company_logo",
+			Self::GetCompanyWebsiteById => "company_website",
+			Self::GetEventById => "event",
+			Self::GetEventLogoById => "event_logo",
+			Self::GetEventNetworkById => "event_network",
+			Self::GetGameEngineById => "game_engine",
+			Self::GetGameEngineLogoById => "game_engine_logo",
+			Self::GetGameLocalizationById => "game_localization",
+			Self::GetGameModeById => "game_mode",
+			Self::GetGameVersionById => "game_version",
+			Self::GetGameVersionFeatureById => "game_version_feature",
+			Self::GetGameVersionFeatureValueById => "game_version_feature_value",
+			Self::GetGameVideoById => "game_video",
+			Self::GetInvolvedCompanyById => "involved_company",
+			Self::GetKeywordById => "keyword",
+			Self::GetLanguageById => "language",
+			Self::GetLanguageSupportById => "language_support",
+			Self::GetLanguageSupportTypeById => "language_support_type",
+			Self::GetMultiplayerModeById => "multiplayer_mode",
+			Self::GetNetworkTypeById => "network_type",
+			Self::GetPlatformById => "platform",
+			Self::GetPlatformFamilyById => "platform_family",
+			Self::GetPlatformLogoById => "platform_logo",
+			Self::GetPlatformVersionById => "platform_version",
+			Self::GetPlatformVersionCompanyById => "platform_version_company",
+			Self::GetPlatformVersionReleaseDateById => "platform_version_release_date",
+			Self::GetPlatformWebsiteById => "platform_website",
+			Self::GetPlayerPerspectiveById => "player_perspective",
+			Self::GetPopularityPrimitiveById => "popularity_primitive",
+			Self::GetPopularityTypeById => "popularity_type",
+			Self::GetRegionById => "region",
+			Self::GetReleaseDateById => "release_date",
+			Self::GetReleaseDateStatusById => "release_date_status",
+			Self::GetScreenshotById => "screenshot",
+			Self::GetThemeById => "theme",
+			Self::GetWebsiteById => "website",
+		}
+	}
+}
+
 impl CacheKey for IgdbCacheType {
 	fn get_cache_key(&self, identifier: &str) -> String {
-		match self {
-			IgdbCacheType::GetAgeRatingById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:age_rating:{identifier}")
-			}
-			IgdbCacheType::GetAgeRatingCategoryById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:age_rating_category:{identifier}"
-				)
-			}
-			IgdbCacheType::GetAgeRatingContentDescriptionTypeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:age_rating_content_description_type:{identifier}"
-				)
-			}
-			IgdbCacheType::GetAgeRatingContentDescriptionV2ById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:age_rating_content_description_v2:{identifier}"
-				)
-			}
-			IgdbCacheType::GetAgeRatingOrganizationById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:age_rating_organization:{identifier}"
-				)
-			}
-			IgdbCacheType::GetAlternativeNameById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:alternative_name:{identifier}"
-				)
-			}
-			IgdbCacheType::GetArtworkById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:artwork:{identifier}")
-			}
-			IgdbCacheType::GetArtworkTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:artwork_type:{identifier}")
-			}
-			IgdbCacheType::GetCharacterMugShotById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:character_mug_shot:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCollectionById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:collection:{identifier}")
-			}
-			IgdbCacheType::GetCompanySizeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company_size:{identifier}")
-			}
-			IgdbCacheType::GetCompanyStatusById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company_status:{identifier}")
-			}
-			IgdbCacheType::GetCompanyTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company_type:{identifier}")
-			}
-			IgdbCacheType::GetCompanyTypeHistoryById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company_type_history:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCoverById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:cover:{identifier}")
-			}
-			IgdbCacheType::GetDateFormatById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:date_format:{identifier}")
-			}
-			IgdbCacheType::GetEntityTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:entity_type:{identifier}")
-			}
-			IgdbCacheType::GetExternalGameById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:external_game:{identifier}")
-			}
-			IgdbCacheType::GetExternalGameSourceById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:external_game_source:{identifier}"
-				)
-			}
-			IgdbCacheType::GetFranchiseById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:franchise:{identifier}")
-			}
-			IgdbCacheType::GetGameById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game:{identifier}")
-			}
-			IgdbCacheType::GetGameBySlug => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game:slug:{identifier}")
-			}
-			IgdbCacheType::SearchGameByName => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game:search:{identifier}")
-			}
-			IgdbCacheType::GetGameReleaseFormatById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_release_format:{identifier}"
-				)
-			}
-			IgdbCacheType::GetGameStatusById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_status:{identifier}")
-			}
-			IgdbCacheType::GetGameTimeToBeatById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_time_to_beat:{identifier}"
-				)
-			}
-			IgdbCacheType::GetGameTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_type:{identifier}")
-			}
-			IgdbCacheType::GetGenreById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:genre:{identifier}")
-			}
-			IgdbCacheType::GetPlatformTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_type:{identifier}")
-			}
-			IgdbCacheType::GetReleaseDateRegionById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:release_date_region:{identifier}"
-				)
-			}
-			IgdbCacheType::GetReportById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:report:{identifier}")
-			}
-			IgdbCacheType::GetReportTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:report_type:{identifier}")
-			}
-			IgdbCacheType::GetWebsiteTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:website_type:{identifier}")
-			}
-			IgdbCacheType::GetCharacterById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:character:{identifier}")
-			}
-			IgdbCacheType::GetCharacterGenderById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:character_gender:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCharacterSpeciesById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:character_species:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCollectionMembershipById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:collection_membership:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCollectionMembershipTypeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:collection_membership_type:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCollectionRelationById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:collection_relation:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCollectionRelationTypeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:collection_relation_type:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCollectionTypeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:collection_type:{identifier}"
-				)
-			}
-			IgdbCacheType::GetCompanyById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company:{identifier}")
-			}
-			IgdbCacheType::GetCompanyLogoById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company_logo:{identifier}")
-			}
-			IgdbCacheType::GetCompanyWebsiteById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:company_website:{identifier}"
-				)
-			}
-			IgdbCacheType::GetEventById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:event:{identifier}")
-			}
-			IgdbCacheType::GetEventLogoById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:event_logo:{identifier}")
-			}
-			IgdbCacheType::GetEventNetworkById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:event_network:{identifier}")
-			}
-			IgdbCacheType::GetGameEngineById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_engine:{identifier}")
-			}
-			IgdbCacheType::GetGameEngineLogoById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_engine_logo:{identifier}"
-				)
-			}
-			IgdbCacheType::GetGameLocalizationById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_localization:{identifier}"
-				)
-			}
-			IgdbCacheType::GetGameModeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_mode:{identifier}")
-			}
-			IgdbCacheType::GetGameVersionById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_version:{identifier}")
-			}
-			IgdbCacheType::GetGameVersionFeatureById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_version_feature:{identifier}"
-				)
-			}
-			IgdbCacheType::GetGameVersionFeatureValueById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_version_feature_value:{identifier}"
-				)
-			}
-			IgdbCacheType::GetGameVideoById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:game_video:{identifier}")
-			}
-			IgdbCacheType::GetInvolvedCompanyById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:involved_company:{identifier}"
-				)
-			}
-			IgdbCacheType::GetKeywordById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:keyword:{identifier}")
-			}
-			IgdbCacheType::GetLanguageById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:language:{identifier}")
-			}
-			IgdbCacheType::GetLanguageSupportById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:language_support:{identifier}"
-				)
-			}
-			IgdbCacheType::GetLanguageSupportTypeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:language_support_type:{identifier}"
-				)
-			}
-			IgdbCacheType::GetMultiplayerModeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:multiplayer_mode:{identifier}"
-				)
-			}
-			IgdbCacheType::GetNetworkTypeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:network_type:{identifier}")
-			}
-			IgdbCacheType::GetPlatformById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform:{identifier}")
-			}
-			IgdbCacheType::GetPlatformFamilyById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_family:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPlatformLogoById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_logo:{identifier}")
-			}
-			IgdbCacheType::GetPlatformVersionById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_version:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPlatformVersionCompanyById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_version_company:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPlatformVersionReleaseDateById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_version_release_date:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPlatformWebsiteById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:platform_website:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPlayerPerspectiveById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:player_perspective:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPopularityPrimitiveById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:popularity_primitive:{identifier}"
-				)
-			}
-			IgdbCacheType::GetPopularityTypeById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:popularity_type:{identifier}"
-				)
-			}
-			IgdbCacheType::GetRegionById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:region:{identifier}")
-			}
-			IgdbCacheType::GetReleaseDateById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:release_date:{identifier}")
-			}
-			IgdbCacheType::GetReleaseDateStatusById => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:release_date_status:{identifier}"
-				)
-			}
-			IgdbCacheType::GetScreenshotById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:screenshot:{identifier}")
-			}
-			IgdbCacheType::GetThemeById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:theme:{identifier}")
-			}
-			IgdbCacheType::GetWebsiteById => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:website:{identifier}")
-			}
-		}
+		format!(
+			"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:igdb:{}:{identifier}",
+			self.segment()
+		)
 	}
 }

@@ -5,9 +5,8 @@ use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::db::game::{find_all_relations_of_game, get_game_by_id};
 use crate::error::{ServiceError, ServiceResult};
 use crate::identification::cache::{
-	IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
-	find_game_and_metadata_ids_by_md5_cached, find_game_and_metadata_ids_by_sha1_cached,
-	find_game_and_metadata_ids_by_sha256_cached,
+	IdentifyCacheType, IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
+	find_game_and_metadata_ids_by_hash_cached,
 };
 use crate::matching::manual::build_result;
 use crate::model::{
@@ -117,21 +116,39 @@ async fn identify_game(
 			GameMatchType::SHA256 => match &search.sha256 {
 				Some(hash) => (
 					true,
-					find_game_and_metadata_ids_by_sha256_cached(hash, redis_conn, db_conn).await?,
+					find_game_and_metadata_ids_by_hash_cached(
+						hash,
+						IdentifyCacheType::IdentifySha256,
+						redis_conn,
+						db_conn,
+					)
+					.await?,
 				),
 				None => (false, NonCached(None)),
 			},
 			GameMatchType::SHA1 => match &search.sha1 {
 				Some(hash) => (
 					true,
-					find_game_and_metadata_ids_by_sha1_cached(hash, redis_conn, db_conn).await?,
+					find_game_and_metadata_ids_by_hash_cached(
+						hash,
+						IdentifyCacheType::IdentifySha1,
+						redis_conn,
+						db_conn,
+					)
+					.await?,
 				),
 				None => (false, NonCached(None)),
 			},
 			GameMatchType::MD5 => match &search.md5 {
 				Some(hash) => (
 					true,
-					find_game_and_metadata_ids_by_md5_cached(hash, redis_conn, db_conn).await?,
+					find_game_and_metadata_ids_by_hash_cached(
+						hash,
+						IdentifyCacheType::IdentifyMd5,
+						redis_conn,
+						db_conn,
+					)
+					.await?,
 				),
 				None => (false, NonCached(None)),
 			},

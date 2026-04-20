@@ -1,7 +1,7 @@
 use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::cache::{
 	CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey, CacheStatus, deserialize_option_redis_value,
-	serialize_option_redis_value,
+	serialize_option_redis_value, spawn_cache_write,
 };
 use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
@@ -19,17 +19,6 @@ use sha2::{Digest, Sha256};
 use std::time::Duration;
 
 const IDENTIFY_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24 * 7).as_secs(); // 7 days
-
-fn spawn_cache_write(mut redis_conn: MultiplexedConnection, cache_key: String, payload: String) {
-	tokio::spawn(async move {
-		if let Err(e) = redis_conn
-			.set_ex(&cache_key, payload, IDENTIFY_CACHE_LIFETIME)
-			.await
-		{
-			warn!("cache write failed for {cache_key}: {e}");
-		}
-	});
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IdentifyEntry {
@@ -102,38 +91,6 @@ pub async fn delete_identify_cache(
 	Ok(())
 }
 
-pub async fn find_game_and_metadata_ids_by_sha256_cached(
-	sha256: &str,
-	redis_conn: &mut MultiplexedConnection,
-	db_conn: &DbConn,
-) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
-	find_game_and_metadata_ids_cached(
-		sha256,
-		IdentifyCacheType::IdentifySha256,
-		redis_conn,
-		db_conn,
-	)
-	.await
-}
-
-pub async fn find_game_and_metadata_ids_by_sha1_cached(
-	sha1: &str,
-	redis_conn: &mut MultiplexedConnection,
-	db_conn: &DbConn,
-) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
-	find_game_and_metadata_ids_cached(sha1, IdentifyCacheType::IdentifySha1, redis_conn, db_conn)
-		.await
-}
-
-pub async fn find_game_and_metadata_ids_by_md5_cached(
-	md5: &str,
-	redis_conn: &mut MultiplexedConnection,
-	db_conn: &DbConn,
-) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
-	find_game_and_metadata_ids_cached(md5, IdentifyCacheType::IdentifyMd5, redis_conn, db_conn)
-		.await
-}
-
 pub async fn find_game_and_metadata_ids_by_filename_size_cached(
 	file_name: &str,
 	file_size: i64,
@@ -173,12 +130,17 @@ pub async fn find_game_and_metadata_ids_by_filename_size_cached(
 		});
 
 	let payload = serialize_option_redis_value(entry.clone())?;
-	spawn_cache_write(redis_conn.clone(), cache_key, payload);
+	spawn_cache_write(
+		redis_conn.clone(),
+		cache_key,
+		payload,
+		IDENTIFY_CACHE_LIFETIME,
+	);
 
 	Ok(NonCached(entry))
 }
 
-async fn find_game_and_metadata_ids_cached(
+pub async fn find_game_and_metadata_ids_by_hash_cached(
 	hash: &str,
 	r#type: IdentifyCacheType,
 	redis_conn: &mut MultiplexedConnection,
@@ -218,7 +180,12 @@ async fn find_game_and_metadata_ids_cached(
 	});
 
 	let payload = serialize_option_redis_value(entry.clone())?;
-	spawn_cache_write(redis_conn.clone(), cache_key, payload);
+	spawn_cache_write(
+		redis_conn.clone(),
+		cache_key,
+		payload,
+		IDENTIFY_CACHE_LIFETIME,
+	);
 
 	Ok(NonCached(entry))
 }

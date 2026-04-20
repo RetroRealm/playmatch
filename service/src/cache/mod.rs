@@ -1,4 +1,7 @@
 use crate::error::ServiceResult;
+use log::warn;
+use redis::AsyncTypedCommands;
+use redis::aio::MultiplexedConnection;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
@@ -32,6 +35,22 @@ pub(crate) fn serialize_option_redis_value<T: Serialize>(
 	value: Option<T>,
 ) -> ServiceResult<String> {
 	Ok(serde_json::to_string(&value)?)
+}
+
+/// Fire-and-forget a SET_EX on a detached task so the request path is not
+/// blocked by the cache write. Errors are logged at warn level; the caller
+/// already has the value.
+pub(crate) fn spawn_cache_write(
+	mut redis_conn: MultiplexedConnection,
+	cache_key: String,
+	payload: String,
+	ttl_secs: u64,
+) {
+	tokio::spawn(async move {
+		if let Err(e) = redis_conn.set_ex(&cache_key, payload, ttl_secs).await {
+			warn!("cache write failed for {cache_key}: {e}");
+		}
+	});
 }
 
 /// Normalise free-text input before using it as a cache key suffix. Lowercase,
