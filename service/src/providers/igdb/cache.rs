@@ -19,11 +19,16 @@ use crate::providers::igdb::model::{
 	Report, ReportType, Screenshot, Theme, Website, WebsiteType,
 };
 use log::{debug, warn};
+use moka::future::Cache as L1Cache;
 use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 const IGDB_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24).as_secs(); // 1 day
+
+const L1_MAX_CAPACITY: u64 = 10_000;
+const L1_TIME_TO_IDLE: Duration = Duration::from_secs(15 * 60);
 
 /// Fire-and-forget a SET_EX on a detached task so the request path is not
 /// blocked by the cache write. Errors are logged at warn level; the caller
@@ -37,6 +42,65 @@ fn spawn_cache_write(mut redis_conn: MultiplexedConnection, cache_key: String, p
 			warn!("cache write failed for {cache_key}: {e}");
 		}
 	});
+}
+
+/// Like `cached_lookup!` but adds a per-worker in-process L1 (moka) in front
+/// of Redis. Reserved for small, rarely-changing reference entities where the
+/// cost of keeping a cloned copy per worker is negligible and the call volume
+/// is high. Heavy entities such as `Game` or `Cover` should continue to use
+/// `cached_lookup!` so their payloads live in Redis only.
+macro_rules! cached_reference_lookup {
+	($fn_name:ident, $ty:ty, $fetch:ident, $variant:ident, $label:literal) => {
+		pub async fn $fn_name(
+			igdb_client: &IgdbClient,
+			redis_conn: &mut MultiplexedConnection,
+			id: i32,
+		) -> anyhow::Result<Option<$ty>> {
+			static L1: OnceLock<L1Cache<i32, Option<$ty>>> = OnceLock::new();
+			let l1 = L1.get_or_init(|| {
+				L1Cache::builder()
+					.max_capacity(L1_MAX_CAPACITY)
+					.time_to_idle(L1_TIME_TO_IDLE)
+					.build()
+			});
+
+			if let Some(hit) = l1.get(&id).await {
+				debug!("igdb L1 hit for {} with id: {}", $label, id);
+				$crate::metrics::record_cache_hit("igdb-l1", $label);
+				return Ok(hit);
+			}
+
+			let cache_key = IgdbCacheType::$variant.get_cache_key(&id.to_string());
+
+			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+				debug!("igdb L2 hit for {} with id: {}", $label, id);
+				$crate::metrics::record_cache_hit("igdb", $label);
+				if let Err(e) = redis_conn
+					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
+					.await
+				{
+					warn!("cache ttl refresh failed for {}: {e}", cache_key);
+				}
+				let deserialized: Option<$ty> = deserialize_option_redis_value(cached_val)?;
+				l1.insert(id, deserialized.clone()).await;
+				return Ok(deserialized);
+			}
+			debug!("igdb Cache miss for {} with id: {}", $label, id);
+			$crate::metrics::record_cache_miss("igdb", $label);
+
+			let value = igdb_client.$fetch(id).await?;
+
+			l1.insert(id, value.clone()).await;
+			let payload = serialize_option_redis_value(value.clone())?;
+			$crate::providers::igdb::cache::spawn_cache_write(
+				redis_conn.clone(),
+				cache_key,
+				payload,
+			);
+
+			Ok(value)
+		}
+	};
 }
 
 macro_rules! cached_lookup {
@@ -160,7 +224,7 @@ cached_lookup!(
 	GetAgeRatingById,
 	"Age Rating"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_age_rating_category_by_id_cached,
 	AgeRatingCategory,
 	get_age_rating_category_by_id,
@@ -230,7 +294,7 @@ cached_lookup!(
 	GetCompanySizeById,
 	"Company Size"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_company_status_by_id_cached,
 	CompanyStatus,
 	get_company_status_by_id,
@@ -258,7 +322,7 @@ cached_lookup!(
 	GetCoverById,
 	"Cover"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_date_format_by_id_cached,
 	DateFormat,
 	get_date_format_by_id,
@@ -321,7 +385,7 @@ cached_lookup!(
 	GetGameReleaseFormatById,
 	"Game Release Format"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_game_status_by_id_cached,
 	GameStatus,
 	get_game_status_by_id,
@@ -335,21 +399,21 @@ cached_lookup!(
 	GetGameTimeToBeatById,
 	"Game Time To Beat"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_game_type_by_id_cached,
 	GameType,
 	get_game_type_by_id,
 	GetGameTypeById,
 	"Game Type"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_genre_by_id_cached,
 	Genre,
 	get_genre_by_id,
 	GetGenreById,
 	"Genre"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_platform_type_by_id_cached,
 	PlatformType,
 	get_platform_type_by_id,
@@ -503,7 +567,7 @@ cached_lookup!(
 	GetGameLocalizationById,
 	"Game Localization"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_game_mode_by_id_cached,
 	GameMode,
 	get_game_mode_by_id,
@@ -552,7 +616,7 @@ cached_lookup!(
 	GetKeywordById,
 	"Keyword"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_language_by_id_cached,
 	Language,
 	get_language_by_id,
@@ -580,7 +644,7 @@ cached_lookup!(
 	GetMultiplayerModeById,
 	"Multiplayer Mode"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_network_type_by_id_cached,
 	NetworkType,
 	get_network_type_by_id,
@@ -636,7 +700,7 @@ cached_lookup!(
 	GetPlatformWebsiteById,
 	"Platform Website"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_player_perspective_by_id_cached,
 	PlayerPerspective,
 	get_player_perspective_by_id,
@@ -650,14 +714,14 @@ cached_lookup!(
 	GetPopularityPrimitiveById,
 	"Popularity Primitive"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_popularity_type_by_id_cached,
 	PopularityType,
 	get_popularity_type_by_id,
 	GetPopularityTypeById,
 	"Popularity Type"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_region_by_id_cached,
 	Region,
 	get_region_by_id,
@@ -685,7 +749,7 @@ cached_lookup!(
 	GetScreenshotById,
 	"Screenshot"
 );
-cached_lookup!(
+cached_reference_lookup!(
 	get_theme_by_id_cached,
 	Theme,
 	get_theme_by_id,
