@@ -3,11 +3,16 @@ use sea_orm::prelude::Uuid;
 use sea_orm::{ActiveModelTrait, ColumnTrait, IntoActiveModel, Set, TryIntoModel};
 use sea_orm::{DatabaseConnection, QueryFilter};
 use sea_orm::{DbConn, DbErr, EntityTrait};
+use sha2::{Digest, Sha256};
 
-/// Look up a user by their API key.
+fn hash_api_key(token: &str) -> String {
+	hex::encode(Sha256::digest(token.as_bytes()))
+}
+
 pub async fn get_user_by_api_key(token: String, db_conn: &DbConn) -> Result<Option<Model>, DbErr> {
+	let token_hash = hash_api_key(&token);
 	let user = entity::user::Entity::find()
-		.filter(entity::user::Column::ApiKey.eq(token))
+		.filter(entity::user::Column::ApiKeyHash.eq(token_hash))
 		.one(db_conn)
 		.await?;
 

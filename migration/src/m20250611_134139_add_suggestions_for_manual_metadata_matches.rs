@@ -347,7 +347,6 @@ impl MigrationTrait for Migration {
 			discord_id: Set(Some(184632227894657025)),
 			username: Set("DevYukine".to_string()),
 			permissions: Set(entity::sea_orm_active_enums::UserPermissionsEnum::Admin),
-			api_key: Set(None),
 			..Default::default()
 		};
 
@@ -356,7 +355,6 @@ impl MigrationTrait for Migration {
 			discord_id: Set(Some(1281668958935584779)),
 			username: Set("RetroBot".to_string()),
 			permissions: Set(entity::sea_orm_active_enums::UserPermissionsEnum::Automation),
-			api_key: Set(None),
 			..Default::default()
 		};
 
