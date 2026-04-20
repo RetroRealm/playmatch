@@ -1,6 +1,7 @@
 use crate::error::ServiceResult;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use sha2::{Digest, Sha256};
 
 pub const CACHE_PREFIX: &str = "playmatch";
 
@@ -31,4 +32,50 @@ pub(crate) fn serialize_option_redis_value<T: Serialize>(
 	value: Option<T>,
 ) -> ServiceResult<String> {
 	Ok(serde_json::to_string(&value)?)
+}
+
+/// Normalise free-text input before using it as a cache key suffix. Lowercase,
+/// trim, and collapse internal whitespace so `"Pokemon"`, `" pokemon "`, and
+/// `"POKEMON"` all hit the same entry. The return value is a sha256 hex digest
+/// of the normalised form, keeping the key short and free of `:` separators
+/// that could collide with the namespace layout.
+pub fn normalised_key_hash(input: &str) -> String {
+	let mut normalised = String::with_capacity(input.len());
+	let mut previous_was_space = true;
+	for ch in input.trim().chars().flat_map(char::to_lowercase) {
+		if ch.is_whitespace() {
+			if !previous_was_space {
+				normalised.push(' ');
+				previous_was_space = true;
+			}
+		} else {
+			normalised.push(ch);
+			previous_was_space = false;
+		}
+	}
+	if normalised.ends_with(' ') {
+		normalised.pop();
+	}
+	hex::encode(Sha256::digest(normalised.as_bytes()))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::normalised_key_hash;
+
+	#[test]
+	fn normalisation_collapses_case_and_whitespace() {
+		let a = normalised_key_hash("Pokemon");
+		let b = normalised_key_hash(" pokemon ");
+		let c = normalised_key_hash("POKEMON");
+		let d = normalised_key_hash("pok emon");
+		assert_eq!(a, b);
+		assert_eq!(a, c);
+		assert_ne!(a, d);
+	}
+
+	#[test]
+	fn different_inputs_diverge() {
+		assert_ne!(normalised_key_hash("mario"), normalised_key_hash("luigi"));
+	}
 }

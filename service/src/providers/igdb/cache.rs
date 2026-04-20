@@ -1,5 +1,5 @@
 use crate::cache::{
-	CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey, deserialize_option_redis_value,
+	CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey, deserialize_option_redis_value, normalised_key_hash,
 	serialize_option_redis_value,
 };
 use crate::providers::igdb::IgdbClient;
@@ -74,7 +74,7 @@ macro_rules! cached_lookup_by_slug {
 			redis_conn: &mut MultiplexedConnection,
 			slug: String,
 		) -> anyhow::Result<Option<$ty>> {
-			let cache_key = IgdbCacheType::$variant.get_cache_key(&slug);
+			let cache_key = IgdbCacheType::$variant.get_cache_key(&normalised_key_hash(&slug));
 
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} with slug: {}", $label, slug);
@@ -116,7 +116,7 @@ macro_rules! cached_search {
 			redis_conn: &mut MultiplexedConnection,
 			query: String,
 		) -> anyhow::Result<Vec<$ty>> {
-			let cache_key = IgdbCacheType::$variant.get_cache_key(&query);
+			let cache_key = IgdbCacheType::$variant.get_cache_key(&normalised_key_hash(&query));
 
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} query: {}", $label, query);
