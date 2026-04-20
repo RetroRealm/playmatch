@@ -13,24 +13,60 @@ use crate::routes::igdb::{
 	get_igdb_age_rating_organizations_by_ids, get_igdb_age_ratings_by_ids,
 	get_igdb_alternative_name_by_id, get_igdb_alternative_names_by_ids, get_igdb_artwork_by_id,
 	get_igdb_artwork_type_by_id, get_igdb_artwork_types_by_ids, get_igdb_artworks_by_ids,
+	get_igdb_character_by_id, get_igdb_character_gender_by_id, get_igdb_character_genders_by_ids,
 	get_igdb_character_mug_shot_by_id, get_igdb_character_mug_shots_by_ids,
-	get_igdb_collection_by_id, get_igdb_collections_by_ids, get_igdb_company_size_by_id,
-	get_igdb_company_sizes_by_ids, get_igdb_company_status_by_id, get_igdb_company_statuses_by_ids,
-	get_igdb_company_type_by_id, get_igdb_company_type_histories_by_ids,
-	get_igdb_company_type_history_by_id, get_igdb_company_types_by_ids, get_igdb_cover_by_id,
-	get_igdb_covers_by_ids, get_igdb_date_format_by_id, get_igdb_date_formats_by_ids,
-	get_igdb_entity_type_by_id, get_igdb_entity_types_by_ids, get_igdb_external_game_by_id,
-	get_igdb_external_game_source_by_id, get_igdb_external_game_sources_by_ids,
-	get_igdb_external_games_by_ids, get_igdb_franchise_by_id, get_igdb_franchises_by_ids,
-	get_igdb_game_by_id, get_igdb_game_release_format_by_id, get_igdb_game_release_formats_by_ids,
+	get_igdb_character_species_by_id, get_igdb_character_species_by_ids,
+	get_igdb_characters_by_ids, get_igdb_collection_by_id, get_igdb_collection_membership_by_id,
+	get_igdb_collection_membership_type_by_id, get_igdb_collection_membership_types_by_ids,
+	get_igdb_collection_memberships_by_ids, get_igdb_collection_relation_by_id,
+	get_igdb_collection_relation_type_by_id, get_igdb_collection_relation_types_by_ids,
+	get_igdb_collection_relations_by_ids, get_igdb_collection_type_by_id,
+	get_igdb_collection_types_by_ids, get_igdb_collections_by_ids, get_igdb_companies_by_ids,
+	get_igdb_company_by_id, get_igdb_company_logo_by_id, get_igdb_company_logos_by_ids,
+	get_igdb_company_size_by_id, get_igdb_company_sizes_by_ids, get_igdb_company_status_by_id,
+	get_igdb_company_statuses_by_ids, get_igdb_company_type_by_id,
+	get_igdb_company_type_histories_by_ids, get_igdb_company_type_history_by_id,
+	get_igdb_company_types_by_ids, get_igdb_company_website_by_id,
+	get_igdb_company_websites_by_ids, get_igdb_cover_by_id, get_igdb_covers_by_ids,
+	get_igdb_date_format_by_id, get_igdb_date_formats_by_ids, get_igdb_entity_type_by_id,
+	get_igdb_entity_types_by_ids, get_igdb_event_by_id, get_igdb_event_logo_by_id,
+	get_igdb_event_logos_by_ids, get_igdb_event_network_by_id, get_igdb_event_networks_by_ids,
+	get_igdb_events_by_ids, get_igdb_external_game_by_id, get_igdb_external_game_source_by_id,
+	get_igdb_external_game_sources_by_ids, get_igdb_external_games_by_ids,
+	get_igdb_franchise_by_id, get_igdb_franchises_by_ids, get_igdb_game_by_id,
+	get_igdb_game_engine_by_id, get_igdb_game_engine_logo_by_id, get_igdb_game_engine_logos_by_ids,
+	get_igdb_game_engines_by_ids, get_igdb_game_localization_by_id,
+	get_igdb_game_localizations_by_ids, get_igdb_game_mode_by_id, get_igdb_game_modes_by_ids,
+	get_igdb_game_release_format_by_id, get_igdb_game_release_formats_by_ids,
 	get_igdb_game_status_by_id, get_igdb_game_statuses_by_ids, get_igdb_game_time_to_beat_by_id,
 	get_igdb_game_time_to_beats_by_ids, get_igdb_game_type_by_id, get_igdb_game_types_by_ids,
-	get_igdb_games_by_ids, get_igdb_genre_by_id, get_igdb_genres_by_ids,
-	get_igdb_platform_type_by_id, get_igdb_platform_types_by_ids,
-	get_igdb_release_date_region_by_id, get_igdb_release_date_regions_by_ids,
-	get_igdb_report_by_id, get_igdb_report_type_by_id, get_igdb_report_types_by_ids,
-	get_igdb_reports_by_ids, get_igdb_website_type_by_id, get_igdb_website_types_by_ids,
-	search_igdb_game_by_name,
+	get_igdb_game_version_by_id, get_igdb_game_version_feature_by_id,
+	get_igdb_game_version_feature_value_by_id, get_igdb_game_version_feature_values_by_ids,
+	get_igdb_game_version_features_by_ids, get_igdb_game_versions_by_ids,
+	get_igdb_game_video_by_id, get_igdb_game_videos_by_ids, get_igdb_games_by_ids,
+	get_igdb_genre_by_id, get_igdb_genres_by_ids, get_igdb_involved_companies_by_ids,
+	get_igdb_involved_company_by_id, get_igdb_keyword_by_id, get_igdb_keywords_by_ids,
+	get_igdb_language_by_id, get_igdb_language_support_by_id, get_igdb_language_support_type_by_id,
+	get_igdb_language_support_types_by_ids, get_igdb_language_supports_by_ids,
+	get_igdb_languages_by_ids, get_igdb_multiplayer_mode_by_id, get_igdb_multiplayer_modes_by_ids,
+	get_igdb_network_type_by_id, get_igdb_network_types_by_ids, get_igdb_platform_by_id,
+	get_igdb_platform_families_by_ids, get_igdb_platform_family_by_id,
+	get_igdb_platform_logo_by_id, get_igdb_platform_logos_by_ids, get_igdb_platform_type_by_id,
+	get_igdb_platform_types_by_ids, get_igdb_platform_version_by_id,
+	get_igdb_platform_version_companies_by_ids, get_igdb_platform_version_company_by_id,
+	get_igdb_platform_version_release_date_by_id, get_igdb_platform_version_release_dates_by_ids,
+	get_igdb_platform_versions_by_ids, get_igdb_platform_website_by_id,
+	get_igdb_platform_websites_by_ids, get_igdb_platforms_by_ids,
+	get_igdb_player_perspective_by_id, get_igdb_player_perspectives_by_ids,
+	get_igdb_popularity_primitive_by_id, get_igdb_popularity_primitives_by_ids,
+	get_igdb_popularity_type_by_id, get_igdb_popularity_types_by_ids, get_igdb_region_by_id,
+	get_igdb_regions_by_ids, get_igdb_release_date_by_id, get_igdb_release_date_region_by_id,
+	get_igdb_release_date_regions_by_ids, get_igdb_release_date_status_by_id,
+	get_igdb_release_date_statuses_by_ids, get_igdb_release_dates_by_ids, get_igdb_report_by_id,
+	get_igdb_report_type_by_id, get_igdb_report_types_by_ids, get_igdb_reports_by_ids,
+	get_igdb_screenshot_by_id, get_igdb_screenshots_by_ids, get_igdb_theme_by_id,
+	get_igdb_themes_by_ids, get_igdb_website_by_id, get_igdb_website_type_by_id,
+	get_igdb_website_types_by_ids, get_igdb_websites_by_ids, search_igdb_game_by_name,
 };
 use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
@@ -344,7 +380,97 @@ fn configure_public_api_routes(cfg: &mut ServiceConfig) {
 		.service(get_igdb_report_by_id)
 		.service(get_igdb_reports_by_ids)
 		.service(get_igdb_report_type_by_id)
-		.service(get_igdb_report_types_by_ids);
+		.service(get_igdb_report_types_by_ids)
+		.service(get_igdb_character_by_id)
+		.service(get_igdb_characters_by_ids)
+		.service(get_igdb_character_gender_by_id)
+		.service(get_igdb_character_genders_by_ids)
+		.service(get_igdb_character_species_by_id)
+		.service(get_igdb_character_species_by_ids)
+		.service(get_igdb_collection_membership_by_id)
+		.service(get_igdb_collection_memberships_by_ids)
+		.service(get_igdb_collection_membership_type_by_id)
+		.service(get_igdb_collection_membership_types_by_ids)
+		.service(get_igdb_collection_relation_by_id)
+		.service(get_igdb_collection_relations_by_ids)
+		.service(get_igdb_collection_relation_type_by_id)
+		.service(get_igdb_collection_relation_types_by_ids)
+		.service(get_igdb_collection_type_by_id)
+		.service(get_igdb_collection_types_by_ids)
+		.service(get_igdb_company_by_id)
+		.service(get_igdb_companies_by_ids)
+		.service(get_igdb_company_logo_by_id)
+		.service(get_igdb_company_logos_by_ids)
+		.service(get_igdb_company_website_by_id)
+		.service(get_igdb_company_websites_by_ids)
+		.service(get_igdb_event_by_id)
+		.service(get_igdb_events_by_ids)
+		.service(get_igdb_event_logo_by_id)
+		.service(get_igdb_event_logos_by_ids)
+		.service(get_igdb_event_network_by_id)
+		.service(get_igdb_event_networks_by_ids)
+		.service(get_igdb_game_engine_by_id)
+		.service(get_igdb_game_engines_by_ids)
+		.service(get_igdb_game_engine_logo_by_id)
+		.service(get_igdb_game_engine_logos_by_ids)
+		.service(get_igdb_game_localization_by_id)
+		.service(get_igdb_game_localizations_by_ids)
+		.service(get_igdb_game_mode_by_id)
+		.service(get_igdb_game_modes_by_ids)
+		.service(get_igdb_game_version_by_id)
+		.service(get_igdb_game_versions_by_ids)
+		.service(get_igdb_game_version_feature_by_id)
+		.service(get_igdb_game_version_features_by_ids)
+		.service(get_igdb_game_version_feature_value_by_id)
+		.service(get_igdb_game_version_feature_values_by_ids)
+		.service(get_igdb_game_video_by_id)
+		.service(get_igdb_game_videos_by_ids)
+		.service(get_igdb_involved_company_by_id)
+		.service(get_igdb_involved_companies_by_ids)
+		.service(get_igdb_keyword_by_id)
+		.service(get_igdb_keywords_by_ids)
+		.service(get_igdb_language_by_id)
+		.service(get_igdb_languages_by_ids)
+		.service(get_igdb_language_support_by_id)
+		.service(get_igdb_language_supports_by_ids)
+		.service(get_igdb_language_support_type_by_id)
+		.service(get_igdb_language_support_types_by_ids)
+		.service(get_igdb_multiplayer_mode_by_id)
+		.service(get_igdb_multiplayer_modes_by_ids)
+		.service(get_igdb_network_type_by_id)
+		.service(get_igdb_network_types_by_ids)
+		.service(get_igdb_platform_by_id)
+		.service(get_igdb_platforms_by_ids)
+		.service(get_igdb_platform_family_by_id)
+		.service(get_igdb_platform_families_by_ids)
+		.service(get_igdb_platform_logo_by_id)
+		.service(get_igdb_platform_logos_by_ids)
+		.service(get_igdb_platform_version_by_id)
+		.service(get_igdb_platform_versions_by_ids)
+		.service(get_igdb_platform_version_company_by_id)
+		.service(get_igdb_platform_version_companies_by_ids)
+		.service(get_igdb_platform_version_release_date_by_id)
+		.service(get_igdb_platform_version_release_dates_by_ids)
+		.service(get_igdb_platform_website_by_id)
+		.service(get_igdb_platform_websites_by_ids)
+		.service(get_igdb_player_perspective_by_id)
+		.service(get_igdb_player_perspectives_by_ids)
+		.service(get_igdb_popularity_primitive_by_id)
+		.service(get_igdb_popularity_primitives_by_ids)
+		.service(get_igdb_popularity_type_by_id)
+		.service(get_igdb_popularity_types_by_ids)
+		.service(get_igdb_region_by_id)
+		.service(get_igdb_regions_by_ids)
+		.service(get_igdb_release_date_by_id)
+		.service(get_igdb_release_dates_by_ids)
+		.service(get_igdb_release_date_status_by_id)
+		.service(get_igdb_release_date_statuses_by_ids)
+		.service(get_igdb_screenshot_by_id)
+		.service(get_igdb_screenshots_by_ids)
+		.service(get_igdb_theme_by_id)
+		.service(get_igdb_themes_by_ids)
+		.service(get_igdb_website_by_id)
+		.service(get_igdb_websites_by_ids);
 }
 
 fn configure_authenticated_api_routes(cfg: &mut ServiceConfig) {

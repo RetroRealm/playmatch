@@ -5,23 +5,44 @@ use crate::providers::igdb::constants::{
 	IGDB_ROUTE_AGE_RATING_CATEGORIES, IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTION_TYPES,
 	IGDB_ROUTE_AGE_RATING_CONTENT_DESCRIPTIONS_V2, IGDB_ROUTE_AGE_RATING_ORGANIZATIONS,
 	IGDB_ROUTE_AGE_RATINGS, IGDB_ROUTE_ALTERNATIVE_NAMES, IGDB_ROUTE_ARTWORK_TYPES,
-	IGDB_ROUTE_ARTWORKS, IGDB_ROUTE_CHARACTER_MUG_SHOTS, IGDB_ROUTE_COLLECTIONS,
-	IGDB_ROUTE_COMPANIES, IGDB_ROUTE_COMPANY_SIZES, IGDB_ROUTE_COMPANY_STATUSES,
-	IGDB_ROUTE_COMPANY_TYPE_HISTORIES, IGDB_ROUTE_COMPANY_TYPES, IGDB_ROUTE_COVERS,
-	IGDB_ROUTE_DATE_FORMATS, IGDB_ROUTE_ENTITY_TYPES, IGDB_ROUTE_EXTERNAL_GAME_SOURCES,
-	IGDB_ROUTE_EXTERNAL_GAMES, IGDB_ROUTE_FRANCHISES, IGDB_ROUTE_GAME_RELEASE_FORMATS,
-	IGDB_ROUTE_GAME_STATUSES, IGDB_ROUTE_GAME_TIME_TO_BEATS, IGDB_ROUTE_GAME_TYPES,
-	IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES, IGDB_ROUTE_PLATFORM_TYPES, IGDB_ROUTE_PLATFORMS,
-	IGDB_ROUTE_RELEASE_DATE_REGIONS, IGDB_ROUTE_REPORT_TYPES, IGDB_ROUTE_REPORTS,
-	IGDB_ROUTE_WEBSITE_TYPES,
+	IGDB_ROUTE_ARTWORKS, IGDB_ROUTE_CHARACTER_GENDERS, IGDB_ROUTE_CHARACTER_MUG_SHOTS,
+	IGDB_ROUTE_CHARACTER_SPECIES, IGDB_ROUTE_CHARACTERS, IGDB_ROUTE_COLLECTION_MEMBERSHIP_TYPES,
+	IGDB_ROUTE_COLLECTION_MEMBERSHIPS, IGDB_ROUTE_COLLECTION_RELATION_TYPES,
+	IGDB_ROUTE_COLLECTION_RELATIONS, IGDB_ROUTE_COLLECTION_TYPES, IGDB_ROUTE_COLLECTIONS,
+	IGDB_ROUTE_COMPANIES, IGDB_ROUTE_COMPANY_LOGOS, IGDB_ROUTE_COMPANY_SIZES,
+	IGDB_ROUTE_COMPANY_STATUSES, IGDB_ROUTE_COMPANY_TYPE_HISTORIES, IGDB_ROUTE_COMPANY_TYPES,
+	IGDB_ROUTE_COMPANY_WEBSITES, IGDB_ROUTE_COVERS, IGDB_ROUTE_DATE_FORMATS,
+	IGDB_ROUTE_ENTITY_TYPES, IGDB_ROUTE_EVENT_LOGOS, IGDB_ROUTE_EVENT_NETWORKS, IGDB_ROUTE_EVENTS,
+	IGDB_ROUTE_EXTERNAL_GAME_SOURCES, IGDB_ROUTE_EXTERNAL_GAMES, IGDB_ROUTE_FRANCHISES,
+	IGDB_ROUTE_GAME_ENGINE_LOGOS, IGDB_ROUTE_GAME_ENGINES, IGDB_ROUTE_GAME_LOCALIZATIONS,
+	IGDB_ROUTE_GAME_MODES, IGDB_ROUTE_GAME_RELEASE_FORMATS, IGDB_ROUTE_GAME_STATUSES,
+	IGDB_ROUTE_GAME_TIME_TO_BEATS, IGDB_ROUTE_GAME_TYPES, IGDB_ROUTE_GAME_VERSION_FEATURE_VALUES,
+	IGDB_ROUTE_GAME_VERSION_FEATURES, IGDB_ROUTE_GAME_VERSIONS, IGDB_ROUTE_GAME_VIDEOS,
+	IGDB_ROUTE_GAMES, IGDB_ROUTE_GENRES, IGDB_ROUTE_INVOLVED_COMPANIES, IGDB_ROUTE_KEYWORDS,
+	IGDB_ROUTE_LANGUAGE_SUPPORT_TYPES, IGDB_ROUTE_LANGUAGE_SUPPORTS, IGDB_ROUTE_LANGUAGES,
+	IGDB_ROUTE_MULTIPLAYER_MODES, IGDB_ROUTE_NETWORK_TYPES, IGDB_ROUTE_PLATFORM_FAMILIES,
+	IGDB_ROUTE_PLATFORM_LOGOS, IGDB_ROUTE_PLATFORM_TYPES, IGDB_ROUTE_PLATFORM_VERSION_COMPANIES,
+	IGDB_ROUTE_PLATFORM_VERSION_RELEASE_DATES, IGDB_ROUTE_PLATFORM_VERSIONS,
+	IGDB_ROUTE_PLATFORM_WEBSITES, IGDB_ROUTE_PLATFORMS, IGDB_ROUTE_PLAYER_PERSPECTIVES,
+	IGDB_ROUTE_POPULARITY_PRIMITIVES, IGDB_ROUTE_POPULARITY_TYPES, IGDB_ROUTE_REGIONS,
+	IGDB_ROUTE_RELEASE_DATE_REGIONS, IGDB_ROUTE_RELEASE_DATE_STATUSES, IGDB_ROUTE_RELEASE_DATES,
+	IGDB_ROUTE_REPORT_TYPES, IGDB_ROUTE_REPORTS, IGDB_ROUTE_SCREENSHOTS, IGDB_ROUTE_THEMES,
+	IGDB_ROUTE_WEBSITE_TYPES, IGDB_ROUTE_WEBSITES,
 };
 use crate::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
-	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, CharacterMugShot, Collection,
-	Company, CompanySize, CompanyStatus, CompanyType, CompanyTypeHistory, Cover, DateFormat,
-	EntityType, ExternalGame, ExternalGameSource, Franchise, Game, GameReleaseFormat, GameStatus,
-	GameTimeToBeat, GameType, Genre, Platform, PlatformType, ReleaseDateRegion, Report, ReportType,
-	WebsiteType,
+	AgeRatingOrganization, AlternativeName, Artwork, ArtworkType, Character, CharacterGender,
+	CharacterMugShot, CharacterSpecies, Collection, CollectionMembership, CollectionMembershipType,
+	CollectionRelation, CollectionRelationType, CollectionType, Company, CompanyLogo, CompanySize,
+	CompanyStatus, CompanyType, CompanyTypeHistory, CompanyWebsite, Cover, DateFormat, EntityType,
+	Event, EventLogo, EventNetwork, ExternalGame, ExternalGameSource, Franchise, Game, GameEngine,
+	GameEngineLogo, GameLocalization, GameMode, GameReleaseFormat, GameStatus, GameTimeToBeat,
+	GameType, GameVersion, GameVersionFeature, GameVersionFeatureValue, GameVideo, Genre,
+	InvolvedCompany, Keyword, Language, LanguageSupport, LanguageSupportType, MultiplayerMode,
+	NetworkType, Platform, PlatformFamily, PlatformLogo, PlatformType, PlatformVersion,
+	PlatformVersionCompany, PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective,
+	PopularityPrimitive, PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus,
+	Report, ReportType, Screenshot, Theme, Website, WebsiteType,
 };
 use chrono::{DateTime, Utc};
 use log::debug;
@@ -521,6 +542,558 @@ impl IgdbClient {
 
 	pub async fn get_report_types_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<ReportType>> {
 		self.get_vec_by_ids(IGDB_ROUTE_REPORT_TYPES, ids).await
+	}
+
+	pub async fn get_character_by_id(&self, id: i32) -> anyhow::Result<Option<Character>> {
+		self.get_single_by_id(IGDB_ROUTE_CHARACTERS, id).await
+	}
+
+	pub async fn get_characters_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Character>> {
+		self.get_vec_by_ids(IGDB_ROUTE_CHARACTERS, ids).await
+	}
+
+	pub async fn get_character_gender_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CharacterGender>> {
+		self.get_single_by_id(IGDB_ROUTE_CHARACTER_GENDERS, id)
+			.await
+	}
+
+	pub async fn get_character_genders_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CharacterGender>> {
+		self.get_vec_by_ids(IGDB_ROUTE_CHARACTER_GENDERS, ids).await
+	}
+
+	pub async fn get_character_species_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CharacterSpecies>> {
+		self.get_single_by_id(IGDB_ROUTE_CHARACTER_SPECIES, id)
+			.await
+	}
+
+	pub async fn get_character_species_by_ids(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CharacterSpecies>> {
+		self.get_vec_by_ids(IGDB_ROUTE_CHARACTER_SPECIES, ids).await
+	}
+
+	pub async fn get_collection_membership_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CollectionMembership>> {
+		self.get_single_by_id(IGDB_ROUTE_COLLECTION_MEMBERSHIPS, id)
+			.await
+	}
+
+	pub async fn get_collection_memberships_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CollectionMembership>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COLLECTION_MEMBERSHIPS, ids)
+			.await
+	}
+
+	pub async fn get_collection_membership_type_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CollectionMembershipType>> {
+		self.get_single_by_id(IGDB_ROUTE_COLLECTION_MEMBERSHIP_TYPES, id)
+			.await
+	}
+
+	pub async fn get_collection_membership_types_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CollectionMembershipType>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COLLECTION_MEMBERSHIP_TYPES, ids)
+			.await
+	}
+
+	pub async fn get_collection_relation_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CollectionRelation>> {
+		self.get_single_by_id(IGDB_ROUTE_COLLECTION_RELATIONS, id)
+			.await
+	}
+
+	pub async fn get_collection_relations_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CollectionRelation>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COLLECTION_RELATIONS, ids)
+			.await
+	}
+
+	pub async fn get_collection_relation_type_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CollectionRelationType>> {
+		self.get_single_by_id(IGDB_ROUTE_COLLECTION_RELATION_TYPES, id)
+			.await
+	}
+
+	pub async fn get_collection_relation_types_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CollectionRelationType>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COLLECTION_RELATION_TYPES, ids)
+			.await
+	}
+
+	pub async fn get_collection_type_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CollectionType>> {
+		self.get_single_by_id(IGDB_ROUTE_COLLECTION_TYPES, id).await
+	}
+
+	pub async fn get_collection_types_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CollectionType>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COLLECTION_TYPES, ids).await
+	}
+
+	pub async fn get_company_by_id(&self, id: i32) -> anyhow::Result<Option<Company>> {
+		self.get_single_by_id(IGDB_ROUTE_COMPANIES, id).await
+	}
+
+	pub async fn get_companies_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Company>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COMPANIES, ids).await
+	}
+
+	pub async fn get_company_logo_by_id(&self, id: i32) -> anyhow::Result<Option<CompanyLogo>> {
+		self.get_single_by_id(IGDB_ROUTE_COMPANY_LOGOS, id).await
+	}
+
+	pub async fn get_company_logos_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<CompanyLogo>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COMPANY_LOGOS, ids).await
+	}
+
+	pub async fn get_company_website_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<CompanyWebsite>> {
+		self.get_single_by_id(IGDB_ROUTE_COMPANY_WEBSITES, id).await
+	}
+
+	pub async fn get_company_websites_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<CompanyWebsite>> {
+		self.get_vec_by_ids(IGDB_ROUTE_COMPANY_WEBSITES, ids).await
+	}
+
+	pub async fn get_event_by_id(&self, id: i32) -> anyhow::Result<Option<Event>> {
+		self.get_single_by_id(IGDB_ROUTE_EVENTS, id).await
+	}
+
+	pub async fn get_events_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Event>> {
+		self.get_vec_by_ids(IGDB_ROUTE_EVENTS, ids).await
+	}
+
+	pub async fn get_event_logo_by_id(&self, id: i32) -> anyhow::Result<Option<EventLogo>> {
+		self.get_single_by_id(IGDB_ROUTE_EVENT_LOGOS, id).await
+	}
+
+	pub async fn get_event_logos_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<EventLogo>> {
+		self.get_vec_by_ids(IGDB_ROUTE_EVENT_LOGOS, ids).await
+	}
+
+	pub async fn get_event_network_by_id(&self, id: i32) -> anyhow::Result<Option<EventNetwork>> {
+		self.get_single_by_id(IGDB_ROUTE_EVENT_NETWORKS, id).await
+	}
+
+	pub async fn get_event_networks_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<EventNetwork>> {
+		self.get_vec_by_ids(IGDB_ROUTE_EVENT_NETWORKS, ids).await
+	}
+
+	pub async fn get_game_engine_by_id(&self, id: i32) -> anyhow::Result<Option<GameEngine>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_ENGINES, id).await
+	}
+
+	pub async fn get_game_engines_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<GameEngine>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_ENGINES, ids).await
+	}
+
+	pub async fn get_game_engine_logo_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<GameEngineLogo>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_ENGINE_LOGOS, id)
+			.await
+	}
+
+	pub async fn get_game_engine_logos_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<GameEngineLogo>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_ENGINE_LOGOS, ids).await
+	}
+
+	pub async fn get_game_localization_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<GameLocalization>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_LOCALIZATIONS, id)
+			.await
+	}
+
+	pub async fn get_game_localizations_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<GameLocalization>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_LOCALIZATIONS, ids)
+			.await
+	}
+
+	pub async fn get_game_mode_by_id(&self, id: i32) -> anyhow::Result<Option<GameMode>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_MODES, id).await
+	}
+
+	pub async fn get_game_modes_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<GameMode>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_MODES, ids).await
+	}
+
+	pub async fn get_game_version_by_id(&self, id: i32) -> anyhow::Result<Option<GameVersion>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_VERSIONS, id).await
+	}
+
+	pub async fn get_game_versions_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<GameVersion>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_VERSIONS, ids).await
+	}
+
+	pub async fn get_game_version_feature_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<GameVersionFeature>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_VERSION_FEATURES, id)
+			.await
+	}
+
+	pub async fn get_game_version_features_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<GameVersionFeature>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_VERSION_FEATURES, ids)
+			.await
+	}
+
+	pub async fn get_game_version_feature_value_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<GameVersionFeatureValue>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_VERSION_FEATURE_VALUES, id)
+			.await
+	}
+
+	pub async fn get_game_version_feature_values_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<GameVersionFeatureValue>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_VERSION_FEATURE_VALUES, ids)
+			.await
+	}
+
+	pub async fn get_game_video_by_id(&self, id: i32) -> anyhow::Result<Option<GameVideo>> {
+		self.get_single_by_id(IGDB_ROUTE_GAME_VIDEOS, id).await
+	}
+
+	pub async fn get_game_videos_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<GameVideo>> {
+		self.get_vec_by_ids(IGDB_ROUTE_GAME_VIDEOS, ids).await
+	}
+
+	pub async fn get_involved_company_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<InvolvedCompany>> {
+		self.get_single_by_id(IGDB_ROUTE_INVOLVED_COMPANIES, id)
+			.await
+	}
+
+	pub async fn get_involved_companies_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<InvolvedCompany>> {
+		self.get_vec_by_ids(IGDB_ROUTE_INVOLVED_COMPANIES, ids)
+			.await
+	}
+
+	pub async fn get_keyword_by_id(&self, id: i32) -> anyhow::Result<Option<Keyword>> {
+		self.get_single_by_id(IGDB_ROUTE_KEYWORDS, id).await
+	}
+
+	pub async fn get_keywords_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Keyword>> {
+		self.get_vec_by_ids(IGDB_ROUTE_KEYWORDS, ids).await
+	}
+
+	pub async fn get_language_by_id(&self, id: i32) -> anyhow::Result<Option<Language>> {
+		self.get_single_by_id(IGDB_ROUTE_LANGUAGES, id).await
+	}
+
+	pub async fn get_languages_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Language>> {
+		self.get_vec_by_ids(IGDB_ROUTE_LANGUAGES, ids).await
+	}
+
+	pub async fn get_language_support_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<LanguageSupport>> {
+		self.get_single_by_id(IGDB_ROUTE_LANGUAGE_SUPPORTS, id)
+			.await
+	}
+
+	pub async fn get_language_supports_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<LanguageSupport>> {
+		self.get_vec_by_ids(IGDB_ROUTE_LANGUAGE_SUPPORTS, ids).await
+	}
+
+	pub async fn get_language_support_type_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<LanguageSupportType>> {
+		self.get_single_by_id(IGDB_ROUTE_LANGUAGE_SUPPORT_TYPES, id)
+			.await
+	}
+
+	pub async fn get_language_support_types_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<LanguageSupportType>> {
+		self.get_vec_by_ids(IGDB_ROUTE_LANGUAGE_SUPPORT_TYPES, ids)
+			.await
+	}
+
+	pub async fn get_multiplayer_mode_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<MultiplayerMode>> {
+		self.get_single_by_id(IGDB_ROUTE_MULTIPLAYER_MODES, id)
+			.await
+	}
+
+	pub async fn get_multiplayer_modes_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<MultiplayerMode>> {
+		self.get_vec_by_ids(IGDB_ROUTE_MULTIPLAYER_MODES, ids).await
+	}
+
+	pub async fn get_network_type_by_id(&self, id: i32) -> anyhow::Result<Option<NetworkType>> {
+		self.get_single_by_id(IGDB_ROUTE_NETWORK_TYPES, id).await
+	}
+
+	pub async fn get_network_types_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<NetworkType>> {
+		self.get_vec_by_ids(IGDB_ROUTE_NETWORK_TYPES, ids).await
+	}
+
+	pub async fn get_platform_by_id(&self, id: i32) -> anyhow::Result<Option<Platform>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORMS, id).await
+	}
+
+	pub async fn get_platforms_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Platform>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORMS, ids).await
+	}
+
+	pub async fn get_platform_family_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PlatformFamily>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORM_FAMILIES, id)
+			.await
+	}
+
+	pub async fn get_platform_families_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlatformFamily>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORM_FAMILIES, ids).await
+	}
+
+	pub async fn get_platform_logo_by_id(&self, id: i32) -> anyhow::Result<Option<PlatformLogo>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORM_LOGOS, id).await
+	}
+
+	pub async fn get_platform_logos_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlatformLogo>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORM_LOGOS, ids).await
+	}
+
+	pub async fn get_platform_version_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PlatformVersion>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORM_VERSIONS, id)
+			.await
+	}
+
+	pub async fn get_platform_versions_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlatformVersion>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORM_VERSIONS, ids).await
+	}
+
+	pub async fn get_platform_version_company_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PlatformVersionCompany>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORM_VERSION_COMPANIES, id)
+			.await
+	}
+
+	pub async fn get_platform_version_companies_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlatformVersionCompany>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORM_VERSION_COMPANIES, ids)
+			.await
+	}
+
+	pub async fn get_platform_version_release_date_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PlatformVersionReleaseDate>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORM_VERSION_RELEASE_DATES, id)
+			.await
+	}
+
+	pub async fn get_platform_version_release_dates_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlatformVersionReleaseDate>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORM_VERSION_RELEASE_DATES, ids)
+			.await
+	}
+
+	pub async fn get_platform_website_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PlatformWebsite>> {
+		self.get_single_by_id(IGDB_ROUTE_PLATFORM_WEBSITES, id)
+			.await
+	}
+
+	pub async fn get_platform_websites_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlatformWebsite>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLATFORM_WEBSITES, ids).await
+	}
+
+	pub async fn get_player_perspective_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PlayerPerspective>> {
+		self.get_single_by_id(IGDB_ROUTE_PLAYER_PERSPECTIVES, id)
+			.await
+	}
+
+	pub async fn get_player_perspectives_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PlayerPerspective>> {
+		self.get_vec_by_ids(IGDB_ROUTE_PLAYER_PERSPECTIVES, ids)
+			.await
+	}
+
+	pub async fn get_popularity_primitive_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PopularityPrimitive>> {
+		self.get_single_by_id(IGDB_ROUTE_POPULARITY_PRIMITIVES, id)
+			.await
+	}
+
+	pub async fn get_popularity_primitives_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PopularityPrimitive>> {
+		self.get_vec_by_ids(IGDB_ROUTE_POPULARITY_PRIMITIVES, ids)
+			.await
+	}
+
+	pub async fn get_popularity_type_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<PopularityType>> {
+		self.get_single_by_id(IGDB_ROUTE_POPULARITY_TYPES, id).await
+	}
+
+	pub async fn get_popularity_types_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<PopularityType>> {
+		self.get_vec_by_ids(IGDB_ROUTE_POPULARITY_TYPES, ids).await
+	}
+
+	pub async fn get_region_by_id(&self, id: i32) -> anyhow::Result<Option<Region>> {
+		self.get_single_by_id(IGDB_ROUTE_REGIONS, id).await
+	}
+
+	pub async fn get_regions_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Region>> {
+		self.get_vec_by_ids(IGDB_ROUTE_REGIONS, ids).await
+	}
+
+	pub async fn get_release_date_by_id(&self, id: i32) -> anyhow::Result<Option<ReleaseDate>> {
+		self.get_single_by_id(IGDB_ROUTE_RELEASE_DATES, id).await
+	}
+
+	pub async fn get_release_dates_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<ReleaseDate>> {
+		self.get_vec_by_ids(IGDB_ROUTE_RELEASE_DATES, ids).await
+	}
+
+	pub async fn get_release_date_status_by_id(
+		&self,
+		id: i32,
+	) -> anyhow::Result<Option<ReleaseDateStatus>> {
+		self.get_single_by_id(IGDB_ROUTE_RELEASE_DATE_STATUSES, id)
+			.await
+	}
+
+	pub async fn get_release_date_statuses_by_id(
+		&self,
+		ids: Vec<i32>,
+	) -> anyhow::Result<Vec<ReleaseDateStatus>> {
+		self.get_vec_by_ids(IGDB_ROUTE_RELEASE_DATE_STATUSES, ids)
+			.await
+	}
+
+	pub async fn get_screenshot_by_id(&self, id: i32) -> anyhow::Result<Option<Screenshot>> {
+		self.get_single_by_id(IGDB_ROUTE_SCREENSHOTS, id).await
+	}
+
+	pub async fn get_screenshots_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Screenshot>> {
+		self.get_vec_by_ids(IGDB_ROUTE_SCREENSHOTS, ids).await
+	}
+
+	pub async fn get_theme_by_id(&self, id: i32) -> anyhow::Result<Option<Theme>> {
+		self.get_single_by_id(IGDB_ROUTE_THEMES, id).await
+	}
+
+	pub async fn get_themes_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Theme>> {
+		self.get_vec_by_ids(IGDB_ROUTE_THEMES, ids).await
+	}
+
+	pub async fn get_website_by_id(&self, id: i32) -> anyhow::Result<Option<Website>> {
+		self.get_single_by_id(IGDB_ROUTE_WEBSITES, id).await
+	}
+
+	pub async fn get_websites_by_id(&self, ids: Vec<i32>) -> anyhow::Result<Vec<Website>> {
+		self.get_vec_by_ids(IGDB_ROUTE_WEBSITES, ids).await
 	}
 
 	async fn get_single_by_id<T: DeserializeOwned>(
