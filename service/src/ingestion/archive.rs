@@ -1,9 +1,15 @@
+use anyhow::bail;
 use log::debug;
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 use tokio::task;
 use zip::ZipArchive;
+
+const MAX_ZIP_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_ZIP_TOTAL_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_ZIP_ENTRIES: usize = 10_000;
 
 pub async fn extract_if_archived(path: &PathBuf) -> anyhow::Result<()> {
 	if let Some(file_extension) = path.extension() {
@@ -33,6 +39,15 @@ fn extract_zip_to_directory(zip_path: &Path, out_dir: &Path) -> anyhow::Result<(
 	let file = File::open(zip_path)?;
 	let mut archive = ZipArchive::new(file)?;
 
+	if archive.len() > MAX_ZIP_ENTRIES {
+		bail!(
+			"zip archive contains {} entries which exceeds the {MAX_ZIP_ENTRIES} limit",
+			archive.len()
+		);
+	}
+
+	let mut total_written: u64 = 0;
+
 	for i in 0..archive.len() {
 		let mut file = archive.by_index(i)?;
 		let outpath = match file.enclosed_name() {
@@ -51,7 +66,17 @@ fn extract_zip_to_directory(zip_path: &Path, out_dir: &Path) -> anyhow::Result<(
 				fs::create_dir_all(p)?;
 			}
 			let mut outfile = File::create(&out_path)?;
-			io::copy(&mut file, &mut outfile)?;
+			// Read one byte past the cap so hitting the cap is detectable after the copy.
+			let limit = MAX_ZIP_ENTRY_BYTES + 1;
+			let mut limited = Read::take(&mut file, limit);
+			let written = io::copy(&mut limited, &mut outfile)?;
+			if written > MAX_ZIP_ENTRY_BYTES {
+				bail!("zip entry exceeds {MAX_ZIP_ENTRY_BYTES} bytes decompressed; aborting");
+			}
+			total_written = total_written.saturating_add(written);
+			if total_written > MAX_ZIP_TOTAL_BYTES {
+				bail!("zip archive exceeds {MAX_ZIP_TOTAL_BYTES} bytes decompressed; aborting");
+			}
 		}
 	}
 
