@@ -9,7 +9,7 @@ use crate::db::game::{
 };
 use crate::error::ServiceResult;
 use entity::{game, signature_metadata_mapping};
-use log::debug;
+use log::{debug, warn};
 use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
@@ -64,7 +64,9 @@ pub async fn delete_identify_cache(
 ) -> ServiceResult<()> {
 	let cache_key = r#type.get_cache_key(hash);
 	debug!("Deleting cache for key: {cache_key}");
-	redis_conn.del(&cache_key).await?;
+	if let Err(e) = redis_conn.del(&cache_key).await {
+		warn!("cache delete failed for {cache_key}: {e}");
+	}
 	Ok(())
 }
 
@@ -111,9 +113,12 @@ async fn find_game_and_metadata_ids_cached(
 	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 		debug!("Cache hit for key: {hash}");
 		crate::metrics::record_cache_hit("identify", r#type.metric_label());
-		redis_conn
+		if let Err(e) = redis_conn
 			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
-			.await?;
+			.await
+		{
+			warn!("cache ttl refresh failed for {cache_key}: {e}");
+		}
 		let deserialized = deserialize_option_redis_value(cached_val)?;
 		return Ok(Cached(deserialized));
 	}
@@ -133,13 +138,16 @@ async fn find_game_and_metadata_ids_cached(
 		metadata_mappings: mappings,
 	});
 
-	redis_conn
+	if let Err(e) = redis_conn
 		.set_ex(
 			&cache_key,
 			serialize_option_redis_value(entry.clone())?,
 			IDENTIFY_CACHE_LIFETIME,
 		)
-		.await?;
+		.await
+	{
+		warn!("cache write failed for {cache_key}: {e}");
+	}
 
 	Ok(NonCached(entry))
 }

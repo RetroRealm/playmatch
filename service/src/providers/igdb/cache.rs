@@ -17,7 +17,7 @@ use crate::providers::igdb::model::{
 	PopularityPrimitive, PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus,
 	Report, ReportType, Screenshot, Theme, Website, WebsiteType,
 };
-use log::debug;
+use log::{debug, warn};
 use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
 use std::time::Duration;
@@ -36,9 +36,12 @@ macro_rules! cached_lookup {
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} with id: {}", $label, id);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				redis_conn
+				if let Err(e) = redis_conn
 					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await?;
+					.await
+				{
+					warn!("cache ttl refresh failed for {}: {e}", cache_key);
+				}
 				let deserialized = deserialize_option_redis_value(cached_val)?;
 				return Ok(deserialized);
 			}
@@ -47,13 +50,16 @@ macro_rules! cached_lookup {
 
 			let value = igdb_client.$fetch(id).await?;
 
-			redis_conn
+			if let Err(e) = redis_conn
 				.set_ex(
 					&cache_key,
 					serialize_option_redis_value(value.clone())?,
 					IGDB_CACHE_LIFETIME,
 				)
-				.await?;
+				.await
+			{
+				warn!("cache write failed for {}: {e}", cache_key);
+			}
 
 			Ok(value)
 		}
@@ -72,9 +78,12 @@ macro_rules! cached_lookup_by_slug {
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} with slug: {}", $label, slug);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				redis_conn
+				if let Err(e) = redis_conn
 					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await?;
+					.await
+				{
+					warn!("cache ttl refresh failed for {}: {e}", cache_key);
+				}
 				let deserialized = deserialize_option_redis_value(cached_val)?;
 				return Ok(deserialized);
 			}
@@ -83,13 +92,16 @@ macro_rules! cached_lookup_by_slug {
 
 			let value = igdb_client.$fetch(&slug).await?;
 
-			redis_conn
+			if let Err(e) = redis_conn
 				.set_ex(
 					&cache_key,
 					serialize_option_redis_value(value.clone())?,
 					IGDB_CACHE_LIFETIME,
 				)
-				.await?;
+				.await
+			{
+				warn!("cache write failed for {}: {e}", cache_key);
+			}
 
 			Ok(value)
 		}
@@ -108,9 +120,12 @@ macro_rules! cached_search {
 			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
 				debug!("igdb Cache hit for {} query: {}", $label, query);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				redis_conn
+				if let Err(e) = redis_conn
 					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await?;
+					.await
+				{
+					warn!("cache ttl refresh failed for {}: {e}", cache_key);
+				}
 				let deserialized: Vec<$ty> = serde_json::from_str(&cached_val)?;
 				return Ok(deserialized);
 			}
@@ -119,13 +134,16 @@ macro_rules! cached_search {
 
 			let values = igdb_client.$fetch(&query).await?;
 
-			redis_conn
+			if let Err(e) = redis_conn
 				.set_ex(
 					&cache_key,
 					serde_json::to_string(&values)?,
 					IGDB_CACHE_LIFETIME,
 				)
-				.await?;
+				.await
+			{
+				warn!("cache write failed for {}: {e}", cache_key);
+			}
 
 			Ok(values)
 		}
