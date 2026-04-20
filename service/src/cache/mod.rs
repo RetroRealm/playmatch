@@ -4,6 +4,12 @@ use serde::de::DeserializeOwned;
 
 pub const CACHE_PREFIX: &str = "playmatch";
 
+/// Bump on any backwards-incompatible change to cached payload shapes. All
+/// cache keys carry this segment so a version change naturally invalidates
+/// legacy entries as they age out via TTL; the new code reads and writes the
+/// bumped namespace immediately.
+pub const CACHE_KEY_VERSION: &str = "v1";
+
 #[derive(Debug, Clone)]
 pub enum CacheStatus<T> {
 	Cached(T),

@@ -1,6 +1,6 @@
 use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::cache::{
-	CACHE_PREFIX, CacheKey, CacheStatus, deserialize_option_redis_value,
+	CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey, CacheStatus, deserialize_option_redis_value,
 	serialize_option_redis_value,
 };
 use crate::db::game::{
@@ -35,13 +35,13 @@ impl CacheKey for IdentifyCacheType {
 	fn get_cache_key(&self, identifier: &str) -> String {
 		match &self {
 			IdentifyCacheType::IdentifySha256 => {
-				format!("{CACHE_PREFIX}:cache:identify:sha256:{identifier}")
+				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:sha256:{identifier}")
 			}
 			IdentifyCacheType::IdentifySha1 => {
-				format!("{CACHE_PREFIX}:cache:identify:sha1:{identifier}")
+				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:sha1:{identifier}")
 			}
 			IdentifyCacheType::IdentifyMd5 => {
-				format!("{CACHE_PREFIX}:cache:identify:md5:{identifier}")
+				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:md5:{identifier}")
 			}
 		}
 	}
