@@ -1,7 +1,8 @@
-use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, Opts, Registry};
+use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry};
 use std::sync::OnceLock;
 
 static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
+static CACHE_L1_SIZE: OnceLock<IntGaugeVec> = OnceLock::new();
 static IDENTIFY_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static SERVICE_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
 static IGDB_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
@@ -27,6 +28,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	CACHE_EVENTS
 		.set(cache_events)
 		.map_err(|_| anyhow::anyhow!("cache metrics already initialised"))?;
+
+	let cache_l1_size = IntGaugeVec::new(
+		Opts::new(
+			"api_cache_l1_entries",
+			"Current entry count of each in-process L1 (moka) cache, per lookup kind",
+		),
+		&["lookup"],
+	)?;
+	registry.register(Box::new(cache_l1_size.clone()))?;
+	CACHE_L1_SIZE
+		.set(cache_l1_size)
+		.map_err(|_| anyhow::anyhow!("cache l1 size metrics already initialised"))?;
 
 	let identify_attempts = IntCounterVec::new(
 		Opts::new(
@@ -184,6 +197,14 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 pub fn record_cache_hit(cache: &str, lookup: &str) {
 	if let Some(counter) = CACHE_EVENTS.get() {
 		counter.with_label_values(&[cache, lookup, "hit"]).inc();
+	}
+}
+
+pub fn set_cache_l1_entries(lookup: &str, entries: u64) {
+	if let Some(gauge) = CACHE_L1_SIZE.get() {
+		gauge
+			.with_label_values(&[lookup])
+			.set(entries.min(i64::MAX as u64) as i64);
 	}
 }
 

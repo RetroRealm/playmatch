@@ -55,6 +55,8 @@ macro_rules! cached_reference_lookup {
 				$crate::metrics::record_cache_hit("igdb-l1", $label);
 				return Ok(hit);
 			}
+			debug!("igdb L1 miss for {} with id: {}", $label, id);
+			$crate::metrics::record_cache_miss("igdb-l1", $label);
 
 			let cache_key = IgdbCacheType::$variant.get_cache_key(&id.to_string());
 
@@ -69,6 +71,7 @@ macro_rules! cached_reference_lookup {
 				}
 				let deserialized: Option<$ty> = deserialize_option_redis_value(cached_val)?;
 				l1.insert(id, deserialized.clone()).await;
+				$crate::metrics::set_cache_l1_entries($label, l1.entry_count());
 				return Ok(deserialized);
 			}
 			debug!("igdb Cache miss for {} with id: {}", $label, id);
@@ -77,6 +80,7 @@ macro_rules! cached_reference_lookup {
 			let value = igdb_client.$fetch(id).await?;
 
 			l1.insert(id, value.clone()).await;
+			$crate::metrics::set_cache_l1_entries($label, l1.entry_count());
 			let payload = serialize_option_redis_value(value.clone())?;
 			$crate::cache::spawn_cache_write(
 				redis_conn.clone(),
