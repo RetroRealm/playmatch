@@ -96,11 +96,14 @@ use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_i
 use crate::routes::suggestion::{
 	__path_approve_suggestion, __path_create_company_suggestion, __path_create_game_suggestion,
 	__path_create_platform_suggestion, __path_delete_suggestion, __path_get_all_suggestions,
-	__path_get_suggestion_by_id,
+	__path_get_suggestion_by_id, __path_submit_external_game_suggestion,
 };
 use crate::routes::user::{
 	__path_create_or_get_by_discord_id, __path_get_user, __path_get_user_by_discord_id,
 	__path_update_user_permission_level,
+};
+use service::model::external_suggestion::{
+	ExternalGameMatchSuggestionPayload, ExternalProviderMapping,
 };
 use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest};
 use service::model::suggestion::{
@@ -169,6 +172,7 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		create_platform_suggestion,
 		approve_suggestion,
 		delete_suggestion,
+		submit_external_game_suggestion,
 		create_or_get_by_discord_id,
 		get_user_by_discord_id,
 		get_user,
@@ -411,6 +415,8 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		PlaymatchSignatureGroup,
 		GameSuggestionRequest,
 		CompanyOrPlatformSuggestionRequest,
+		ExternalGameMatchSuggestionPayload,
+		ExternalProviderMapping,
 		UpdatedMetadataMatchesFromSuggestionResponse,
 		Suggestion,
 		User,
