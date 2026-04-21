@@ -262,7 +262,7 @@ async fn start() -> anyhow::Result<()> {
 				{
 					Ok(stats) if stats.processed_envelopes > 0 => {
 						debug!(
-							"external suggestion drain: processed {} envelopes (created: {}, already_matched: {}, duplicates: {}, unknown_roms: {}, invalid: {}, invalid_mappings: {})",
+							"external suggestion drain: processed {} envelopes (created: {}, already_matched: {}, duplicates: {}, unknown_roms: {}, invalid: {}, invalid_mappings: {}, unsupported_providers: {})",
 							stats.processed_envelopes,
 							stats.created,
 							stats.already_matched,
@@ -270,6 +270,7 @@ async fn start() -> anyhow::Result<()> {
 							stats.unknown_roms,
 							stats.invalid_payloads,
 							stats.invalid_mappings,
+							stats.unsupported_providers,
 						);
 					}
 					Ok(_) => {}

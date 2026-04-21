@@ -1,4 +1,3 @@
-use crate::model::MetadataProvider;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -31,8 +30,9 @@ pub struct ExternalGameMatchSuggestionPayload {
 #[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalProviderMapping {
-	/// Metadata provider the external id belongs to.
-	pub provider: MetadataProvider,
+	/// Metadata provider tag. Unknown values are accepted and dropped by the
+	/// drain worker; only `IGDB` is recognised at the moment.
+	pub provider: String,
 
 	/// Provider-side id the client matched the ROM to.
 	pub provider_id: String,

@@ -39,6 +39,7 @@ pub enum ProcessOutcome {
 	InvalidPayload,
 	UnknownRom,
 	InvalidMapping,
+	UnsupportedProvider,
 	AlreadyMatched,
 	DuplicateSuggestion,
 	Created,
@@ -50,6 +51,7 @@ impl ProcessOutcome {
 			Self::InvalidPayload => "invalid_payload",
 			Self::UnknownRom => "unknown_rom",
 			Self::InvalidMapping => "invalid_mapping",
+			Self::UnsupportedProvider => "unsupported_provider",
 			Self::AlreadyMatched => "already_matched",
 			Self::DuplicateSuggestion => "duplicate_suggestion",
 			Self::Created => "created",
@@ -119,6 +121,7 @@ pub struct DrainStats {
 	pub invalid_payloads: u32,
 	pub unknown_roms: u32,
 	pub invalid_mappings: u32,
+	pub unsupported_providers: u32,
 	pub already_matched: u32,
 	pub duplicate_suggestions: u32,
 	pub created: u32,
@@ -130,6 +133,7 @@ impl DrainStats {
 			ProcessOutcome::InvalidPayload => self.invalid_payloads += 1,
 			ProcessOutcome::UnknownRom => self.unknown_roms += 1,
 			ProcessOutcome::InvalidMapping => self.invalid_mappings += 1,
+			ProcessOutcome::UnsupportedProvider => self.unsupported_providers += 1,
 			ProcessOutcome::AlreadyMatched => self.already_matched += 1,
 			ProcessOutcome::DuplicateSuggestion => self.duplicate_suggestions += 1,
 			ProcessOutcome::Created => self.created += 1,
@@ -258,6 +262,13 @@ async fn resolve_game(
 	Ok(None)
 }
 
+fn parse_provider(raw: &str) -> Option<MetadataProviderEnum> {
+	match raw.trim().to_ascii_uppercase().as_str() {
+		"IGDB" => Some(MetadataProviderEnum::Igdb),
+		_ => None,
+	}
+}
+
 async fn process_mapping(
 	game_id: sea_orm::prelude::Uuid,
 	mapping: ExternalProviderMapping,
@@ -265,7 +276,14 @@ async fn process_mapping(
 	db_conn: &DbConn,
 	stats: &mut DrainStats,
 ) {
-	let provider: MetadataProviderEnum = mapping.provider.into();
+	let Some(provider) = parse_provider(&mapping.provider) else {
+		debug!(
+			"external suggestion: dropping mapping with unsupported provider '{}'",
+			mapping.provider
+		);
+		stats.record(ProcessOutcome::UnsupportedProvider);
+		return;
+	};
 	let provider_id = mapping.provider_id.trim().to_string();
 	if provider_id.is_empty() || provider_id.len() > PROVIDER_ID_MAX_LEN {
 		stats.record(ProcessOutcome::InvalidMapping);
