@@ -3,6 +3,7 @@ pub mod config;
 pub mod db;
 pub mod entities;
 pub mod error;
+pub mod external_suggestion;
 mod fs;
 pub mod http;
 pub mod identification;

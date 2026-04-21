@@ -1,4 +1,5 @@
 use actix_governor::{KeyExtractor, SimpleKeyExtractionError};
+use actix_web::HttpRequest;
 use actix_web::dev::ServiceRequest;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -48,6 +49,20 @@ fn extract_client_ip(
 	req.peer_addr().map(|addr| addr.ip()).ok_or_else(|| {
 		SimpleKeyExtractionError::new("Could not extract peer IP address from request")
 	})
+}
+
+/// Mirrors [`ReverProxyExtractor`] for handlers that only have an [`HttpRequest`].
+/// Keep in sync with [`extract_client_ip`] above.
+pub fn client_ip_from_http_request(req: &HttpRequest) -> Option<IpAddr> {
+	if trust_cf_connecting_ip()
+		&& let Some(header) = req.headers().get("CF-Connecting-IP")
+		&& let Ok(value) = header.to_str()
+		&& let Ok(ip) = IpAddr::from_str(value.trim())
+	{
+		return Some(ip);
+	}
+
+	req.peer_addr().map(|addr| addr.ip())
 }
 
 #[cfg(test)]

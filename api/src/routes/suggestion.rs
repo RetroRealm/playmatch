@@ -1,14 +1,19 @@
 use crate::error;
 use crate::routes::handle_auth_and_permissions;
+use crate::util::http::client_ip_from_http_request;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post};
 use entity::sea_orm_active_enums::UserPermissionsEnum;
 use redis::aio::MultiplexedConnection;
 use sea_orm::DatabaseConnection;
+use service::external_suggestion::{
+	EnqueueOutcome, check_rate_limit, enqueue_external_suggestion, truncate_user_agent,
+};
 use service::matching::suggestions::{
 	accept_suggestion, add_company_suggestion, add_game_suggestion, add_platform_suggestion,
 	decline_suggestion, get_suggestion, get_suggestions,
 };
+use service::model::external_suggestion::ExternalGameMatchSuggestionPayload;
 use service::model::suggestion::{
 	CompanyOrPlatformSuggestionRequest, GameSuggestionRequest,
 	UpdatedMetadataMatchesFromSuggestionResponse,
@@ -180,6 +185,64 @@ pub async fn approve_suggestion(
 	let updated = accept_suggestion(id.into_inner(), db_conn.get_ref(), &mut redis_conn).await?;
 
 	Ok(HttpResponse::Ok().json(UpdatedMetadataMatchesFromSuggestionResponse { updated }))
+}
+
+/// Fire-and-forget signal from third-party tools. Always returns 204; a scheduled
+/// worker validates the payload and only creates a suggestion for ROMs already in
+/// the database where the proposed mapping is not yet represented.
+#[utoipa::path(
+	post,
+	context_path = "/api",
+	tag = "Suggestion",
+	responses(
+		(status = 204, description = "Accepted. Processing happens asynchronously."),
+	)
+)]
+#[post("/suggestion/external/game")]
+pub async fn submit_external_game_suggestion(
+	body: Json<ExternalGameMatchSuggestionPayload>,
+	redis_conn: Data<MultiplexedConnection>,
+	req: HttpRequest,
+) -> error::Result<impl Responder> {
+	let mut redis_conn = redis_conn.get_ref().clone();
+
+	if let Some(ip) = client_ip_from_http_request(&req) {
+		let ip = ip.to_string();
+		match check_rate_limit(&mut redis_conn, &ip).await {
+			Ok(true) => {}
+			Ok(false) => {
+				service::metrics::record_user_action("external_suggestion", "rate_limited");
+				return Ok(HttpResponse::NoContent());
+			}
+			Err(e) => {
+				log::warn!("external suggestion rate limit check failed for {ip}: {e}");
+			}
+		}
+	}
+
+	let user_agent = truncate_user_agent(
+		req.headers()
+			.get("User-Agent")
+			.and_then(|h| h.to_str().ok()),
+	);
+
+	match enqueue_external_suggestion(&mut redis_conn, body.into_inner(), user_agent).await {
+		Ok(EnqueueOutcome::Accepted) => {
+			service::metrics::record_user_action("external_suggestion", "accepted");
+		}
+		Ok(EnqueueOutcome::RateLimited) => {
+			service::metrics::record_user_action("external_suggestion", "rate_limited");
+		}
+		Ok(EnqueueOutcome::QueueFull) => {
+			service::metrics::record_user_action("external_suggestion", "queue_full");
+		}
+		Err(e) => {
+			log::warn!("external suggestion enqueue failed: {e}");
+			service::metrics::record_user_action("external_suggestion", "bad_payload");
+		}
+	}
+
+	Ok(HttpResponse::NoContent())
 }
 
 /// Declines a suggestion by id.

@@ -18,6 +18,7 @@ pub struct Model {
 	pub created_by: Option<Uuid>,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
+	pub source: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

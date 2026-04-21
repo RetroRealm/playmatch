@@ -75,6 +75,7 @@ use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::suggestion::{
 	approve_suggestion, create_company_suggestion, create_game_suggestion,
 	create_platform_suggestion, delete_suggestion, get_all_suggestions, get_suggestion_by_id,
+	submit_external_game_suggestion,
 };
 use crate::routes::user::{
 	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
@@ -176,6 +177,7 @@ async fn start() -> anyhow::Result<()> {
 	let igdb_client_arc = Arc::new(igdb_client);
 
 	let redis_client_data = Data::new(redis_client);
+	let redis_conn_for_cron = redis_conn.clone();
 	let redis_conn_data = Data::new(redis_conn);
 	let conn_data = Data::from(conn_arc.clone());
 	let igdb_data = Data::from(igdb_client_arc.clone());
@@ -246,6 +248,37 @@ async fn start() -> anyhow::Result<()> {
 		})?)
 		.await?;
 
+	let external_conn = conn_arc.clone();
+	let external_redis = redis_conn_for_cron;
+	sched
+		.add(Job::new_async("0/30 * * * * *", move |_, _| {
+			let conn = external_conn.clone();
+			let mut redis = external_redis.clone();
+			Box::pin(async move {
+				match service::external_suggestion::drain_external_suggestions(
+					100, &conn, &mut redis,
+				)
+				.await
+				{
+					Ok(stats) if stats.processed_envelopes > 0 => {
+						debug!(
+							"external suggestion drain: processed {} envelopes (created: {}, already_matched: {}, duplicates: {}, unknown_roms: {}, invalid: {}, invalid_mappings: {})",
+							stats.processed_envelopes,
+							stats.created,
+							stats.already_matched,
+							stats.duplicate_suggestions,
+							stats.unknown_roms,
+							stats.invalid_payloads,
+							stats.invalid_mappings,
+						);
+					}
+					Ok(_) => {}
+					Err(e) => error!("external suggestion drain failed: {e}"),
+				}
+			})
+		})?)
+		.await?;
+
 	let conn = conn_arc.clone();
 	let http_client = dat_http_client_arc.clone();
 	let igdb_client = igdb_client_arc.clone();
@@ -312,6 +345,7 @@ pub fn main() {
 fn configure_public_api_routes(cfg: &mut ServiceConfig) {
 	cfg.service(health)
 		.service(ready)
+		.service(submit_external_game_suggestion)
 		.service(get_all_companies)
 		.service(get_company_by_id)
 		.service(get_all_platforms)

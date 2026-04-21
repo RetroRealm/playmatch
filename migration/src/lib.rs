@@ -19,6 +19,7 @@ mod m20250719_011819_add_case_insensitive_index;
 mod m20250725_063924_add_normalized_name_automatic_match_reason;
 mod m20260418_120000_tune_hot_path_indexes;
 mod m20260420_041040_hash_api_keys;
+mod m20260420_120000_add_source_to_suggestions;
 
 pub struct Migrator;
 
@@ -45,6 +46,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20250725_063924_add_normalized_name_automatic_match_reason::Migration),
 			Box::new(m20260418_120000_tune_hot_path_indexes::Migration),
 			Box::new(m20260420_041040_hash_api_keys::Migration),
+			Box::new(m20260420_120000_add_source_to_suggestions::Migration),
 		]
 	}
 }

@@ -1,3 +1,4 @@
+pub mod external_suggestion;
 pub mod matching;
 pub mod suggestion;
 pub mod user;

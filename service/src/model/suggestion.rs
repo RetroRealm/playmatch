@@ -84,6 +84,10 @@ pub struct Suggestion {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub created_by: Option<Uuid>,
 
+	/// Origin of an externally-submitted suggestion (e.g. truncated User-Agent), null for user-submitted ones.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub source: Option<String>,
+
 	/// When the suggestion was created.
 	pub created_at: DateTime<Utc>,
 
@@ -108,6 +112,7 @@ impl From<Model> for Suggestion {
 			provider_id: value.provider_id,
 			comment: value.comment,
 			created_by: value.created_by,
+			source: value.source,
 			created_at: value.created_at.into(),
 			updated_at: value.updated_at.into(),
 		}
