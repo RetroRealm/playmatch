@@ -58,70 +58,31 @@ use service::providers::igdb::model::{
 	Report, ReportType, Screenshot, Theme, Website, WebsiteType,
 };
 
+/// IGDB-prefilled thin wrapper around `$crate::__provider_id_route_impl`.
 macro_rules! igdb_id_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $model:ty) => {
-		#[utoipa::path(
-			get,
-			context_path = "/api",
-			tag = "IGDB",
-			params(IdQuery),
-			responses(
-				(status = 200, description = "Returns IGDB metadata for the requested id", body = $model),
-				(status = 404, description = "Not found")
-			)
-		)]
-		#[get($route)]
-		pub async fn $fn_name(
-			query: Query<IdQuery>,
-			redis_conn: Data<MultiplexedConnection>,
-			igdb_client: Data<IgdbClient>,
-		) -> error::Result<impl Responder> {
-			let response = $cached_fn(
-				igdb_client.as_ref(),
-				&mut redis_conn.get_ref().clone(),
-				query.into_inner().id,
-			)
-			.await?;
-
-			if response.is_none() {
-				return Ok(HttpResponse::NotFound().finish());
-			}
-
-			Ok(HttpResponse::Ok().json(response))
-		}
+		$crate::__provider_id_route_impl!(
+			IgdbClient,
+			"IGDB",
+			$route,
+			$fn_name,
+			$cached_fn,
+			$model
+		);
 	};
 }
 
+/// IGDB-prefilled thin wrapper around `$crate::__provider_ids_route_impl`.
 macro_rules! igdb_ids_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $model:ty) => {
-		#[utoipa::path(
-			get,
-			context_path = "/api",
-			tag = "IGDB",
-			params(IdsQuery),
-			responses(
-				(status = 200, description = "Returns IGDB metadata for the requested ids", body = Vec<$model>)
-			)
-		)]
-		#[get($route)]
-		pub async fn $fn_name(
-			query: Query<IdsQuery>,
-			redis_conn: Data<MultiplexedConnection>,
-			igdb_client: Data<IgdbClient>,
-		) -> error::Result<impl Responder> {
-			let redis_conn = redis_conn.get_ref().clone();
-
-			let response = igdb_route_mutli_id_helper::<$model>(query.into_inner().ids, |id| {
-				tokio::spawn({
-					let client = igdb_client.clone();
-					let mut redis_conn = redis_conn.clone();
-					async move { $cached_fn(client.as_ref(), &mut redis_conn, id).await }
-				})
-			})
-			.await?;
-
-			Ok(HttpResponse::Ok().json(response))
-		}
+		$crate::__provider_ids_route_impl!(
+			IgdbClient,
+			"IGDB",
+			$route,
+			$fn_name,
+			$cached_fn,
+			$model
+		);
 	};
 }
 

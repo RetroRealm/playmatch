@@ -7,6 +7,8 @@ use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use service::db::user::get_user_by_api_key;
 
+mod macros;
+
 pub mod company;
 pub mod game;
 pub mod health;
