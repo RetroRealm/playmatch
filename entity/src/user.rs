@@ -12,6 +12,7 @@ pub struct Model {
 	pub discord_id: Option<i64>,
 	pub username: String,
 	pub api_key_hash: Option<String>,
+	pub api_key_hash_hmac: Option<String>,
 	pub permissions: UserPermissionsEnum,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,

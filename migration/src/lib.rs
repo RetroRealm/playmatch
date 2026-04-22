@@ -21,6 +21,7 @@ mod m20260418_120000_tune_hot_path_indexes;
 mod m20260420_041040_hash_api_keys;
 mod m20260420_120000_add_source_to_suggestions;
 mod m20260423_000000_index_game_dat_file_import_id_name;
+mod m20260424_000000_add_api_key_hash_hmac_column;
 
 pub struct Migrator;
 
@@ -49,6 +50,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260420_041040_hash_api_keys::Migration),
 			Box::new(m20260420_120000_add_source_to_suggestions::Migration),
 			Box::new(m20260423_000000_index_game_dat_file_import_id_name::Migration),
+			Box::new(m20260424_000000_add_api_key_hash_hmac_column::Migration),
 		]
 	}
 }

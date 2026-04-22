@@ -28,6 +28,8 @@ oauth2 = { version = "^5", features = ["reqwest"] }
 utoipa = { workspace = true, features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
 md-5 = "^0.11"
 sha2 = "^0.11"
+hmac = "^0.13"
+subtle = "^2"
 hex = "^0.4"
 moka = { version = "^0.12", features = ["future"] }
 num_cpus = "^1.16"
