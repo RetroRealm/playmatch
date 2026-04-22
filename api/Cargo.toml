@@ -21,6 +21,7 @@ serde_repr = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
+futures-util = "^0.3"
 actix-governor = "^0.10"
 utoipa = { workspace = true, features = ["actix_extras", "uuid", "chrono", "repr", "debug"] }
 utoipa-swagger-ui = { version = "~7", features = ["actix-web"] }

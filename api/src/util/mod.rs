@@ -59,16 +59,12 @@ pub async fn igdb_route_mutli_id_helper<T: DeserializeOwned>(
 		)));
 	}
 
-	let mut requests = vec![];
+	let requests: Vec<_> = ids.into_iter().map(&f).collect();
+	let results = futures_util::future::join_all(requests).await;
 
-	for id in ids {
-		requests.push(f(id));
-	}
-
-	let mut response = vec![];
-
-	for future in requests {
-		if let Some(inner) = future.await.map_err(anyhow::Error::from)?? {
+	let mut response = Vec::with_capacity(results.len());
+	for raw in results {
+		if let Some(inner) = raw.map_err(anyhow::Error::from)?? {
 			response.push(inner);
 		}
 	}
