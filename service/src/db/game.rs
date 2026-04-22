@@ -441,7 +441,7 @@ fn get_unmatched_games_with_limit<'a>(
 					.eq(provider.as_enum()),
 			)
 			.filter(
-				Expr::col(game::Column::Id).not_in_subquery(
+				Expr::col((game::Entity, game::Column::Id)).not_in_subquery(
 					::sea_orm::sea_query::Query::select()
 						.column(signature_metadata_mapping::Column::GameId)
 						.from(signature_metadata_mapping::Entity)
