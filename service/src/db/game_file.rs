@@ -46,6 +46,21 @@ pub async fn get_game_files_from_game_id(
 		.await
 }
 
+/// Bulk variant of [`get_game_files_from_game_id`]. Returns every game file whose
+/// `game_id` is in `game_ids`; caller groups by `game_id` if needed.
+pub async fn get_game_files_from_game_ids(
+	game_ids: &[Uuid],
+	conn: &DbConn,
+) -> Result<Vec<game_file::Model>, DbErr> {
+	if game_ids.is_empty() {
+		return Ok(Vec::new());
+	}
+	game_file::Entity::find()
+		.filter(game_file::Column::GameId.is_in(game_ids.iter().copied()))
+		.all(conn)
+		.await
+}
+
 fn get_active_model_from_rom_element(
 	game_id: Uuid,
 	game_file: RomElement,

@@ -1,10 +1,11 @@
+use crate::cache::CacheKey;
 use crate::db::company::{find_company_by_name, find_company_related_signature_metadata_mapping};
 use crate::db::game::{
 	find_all_children_of_game, find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
 	find_game_and_id_mapping_by_sha256, find_game_by_name_or_game_file_name, find_game_parent,
 	find_game_signature_metadata_mapping, find_games_by_name_and_platform_id,
 };
-use crate::db::game_file::get_game_files_from_game_id;
+use crate::db::game_file::get_game_files_from_game_ids;
 use crate::db::platform::{
 	find_platform_by_name, find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
@@ -12,17 +13,20 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
-use crate::identification::cache::{IdentifyCacheType, delete_identify_cache, filename_size_key};
+use crate::identification::cache::{IdentifyCacheType, filename_size_key};
 use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchData, GameMatchRequest};
 use crate::model::{
 	GameMatchType, GameMetadataMatchResult, GameMetadataMatchResultBuilder, UpdatedMatchResult,
 	UpdatedMatchResultBuilder,
 };
+use entity::game_file;
 use entity::sea_orm_active_enums::MatchTypeEnum;
 use entity::{game, signature_metadata_mapping};
-use log::debug;
+use log::{debug, warn};
+use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy)]
 enum ManualTarget {
@@ -200,7 +204,16 @@ pub async fn apply_manual_game_match_by_game(
 		}
 	}
 
+	// Batch-fetch and index by game_id so the update loop is memory-only.
+	let game_ids: Vec<_> = games_to_update.iter().map(|g| g.id).collect();
+	let all_files = get_game_files_from_game_ids(&game_ids, db_conn).await?;
+	let mut files_by_game: HashMap<_, Vec<game_file::Model>> = HashMap::new();
+	for file in all_files {
+		files_by_game.entry(file.game_id).or_default().push(file);
+	}
+
 	let mut results = vec![];
+	let mut cache_keys_to_bust: Vec<String> = Vec::new();
 
 	for game in games_to_update {
 		debug!("Updating game: {}", game.name);
@@ -240,18 +253,11 @@ pub async fn apply_manual_game_match_by_game(
 		)
 		.await?;
 
-		// Bust the cache for the hashes of the game files associated with this game so that the next time it is queried, it will return the updated mapping
-		let game_files = get_game_files_from_game_id(game.id, db_conn).await?;
-		for game_file in game_files {
-			bust_cache_for_hashes(
-				game_file.sha256,
-				game_file.sha1,
-				game_file.md5,
-				game_file.file_name,
-				game_file.file_size_in_bytes,
-				redis_conn,
-			)
-			.await?
+		// Keys flushed as one pipelined DEL after the loop.
+		if let Some(files) = files_by_game.get(&game.id) {
+			for file in files {
+				collect_identify_cache_keys(file, &mut cache_keys_to_bust);
+			}
 		}
 
 		results.push(
@@ -262,35 +268,38 @@ pub async fn apply_manual_game_match_by_game(
 		)
 	}
 
+	if !cache_keys_to_bust.is_empty() {
+		debug!(
+			"Busting {} identify-cache keys in one DEL",
+			cache_keys_to_bust.len()
+		);
+		if let Err(e) = redis_conn.del(&cache_keys_to_bust).await {
+			warn!(
+				"batch identify-cache delete failed for {} keys: {e}",
+				cache_keys_to_bust.len()
+			);
+		}
+	}
+
 	debug!("Updated {} games", results.len());
 
 	Ok(results)
 }
 
-async fn bust_cache_for_hashes(
-	sha256: Option<String>,
-	sha1: Option<String>,
-	md5: Option<String>,
-	file_name: String,
-	file_size: Option<i64>,
-	redis_conn: &mut MultiplexedConnection,
-) -> ServiceResult<()> {
-	if let Some(sha256) = &sha256 {
-		delete_identify_cache(sha256, IdentifyCacheType::IdentifySha256, redis_conn).await?;
+fn collect_identify_cache_keys(file: &game_file::Model, out: &mut Vec<String>) {
+	if let Some(sha256) = &file.sha256 {
+		out.push(IdentifyCacheType::IdentifySha256.get_cache_key(sha256));
 	}
-	if let Some(sha1) = &sha1 {
-		delete_identify_cache(sha1, IdentifyCacheType::IdentifySha1, redis_conn).await?;
+	if let Some(sha1) = &file.sha1 {
+		out.push(IdentifyCacheType::IdentifySha1.get_cache_key(sha1));
 	}
-	if let Some(md5) = &md5 {
-		delete_identify_cache(md5, IdentifyCacheType::IdentifyMd5, redis_conn).await?;
+	if let Some(md5) = &file.md5 {
+		out.push(IdentifyCacheType::IdentifyMd5.get_cache_key(md5));
 	}
-	if let Some(size) = file_size {
-		let key = filename_size_key(&file_name, size);
-		delete_identify_cache(&key, IdentifyCacheType::IdentifyFilenameSize, redis_conn).await?;
+	if let Some(size) = file.file_size_in_bytes {
+		let key = filename_size_key(&file.file_name, size);
+		out.push(IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key));
 	}
-	debug!("Cache busted for hashes: sha256: {sha256:?}, sha1: {sha1:?}, md5: {md5:?}");
-
-	Ok(())
 }
 
 pub fn build_result(
