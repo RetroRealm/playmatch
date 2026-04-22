@@ -441,10 +441,14 @@ fn get_unmatched_games_with_limit<'a>(
 					.eq(provider.as_enum()),
 			)
 			.filter(
-				Expr::col((game::Entity, game::Column::Id)).not_in_subquery(
+				Expr::exists(
 					::sea_orm::sea_query::Query::select()
-						.column(signature_metadata_mapping::Column::GameId)
+						.expr(Expr::val(1))
 						.from(signature_metadata_mapping::Entity)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::GameId)
+								.equals((game::Entity, game::Column::Id)),
+						)
 						.and_where(
 							Expr::col(signature_metadata_mapping::Column::Provider)
 								.eq(provider.as_enum()),
@@ -453,9 +457,9 @@ fn get_unmatched_games_with_limit<'a>(
 							Expr::col(signature_metadata_mapping::Column::MatchType)
 								.ne(MatchTypeEnum::None.as_enum()),
 						)
-						.and_where(signature_metadata_mapping::Column::GameId.is_not_null())
 						.to_owned(),
-				),
+				)
+				.not(),
 			)
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)

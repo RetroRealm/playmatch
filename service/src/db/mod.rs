@@ -32,10 +32,14 @@ macro_rules! unmatched_entities_with_limit {
 			use ::sea_orm::ActiveEnum;
 			let rows = $entity::find()
 				.filter(
-					::sea_orm::sea_query::Expr::col($column).not_in_subquery(
+					::sea_orm::sea_query::Expr::exists(
 						::sea_orm::sea_query::Query::select()
-							.column($fk_column)
+							.expr(::sea_orm::sea_query::Expr::val(1))
 							.from(signature_metadata_mapping::Entity)
+							.and_where(
+								::sea_orm::sea_query::Expr::col($fk_column)
+									.equals(($entity, $column)),
+							)
 							.and_where(
 								::sea_orm::sea_query::Expr::col(
 									signature_metadata_mapping::Column::Provider,
@@ -48,9 +52,9 @@ macro_rules! unmatched_entities_with_limit {
 								)
 								.ne(MatchTypeEnum::None.as_enum()),
 							)
-							.and_where($fk_column.is_not_null())
 							.to_owned(),
-					),
+					)
+					.not(),
 				)
 				.order_by_asc($column)
 				.limit(limit)
