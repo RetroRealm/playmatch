@@ -37,35 +37,39 @@ pub async fn find_all_relations_of_game(
 	),
 	DbErr,
 > {
-	let dat_file_import_opt = game.find_related(dat_file_import::Entity).one(conn).await?;
-
-	let dat_file_import = dat_file_import_opt
+	let dat_file_import = game
+		.find_related(dat_file_import::Entity)
+		.one(conn)
+		.await?
 		.ok_or_else(|| DbErr::RecordNotFound("Dat file import not found".to_string()))?;
 
-	let dat_file_opt = dat_file_import
+	let dat_file = dat_file_import
 		.find_related(dat_file::Entity)
 		.one(conn)
-		.await?;
+		.await?
+		.ok_or_else(|| DbErr::RecordNotFound("Dat file not found".to_string()))?;
 
-	let dat_file =
-		dat_file_opt.ok_or_else(|| DbErr::RecordNotFound("Dat file not found".to_string()))?;
+	let (signature_group, platform) = tokio::try_join!(
+		async {
+			dat_file
+				.find_related(signature_group::Entity)
+				.one(conn)
+				.await?
+				.ok_or_else(|| DbErr::RecordNotFound("Signature group not found".to_string()))
+		},
+		async {
+			dat_file
+				.find_related(platform::Entity)
+				.one(conn)
+				.await?
+				.ok_or_else(|| DbErr::RecordNotFound("Platform not found".to_string()))
+		},
+	)?;
 
-	let signature_group_opt = dat_file
-		.find_related(signature_group::Entity)
-		.one(conn)
-		.await?;
-
-	let signature_group = signature_group_opt
-		.ok_or_else(|| DbErr::RecordNotFound("Signature group not found".to_string()))?;
-
-	let platform_opt = dat_file.find_related(platform::Entity).one(conn).await?;
-
-	let platform =
-		platform_opt.ok_or_else(|| DbErr::RecordNotFound("Platform not found".to_string()))?;
-
-	let company = platform.find_related(company::Entity).one(conn).await?;
-
-	let game_files = game.find_related(game_file::Entity).all(conn).await?;
+	let (company, game_files) = tokio::try_join!(
+		platform.find_related(company::Entity).one(conn),
+		game.find_related(game_file::Entity).all(conn),
+	)?;
 
 	Ok((
 		dat_file_import,
