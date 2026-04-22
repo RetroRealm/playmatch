@@ -39,10 +39,12 @@ pub struct AgeRatingCategory {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub organization: i32,
 	pub rating: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -51,11 +53,13 @@ pub struct AgeRatingContentDescriptionV2 {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
 	pub description_type: i32,
 	pub organization: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -64,10 +68,12 @@ pub struct AgeRatingContentDescriptionType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -76,9 +82,11 @@ pub struct AgeRatingOrganization {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -114,10 +122,12 @@ pub struct ArtworkType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -134,6 +144,7 @@ pub struct Character {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub country_name: Option<String>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
@@ -152,6 +163,7 @@ pub struct Character {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub species: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -175,9 +187,11 @@ pub struct CharacterGender {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -186,9 +200,11 @@ pub struct CharacterSpecies {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -201,6 +217,7 @@ pub struct Collection {
 	pub as_parent_relations: Option<Vec<i32>>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub games: Vec<i32>,
 	pub name: String,
@@ -208,6 +225,7 @@ pub struct Collection {
 	#[serde(rename = "type")]
 	pub r#type: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -218,10 +236,12 @@ pub struct CollectionMembership {
 	pub checksum: Uuid,
 	pub collection: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub game: i32,
 	pub r#type: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -231,10 +251,12 @@ pub struct CollectionMembershipType {
 	pub allowed_collection_type: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -244,10 +266,12 @@ pub struct CollectionRelation {
 	pub checksum: Uuid,
 	pub child_collection: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub parent_collection: i32,
 	pub r#type: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -258,10 +282,12 @@ pub struct CollectionRelationType {
 	pub allowed_parent_type: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -270,10 +296,12 @@ pub struct CollectionType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -298,6 +326,7 @@ pub struct Company {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub country: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
@@ -322,6 +351,7 @@ pub struct Company {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub status: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub url: Option<String>,
@@ -334,9 +364,11 @@ pub struct CompanySize {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -359,9 +391,11 @@ pub struct CompanyStatus {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -370,9 +404,11 @@ pub struct CompanyType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -384,10 +420,12 @@ pub struct CompanyTypeHistory {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_type: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub parent_company: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -428,9 +466,11 @@ pub struct DateFormat {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub format: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -439,11 +479,13 @@ pub struct EntityType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -452,9 +494,11 @@ pub struct Event {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub end_time: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub event_logo: Option<i32>,
@@ -467,9 +511,11 @@ pub struct Event {
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub start_time: DateTime<Utc>,
 	pub time_zone: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub videos: Option<Vec<i32>>,
@@ -484,11 +530,13 @@ pub struct EventLogo {
 	pub animated: Option<bool>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub event: i32,
 	pub height: i32,
 	pub image_id: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 	pub width: i32,
@@ -499,10 +547,12 @@ pub struct EventNetwork {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub event: i32,
 	pub network_type: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -518,6 +568,7 @@ pub struct ExternalGame {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub countries: Option<Vec<i32>>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub external_game_source: Option<i32>,
@@ -533,6 +584,7 @@ pub struct ExternalGame {
 	pub platform: Option<i32>,
 	pub uid: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -544,9 +596,11 @@ pub struct ExternalGameSource {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -555,12 +609,14 @@ pub struct Franchise {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub games: Option<Vec<i32>>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -594,6 +650,7 @@ pub struct Game {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub cover: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dlcs: Option<Vec<i32>>,
@@ -680,6 +737,7 @@ pub struct Game {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub total_rating_count: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -699,6 +757,7 @@ pub struct GameEngine {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub companies: Option<Vec<i32>>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
@@ -709,6 +768,7 @@ pub struct GameEngine {
 	pub platforms: Option<Vec<i32>>,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -734,12 +794,14 @@ pub struct GameLocalization {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub cover: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub game: i32,
 	pub name: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub region: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -748,10 +810,12 @@ pub struct GameMode {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -761,9 +825,11 @@ pub struct GameReleaseFormat {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub format: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -772,9 +838,11 @@ pub struct GameStatus {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub status: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -787,6 +855,7 @@ pub struct GameTimeToBeat {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub count: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub game_id: i32,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -794,6 +863,7 @@ pub struct GameTimeToBeat {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub normally: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -802,10 +872,12 @@ pub struct GameType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(rename = "type")]
 	pub r#type: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -814,6 +886,7 @@ pub struct GameVersion {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub features: Option<Vec<i32>>,
@@ -821,6 +894,7 @@ pub struct GameVersion {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub games: Option<Vec<i32>>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -877,10 +951,12 @@ pub struct Genre {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -891,6 +967,7 @@ pub struct InvolvedCompany {
 	pub checksum: Uuid,
 	pub company: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub developer: bool,
 	pub game: i32,
@@ -898,6 +975,7 @@ pub struct InvolvedCompany {
 	pub publisher: bool,
 	pub supporting: bool,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -906,10 +984,12 @@ pub struct Keyword {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -919,11 +999,13 @@ pub struct Language {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub locale: String,
 	pub name: String,
 	pub native_name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -932,11 +1014,13 @@ pub struct LanguageSupport {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub game: i32,
 	pub language: i32,
 	pub language_support_type: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -945,9 +1029,11 @@ pub struct LanguageSupportType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -979,11 +1065,13 @@ pub struct NetworkType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub event_networks: Option<Vec<i32>>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1000,6 +1088,7 @@ pub struct Platform {
 	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub generation: Option<i32>,
@@ -1014,6 +1103,7 @@ pub struct Platform {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub summary: Option<String>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -1049,9 +1139,11 @@ pub struct PlatformType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1114,6 +1206,7 @@ pub struct PlatformVersionReleaseDate {
 	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date: Option<i64>,
@@ -1129,6 +1222,7 @@ pub struct PlatformVersionReleaseDate {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub release_region: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub y: i32,
 }
@@ -1153,10 +1247,12 @@ pub struct PlayerPerspective {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -1165,9 +1261,11 @@ pub struct PlayerPerspective {
 pub struct PopularityPrimitive {
 	pub id: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub calculated_at: DateTime<Utc>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub external_popularity_source: Option<i32>,
@@ -1178,6 +1276,7 @@ pub struct PopularityPrimitive {
 	pub popularity_source: Option<i32>,
 	pub popularity_type: i32,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	#[schema(value_type = String)]
 	pub value: BigDecimal,
@@ -1188,6 +1287,7 @@ pub struct PopularityType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub external_popularity_source: Option<i32>,
@@ -1197,6 +1297,7 @@ pub struct PopularityType {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub popularity_source: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1206,10 +1307,12 @@ pub struct Region {
 	pub category: String,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub identifier: String,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1222,6 +1325,7 @@ pub struct ReleaseDate {
 	pub category: Option<i32>,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub d: Option<i32>,
@@ -1230,6 +1334,7 @@ pub struct ReleaseDate {
 		skip_serializing_if = "Option::is_none",
 		with = "ts_seconds_option"
 	)]
+	#[schema(value_type = Option<i64>)]
 	pub date: Option<DateTime<Utc>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub date_format: Option<i32>,
@@ -1246,6 +1351,7 @@ pub struct ReleaseDate {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub status: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub y: i32,
 }
@@ -1255,9 +1361,11 @@ pub struct ReleaseDateRegion {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub region: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1266,10 +1374,12 @@ pub struct ReleaseDateStatus {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub description: String,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1278,6 +1388,7 @@ pub struct Report {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub entity_type: Option<i32>,
@@ -1288,6 +1399,7 @@ pub struct Report {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub target_item_id: Option<i32>,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1296,9 +1408,11 @@ pub struct ReportType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -1322,10 +1436,12 @@ pub struct Theme {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	pub name: String,
 	pub slug: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 	pub url: String,
 }
@@ -1352,9 +1468,11 @@ pub struct WebsiteType {
 	pub id: i32,
 	pub checksum: Uuid,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub created_at: DateTime<Utc>,
 	#[serde(rename = "type")]
 	pub r#type: String,
 	#[serde(with = "ts_seconds")]
+	#[schema(value_type = i64)]
 	pub updated_at: DateTime<Utc>,
 }
