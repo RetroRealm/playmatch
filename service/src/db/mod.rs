@@ -29,6 +29,7 @@ macro_rules! unmatched_entities_with_limit {
 			limit: u64,
 			conn: &::sea_orm::DbConn,
 		) -> ::anyhow::Result<Option<Vec<$model>>> {
+			use ::sea_orm::ActiveEnum;
 			let rows = $entity::find()
 				.filter(
 					::sea_orm::sea_query::Expr::col($column).not_in_subquery(
@@ -36,11 +37,16 @@ macro_rules! unmatched_entities_with_limit {
 							.column($fk_column)
 							.from(signature_metadata_mapping::Entity)
 							.and_where(
-								signature_metadata_mapping::Column::Provider.eq(provider),
+								::sea_orm::sea_query::Expr::col(
+									signature_metadata_mapping::Column::Provider,
+								)
+								.eq(provider.as_enum()),
 							)
 							.and_where(
-								signature_metadata_mapping::Column::MatchType
-									.ne(MatchTypeEnum::None),
+								::sea_orm::sea_query::Expr::col(
+									signature_metadata_mapping::Column::MatchType,
+								)
+								.ne(MatchTypeEnum::None.as_enum()),
 							)
 							.and_where($fk_column.is_not_null())
 							.to_owned(),

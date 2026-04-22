@@ -438,16 +438,20 @@ fn get_unmatched_games_with_limit<'a>(
 			)
 			.filter(
 				Expr::col((smm1.clone(), signature_metadata_mapping::Column::Provider))
-					.eq(provider),
+					.eq(provider.as_enum()),
 			)
 			.filter(
 				Expr::col(game::Column::Id).not_in_subquery(
 					::sea_orm::sea_query::Query::select()
 						.column(signature_metadata_mapping::Column::GameId)
 						.from(signature_metadata_mapping::Entity)
-						.and_where(signature_metadata_mapping::Column::Provider.eq(provider))
 						.and_where(
-							signature_metadata_mapping::Column::MatchType.ne(MatchTypeEnum::None),
+							Expr::col(signature_metadata_mapping::Column::Provider)
+								.eq(provider.as_enum()),
+						)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::MatchType)
+								.ne(MatchTypeEnum::None.as_enum()),
 						)
 						.and_where(signature_metadata_mapping::Column::GameId.is_not_null())
 						.to_owned(),
