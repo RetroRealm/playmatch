@@ -124,12 +124,13 @@ pub async fn create_or_find_platform_by_name(
 }
 
 unmatched_entities_with_limit! {
-	/// Return up to `limit` platforms that have no IGDB metadata mapping yet (or one with match_type None).
-	/// Returns `Ok(None)` when there is nothing left to process.
+	/// Return up to `limit` platforms that have no metadata mapping yet for the given provider
+	/// (or one with match_type None). Returns `Ok(None)` when there is nothing left to process.
 	get_unmatched_platforms_with_limit,
 	Platform,
 	platform::Model,
-	platform::Column::Id
+	platform::Column::Id,
+	signature_metadata_mapping::Column::PlatformId
 }
 
 /// Resolve the platform a given game is attached to, via dat file and dat file import.
@@ -146,14 +147,15 @@ pub async fn find_platform_of_game(
 		.await
 }
 
-/// Return the IGDB signature metadata mapping attached to a platform, if any.
+/// Return the signature metadata mapping for the given provider attached to a platform, if any.
 pub async fn find_platform_related_signature_metadata_mapping(
 	model: &platform::Model,
+	provider: MetadataProviderEnum,
 	conn: &DbConn,
 ) -> Result<Option<signature_metadata_mapping::Model>, DbErr> {
 	model
 		.find_related(signature_metadata_mapping::Entity)
-		.filter(signature_metadata_mapping::Column::Provider.eq(MetadataProviderEnum::Igdb))
+		.filter(signature_metadata_mapping::Column::Provider.eq(provider))
 		.one(conn)
 		.await
 }

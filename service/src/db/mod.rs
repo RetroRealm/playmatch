@@ -11,24 +11,40 @@ pub mod signature_metadata_mapping;
 pub mod signature_metadata_mapping_suggestions;
 pub mod user;
 
-/// Generate a `get_unmatched_*_with_limit` fn that returns up to `limit` rows of `$entity`
-/// that have no IGDB signature metadata mapping (or one with match_type `None`).
+/// Generate a `get_unmatched_*_with_limit(provider, limit, conn)` fn that returns up to
+/// `limit` rows of `$entity` with no signature metadata mapping for the given provider
+/// (or one whose match_type is `None`). The join is provider-scoped via `on_condition`
+/// so rows matched to a different provider still appear as unmatched for this one.
+///
+/// `$fk_column` is the signature_metadata_mapping column pointing back to `$entity`
+/// (e.g. `signature_metadata_mapping::Column::CompanyId`).
 ///
 /// Expects `signature_metadata_mapping`, `MatchTypeEnum`, sea-orm query traits, and the
 /// entity's prelude type (`$entity`) to be in scope at the call site.
 macro_rules! unmatched_entities_with_limit {
-	($(#[$meta:meta])* $fn:ident, $entity:ident, $model:ty, $column:expr) => {
+	($(#[$meta:meta])* $fn:ident, $entity:ident, $model:ty, $column:expr, $fk_column:expr) => {
 		$(#[$meta])*
 		pub async fn $fn(
+			provider: ::entity::sea_orm_active_enums::MetadataProviderEnum,
 			limit: u64,
 			conn: &::sea_orm::DbConn,
 		) -> ::anyhow::Result<Option<Vec<$model>>> {
 			let rows = $entity::find()
-				.left_join(signature_metadata_mapping::Entity)
 				.filter(
-					signature_metadata_mapping::Column::Id
-						.is_null()
-						.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::None)),
+					::sea_orm::sea_query::Expr::col($column).not_in_subquery(
+						::sea_orm::sea_query::Query::select()
+							.column($fk_column)
+							.from(signature_metadata_mapping::Entity)
+							.and_where(
+								signature_metadata_mapping::Column::Provider.eq(provider),
+							)
+							.and_where(
+								signature_metadata_mapping::Column::MatchType
+									.ne(MatchTypeEnum::None),
+							)
+							.and_where($fk_column.is_not_null())
+							.to_owned(),
+					),
 				)
 				.order_by_asc($column)
 				.limit(limit)

@@ -24,14 +24,15 @@ pub async fn find_company_by_name(
 	Ok(company)
 }
 
-/// Return the IGDB signature metadata mapping attached to a company, if any.
+/// Return the signature metadata mapping for the given provider attached to a company, if any.
 pub async fn find_company_related_signature_metadata_mapping(
 	model: &company::Model,
+	provider: MetadataProviderEnum,
 	conn: &DbConn,
 ) -> Result<Option<signature_metadata_mapping::Model>, DbErr> {
 	model
 		.find_related(signature_metadata_mapping::Entity)
-		.filter(signature_metadata_mapping::Column::Provider.eq(MetadataProviderEnum::Igdb))
+		.filter(signature_metadata_mapping::Column::Provider.eq(provider))
 		.one(conn)
 		.await
 }
@@ -95,10 +96,11 @@ pub async fn create_or_find_company_by_name(
 }
 
 unmatched_entities_with_limit! {
-	/// Return up to `limit` companies that have no IGDB metadata mapping yet (or one with match_type None).
-	/// Returns `Ok(None)` when there is nothing left to process.
+	/// Return up to `limit` companies that have no metadata mapping yet for the given provider
+	/// (or one with match_type None). Returns `Ok(None)` when there is nothing left to process.
 	get_unmatched_companies_with_limit,
 	Company,
 	company::Model,
-	company::Column::Id
+	company::Column::Id,
+	signature_metadata_mapping::Column::CompanyId
 }

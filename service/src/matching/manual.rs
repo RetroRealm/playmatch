@@ -20,7 +20,7 @@ use crate::model::{
 	UpdatedMatchResultBuilder,
 };
 use entity::game_file;
-use entity::sea_orm_active_enums::MatchTypeEnum;
+use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
 use entity::{game, signature_metadata_mapping};
 use log::{debug, warn};
 use redis::AsyncTypedCommands;
@@ -62,19 +62,30 @@ async fn apply_manual_entity_match(
 	r#match: CompanyOrPlatformMatchRequest,
 	conn: &DbConn,
 ) -> ServiceResult<UpdatedMatchResult> {
+	let provider_enum: MetadataProviderEnum = r#match.provider.into();
 	let (entity_id, existing_mapping) = match target {
 		ManualTarget::Company => {
 			let company = find_company_by_name(r#match.name.as_str(), conn)
 				.await?
 				.ok_or(ServiceError::CompanyNotFound)?;
-			let mapping = find_company_related_signature_metadata_mapping(&company, conn).await?;
+			let mapping = find_company_related_signature_metadata_mapping(
+				&company,
+				provider_enum,
+				conn,
+			)
+			.await?;
 			(company.id, mapping)
 		}
 		ManualTarget::Platform => {
 			let platform = find_platform_by_name(r#match.name.as_str(), conn)
 				.await?
 				.ok_or(ServiceError::PlatformNotFound)?;
-			let mapping = find_platform_related_signature_metadata_mapping(&platform, conn).await?;
+			let mapping = find_platform_related_signature_metadata_mapping(
+				&platform,
+				provider_enum,
+				conn,
+			)
+			.await?;
 			(platform.id, mapping)
 		}
 	};

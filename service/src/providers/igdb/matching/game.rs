@@ -9,17 +9,15 @@ use crate::db::platform::{
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
+use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::igdb::IgdbClient;
-use crate::providers::igdb::matching::util::roman_to_int;
-use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, PAGE_SIZE, clean_name};
+use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, PAGE_SIZE};
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use lazy_static::lazy_static;
 use log::{debug, error};
-use regex::Regex;
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::pin::Pin;
@@ -27,6 +25,7 @@ use std::sync::Arc;
 
 type FetchFn =
 	fn(
+		MetadataProviderEnum,
 		u64,
 		DbConn,
 	) -> Pin<Box<dyn Future<Output = Result<Option<Vec<Model>>, anyhow::Error>> + Send>>;
@@ -42,6 +41,7 @@ pub async fn match_games_to_igdb(
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
 	match_games_in_batches(
+		MetadataProviderEnum::Igdb,
 		get_unmatched_games_without_clone_of_with_limit,
 		match_game_to_igdb,
 		igdb_client.clone(),
@@ -51,6 +51,7 @@ pub async fn match_games_to_igdb(
 	debug!("Finished matching games without clone_of id to IGDB");
 
 	match_games_in_batches(
+		MetadataProviderEnum::Igdb,
 		get_unmatched_games_with_clone_of_with_limit,
 		match_clone_of_game_to_igdb,
 		igdb_client.clone(),
@@ -60,6 +61,7 @@ pub async fn match_games_to_igdb(
 	debug!("Finished matching games with clone_of id to IGDB");
 
 	match_games_in_batches(
+		MetadataProviderEnum::Igdb,
 		get_automatic_match_failed_games_with_limit,
 		match_game_to_igdb,
 		igdb_client.clone(),
@@ -72,12 +74,13 @@ pub async fn match_games_to_igdb(
 }
 
 pub async fn match_games_in_batches(
+	provider: MetadataProviderEnum,
 	fetch_fn: FetchFn,
 	match_fn: MatchFn,
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	while let Some(page) = fetch_fn(PAGE_SIZE, db_conn.clone()).await? {
+	while let Some(page) = fetch_fn(provider, PAGE_SIZE, db_conn.clone()).await? {
 		for page_chunks in page.chunks(IGDB_CHUNK_SIZE) {
 			let mut results = vec![];
 
@@ -296,42 +299,6 @@ fn match_game_to_igdb<'a>(
 	})
 }
 
-pub fn normalize_title(input: &str) -> String {
-	lazy_static! {
-		static ref RE_STRIP: Regex = Regex::new(r" - |: ").unwrap();
-		static ref RE_LEADING: Regex = Regex::new(r"^(?i)(the |a |an )").unwrap();
-		// Remove ", The", ", A", ", An" anywhere in the string (case-insensitive)
-		static ref RE_ARTICLE: Regex = Regex::new(r"(?i),\s*(the|a|an)\b").unwrap();
-		static ref RE_ROMAN: Regex = Regex::new(
-			r"\b(?i:M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\b"
-		).unwrap();
-	}
-
-	// 1. Strip " - " and ": "
-	let mut s = RE_STRIP.replace_all(input, " ").to_string();
-
-	// 2. Strip leading article
-	s = RE_LEADING.replace(&s, "").to_string();
-
-	// 3. Remove all article suffixes (anywhere in string)
-	s = RE_ARTICLE.replace_all(&s, "").to_string();
-
-	// 4. Replace all roman numerals
-	s = RE_ROMAN
-		.replace_all(&s, |caps: &regex::Captures| {
-			let roman = &caps[0];
-			if !roman.is_empty()
-				&& let Some(val) = roman_to_int(roman)
-			{
-				return val.to_string();
-			}
-			roman.to_string()
-		})
-		.to_string();
-
-	s.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
 async fn create_or_update_signature_metadata_mapping_success(
 	provider_id: String,
 	game_id: Uuid,
@@ -365,7 +332,13 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 	};
 
 	let platform_igdb_metadata_mapping =
-		match find_platform_related_signature_metadata_mapping(&platform, db_conn).await? {
+		match find_platform_related_signature_metadata_mapping(
+			&platform,
+			MetadataProviderEnum::Igdb,
+			db_conn,
+		)
+		.await?
+		{
 			None => {
 				return Err(anyhow::anyhow!(
 					"Platform {} is missing its igdb metadata mapping, this shouldn't happen...",
@@ -401,38 +374,3 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 	Ok(platform_igdb_id)
 }
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_normalize_title() {
-		assert_eq!(
-			normalize_title("The Legend of Zelda: Majora's Mask"),
-			"Legend of Zelda Majora's Mask"
-		);
-		assert_eq!(
-			normalize_title("Star Wars IV: A New Hope"),
-			"Star Wars 4 A New Hope"
-		);
-		assert_eq!(
-			normalize_title("A Series of Unfortunate Events, The"),
-			"Series of Unfortunate Events"
-		);
-		assert_eq!(
-			normalize_title("An American Tail - Fievel Goes West"),
-			"American Tail Fievel Goes West"
-		);
-		assert_eq!(normalize_title("Final Fantasy VII"), "Final Fantasy 7");
-		assert_eq!(normalize_title("Rocky II"), "Rocky 2");
-		assert_eq!(normalize_title("An Untitled Story"), "Untitled Story");
-		assert_eq!(
-			normalize_title("Legend of Zelda, The - Twilight Princess"),
-			"Legend of Zelda Twilight Princess"
-		);
-		assert_eq!(
-			normalize_title("The Legend of Zelda: Twilight Princess"),
-			"Legend of Zelda Twilight Princess"
-		)
-	}
-}

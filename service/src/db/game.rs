@@ -5,7 +5,7 @@ use ::entity::{
 	signature_metadata_mapping,
 };
 use chrono::{Duration, NaiveDateTime, Utc};
-use entity::sea_orm_active_enums::{FailedMatchReasonEnum, MatchTypeEnum};
+use entity::sea_orm_active_enums::{FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum};
 use entity::{company, dat_file, dat_file_import, platform, signature_group};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
@@ -342,27 +342,31 @@ pub async fn get_unpopulated_clone_of_games(
 		.await
 }
 
-/// Return up to `page_size` unmatched games that are not clones of any other game.
-/// Returns `Ok(None)` when there is nothing left to process.
+/// Return up to `page_size` games without a successful mapping for `provider` that are not
+/// clones of any other game. Returns `Ok(None)` when there is nothing left to process.
 pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
+	provider: MetadataProviderEnum,
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(true, page_size, conn)
+	get_unmatched_games_with_limit(provider, true, page_size, conn)
 }
 
-/// Return up to `page_size` unmatched games that are clones of another game.
-/// Returns `Ok(None)` when there is nothing left to process.
+/// Return up to `page_size` games without a successful mapping for `provider` that are
+/// clones of another game. Returns `Ok(None)` when there is nothing left to process.
 pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
+	provider: MetadataProviderEnum,
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(false, page_size, conn)
+	get_unmatched_games_with_limit(provider, false, page_size, conn)
 }
 
-/// Return up to `page_size` games whose last automatic match failed with `NoDirectMatch` more than 60 days ago.
-/// Used to retry stale failures. Returns `Ok(None)` when there is nothing left to process.
+/// Return up to `page_size` games whose last automatic match for `provider` failed with
+/// `NoDirectMatch` more than 60 days ago. Used to retry stale failures.
+/// Returns `Ok(None)` when there is nothing left to process.
 pub fn get_automatic_match_failed_games_with_limit<'a>(
+	provider: MetadataProviderEnum,
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
@@ -382,7 +386,8 @@ pub fn get_automatic_match_failed_games_with_limit<'a>(
 						signature_metadata_mapping::Column::FailedMatchReason
 							.eq(FailedMatchReasonEnum::NoDirectMatch),
 					)
-					.and(signature_metadata_mapping::Column::UpdatedAt.lt(sixty_days_ago_naive)),
+					.and(signature_metadata_mapping::Column::UpdatedAt.lt(sixty_days_ago_naive))
+					.and(signature_metadata_mapping::Column::Provider.eq(provider)),
 			)
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)
@@ -398,13 +403,13 @@ pub fn get_automatic_match_failed_games_with_limit<'a>(
 }
 
 fn get_unmatched_games_with_limit<'a>(
+	provider: MetadataProviderEnum,
 	clone_of_null: bool,
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
 	Box::pin(async move {
 		let smm1 = Alias::new("smm1");
-		let smm2 = Alias::new("smm2");
 
 		let res = Game::find()
 			.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
@@ -417,11 +422,6 @@ fn get_unmatched_games_with_limit<'a>(
 				JoinType::InnerJoin,
 				platform::Relation::SignatureMetadataMapping.def(),
 				smm1.clone(),
-			)
-			.join_as(
-				JoinType::LeftJoin,
-				game::Relation::SignatureMetadataMapping.def(),
-				smm2.clone(),
 			)
 			.filter(if clone_of_null {
 				game::Column::CloneOf.is_null()
@@ -437,12 +437,24 @@ fn get_unmatched_games_with_limit<'a>(
 				),
 			)
 			.filter(
-				Expr::col((smm2.clone(), signature_metadata_mapping::Column::Id))
-					.is_null()
-					.or(
-						Expr::col((smm2, signature_metadata_mapping::Column::MatchType))
-							.eq(MatchTypeEnum::None.as_enum()),
-					),
+				Expr::col((smm1.clone(), signature_metadata_mapping::Column::Provider))
+					.eq(provider),
+			)
+			.filter(
+				Expr::col(game::Column::Id).not_in_subquery(
+					::sea_orm::sea_query::Query::select()
+						.column(signature_metadata_mapping::Column::GameId)
+						.from(signature_metadata_mapping::Entity)
+						.and_where(
+							signature_metadata_mapping::Column::Provider.eq(provider),
+						)
+						.and_where(
+							signature_metadata_mapping::Column::MatchType
+								.ne(MatchTypeEnum::None),
+						)
+						.and_where(signature_metadata_mapping::Column::GameId.is_not_null())
+						.to_owned(),
+				),
 			)
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)

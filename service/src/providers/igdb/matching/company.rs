@@ -15,7 +15,9 @@ pub async fn match_companies_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	while let Some(inner_page) = get_unmatched_companies_with_limit(PAGE_SIZE, db_conn).await? {
+	while let Some(inner_page) =
+		get_unmatched_companies_with_limit(MetadataProviderEnum::Igdb, PAGE_SIZE, db_conn).await?
+	{
 		for inner_chunk in inner_page.chunks(IGDB_CHUNK_SIZE) {
 			let mut results = vec![];
 
