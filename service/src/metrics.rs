@@ -5,12 +5,12 @@ static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
 static CACHE_L1_SIZE: OnceLock<IntGaugeVec> = OnceLock::new();
 static IDENTIFY_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static SERVICE_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
-static IGDB_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
-static IGDB_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
+static METADATA_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
+static METADATA_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_RUNS: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_DURATION: OnceLock<HistogramVec> = OnceLock::new();
-static IGDB_REQUESTS: OnceLock<IntCounterVec> = OnceLock::new();
-static IGDB_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
+static METADATA_REQUESTS: OnceLock<IntCounterVec> = OnceLock::new();
+static METADATA_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 static DAT_INGESTION_FILES: OnceLock<IntCounterVec> = OnceLock::new();
 static CLONE_OF_RESOLUTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_ACTIONS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -65,29 +65,29 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(service_errors)
 		.map_err(|_| anyhow::anyhow!("service error metrics already initialised"))?;
 
-	let igdb_auto_matches = IntCounterVec::new(
+	let metadata_auto_matches = IntCounterVec::new(
 		Opts::new(
-			"api_igdb_auto_match_total",
-			"Automatic IGDB match outcomes per entity type, result and reason",
+			"api_metadata_auto_match_total",
+			"Automatic metadata-provider match outcomes per provider, entity type, result and reason",
 		),
-		&["entity_type", "result", "reason"],
+		&["provider", "entity_type", "result", "reason"],
 	)?;
-	registry.register(Box::new(igdb_auto_matches.clone()))?;
-	IGDB_AUTO_MATCHES
-		.set(igdb_auto_matches)
-		.map_err(|_| anyhow::anyhow!("igdb auto match metrics already initialised"))?;
+	registry.register(Box::new(metadata_auto_matches.clone()))?;
+	METADATA_AUTO_MATCHES
+		.set(metadata_auto_matches)
+		.map_err(|_| anyhow::anyhow!("metadata auto match metrics already initialised"))?;
 
-	let igdb_token_refreshes = IntCounterVec::new(
+	let metadata_token_refreshes = IntCounterVec::new(
 		Opts::new(
-			"api_igdb_token_refresh_total",
-			"IGDB OAuth2 token refresh attempts by trigger and result",
+			"api_metadata_token_refresh_total",
+			"OAuth2 token refresh attempts by provider, trigger and result",
 		),
-		&["trigger", "result"],
+		&["provider", "trigger", "result"],
 	)?;
-	registry.register(Box::new(igdb_token_refreshes.clone()))?;
-	IGDB_TOKEN_REFRESHES
-		.set(igdb_token_refreshes)
-		.map_err(|_| anyhow::anyhow!("igdb token refresh metrics already initialised"))?;
+	registry.register(Box::new(metadata_token_refreshes.clone()))?;
+	METADATA_TOKEN_REFRESHES
+		.set(metadata_token_refreshes)
+		.map_err(|_| anyhow::anyhow!("metadata token refresh metrics already initialised"))?;
 
 	let background_job_runs = IntCounterVec::new(
 		Opts::new(
@@ -116,32 +116,32 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(background_job_duration)
 		.map_err(|_| anyhow::anyhow!("background job duration metrics already initialised"))?;
 
-	let igdb_requests = IntCounterVec::new(
+	let metadata_requests = IntCounterVec::new(
 		Opts::new(
-			"api_igdb_request_total",
-			"IGDB outbound requests by endpoint and result",
+			"api_metadata_request_total",
+			"Metadata-provider outbound requests by provider, endpoint and result",
 		),
-		&["endpoint", "result"],
+		&["provider", "endpoint", "result"],
 	)?;
-	registry.register(Box::new(igdb_requests.clone()))?;
-	IGDB_REQUESTS
-		.set(igdb_requests)
-		.map_err(|_| anyhow::anyhow!("igdb request metrics already initialised"))?;
+	registry.register(Box::new(metadata_requests.clone()))?;
+	METADATA_REQUESTS
+		.set(metadata_requests)
+		.map_err(|_| anyhow::anyhow!("metadata request metrics already initialised"))?;
 
-	let igdb_request_duration = HistogramVec::new(
+	let metadata_request_duration = HistogramVec::new(
 		HistogramOpts::new(
-			"api_igdb_request_duration_seconds",
-			"IGDB outbound request duration in seconds",
+			"api_metadata_request_duration_seconds",
+			"Metadata-provider outbound request duration in seconds, by provider and endpoint",
 		)
 		.buckets(vec![
 			0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0,
 		]),
-		&["endpoint"],
+		&["provider", "endpoint"],
 	)?;
-	registry.register(Box::new(igdb_request_duration.clone()))?;
-	IGDB_REQUEST_DURATION
-		.set(igdb_request_duration)
-		.map_err(|_| anyhow::anyhow!("igdb request duration metrics already initialised"))?;
+	registry.register(Box::new(metadata_request_duration.clone()))?;
+	METADATA_REQUEST_DURATION
+		.set(metadata_request_duration)
+		.map_err(|_| anyhow::anyhow!("metadata request duration metrics already initialised"))?;
 
 	let dat_ingestion_files = IntCounterVec::new(
 		Opts::new(
@@ -228,17 +228,19 @@ pub fn record_service_error(variant: &str) {
 	}
 }
 
-pub fn record_igdb_auto_match(entity_type: &str, result: &str, reason: &str) {
-	if let Some(counter) = IGDB_AUTO_MATCHES.get() {
+pub fn record_metadata_auto_match(provider: &str, entity_type: &str, result: &str, reason: &str) {
+	if let Some(counter) = METADATA_AUTO_MATCHES.get() {
 		counter
-			.with_label_values(&[entity_type, result, reason])
+			.with_label_values(&[provider, entity_type, result, reason])
 			.inc();
 	}
 }
 
-pub fn record_igdb_token_refresh(trigger: &str, result: &str) {
-	if let Some(counter) = IGDB_TOKEN_REFRESHES.get() {
-		counter.with_label_values(&[trigger, result]).inc();
+pub fn record_metadata_token_refresh(provider: &str, trigger: &str, result: &str) {
+	if let Some(counter) = METADATA_TOKEN_REFRESHES.get() {
+		counter
+			.with_label_values(&[provider, trigger, result])
+			.inc();
 	}
 }
 
@@ -253,13 +255,20 @@ pub fn record_background_job(job: &str, result: &str, duration_seconds: f64) {
 	}
 }
 
-pub fn record_igdb_request(endpoint: &str, result: &str, duration_seconds: f64) {
-	if let Some(counter) = IGDB_REQUESTS.get() {
-		counter.with_label_values(&[endpoint, result]).inc();
+pub fn record_metadata_request(
+	provider: &str,
+	endpoint: &str,
+	result: &str,
+	duration_seconds: f64,
+) {
+	if let Some(counter) = METADATA_REQUESTS.get() {
+		counter
+			.with_label_values(&[provider, endpoint, result])
+			.inc();
 	}
-	if let Some(histogram) = IGDB_REQUEST_DURATION.get() {
+	if let Some(histogram) = METADATA_REQUEST_DURATION.get() {
 		histogram
-			.with_label_values(&[endpoint])
+			.with_label_values(&[provider, endpoint])
 			.observe(duration_seconds);
 	}
 }

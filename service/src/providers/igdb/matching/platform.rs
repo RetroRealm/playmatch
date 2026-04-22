@@ -66,7 +66,7 @@ pub async fn match_platform_to_igdb(
 				&db_conn,
 			)
 			.await?;
-			crate::metrics::record_igdb_auto_match("platform", "matched", "direct_name");
+			crate::metrics::record_metadata_auto_match("igdb","platform", "matched", "direct_name");
 
 			return Ok(());
 		}
@@ -83,7 +83,7 @@ pub async fn match_platform_to_igdb(
 		&db_conn,
 	)
 	.await?;
-	crate::metrics::record_igdb_auto_match("platform", "failed", "no_direct_match");
+	crate::metrics::record_metadata_auto_match("igdb","platform", "failed", "no_direct_match");
 
 	Ok(())
 }

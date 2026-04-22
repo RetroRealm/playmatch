@@ -1185,11 +1185,11 @@ impl IgdbClient {
 	async fn refresh_token_instrumented(&self, trigger: &'static str) -> anyhow::Result<()> {
 		match self.refresh_token().await {
 			Ok(()) => {
-				crate::metrics::record_igdb_token_refresh(trigger, "success");
+				crate::metrics::record_metadata_token_refresh("igdb",trigger, "success");
 				Ok(())
 			}
 			Err(e) => {
-				crate::metrics::record_igdb_token_refresh(trigger, "error");
+				crate::metrics::record_metadata_token_refresh("igdb",trigger, "error");
 				Err(e)
 			}
 		}
@@ -1208,7 +1208,7 @@ impl IgdbClient {
 			.do_request_parsed_inner::<T>(method, path, fields_clause, where_clause, limit_clause)
 			.await;
 		let outcome = if result.is_ok() { "success" } else { "error" };
-		crate::metrics::record_igdb_request(path, outcome, started.elapsed().as_secs_f64());
+		crate::metrics::record_metadata_request("igdb", path, outcome, started.elapsed().as_secs_f64());
 		result
 	}
 
