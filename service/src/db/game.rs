@@ -445,12 +445,9 @@ fn get_unmatched_games_with_limit<'a>(
 					::sea_orm::sea_query::Query::select()
 						.column(signature_metadata_mapping::Column::GameId)
 						.from(signature_metadata_mapping::Entity)
+						.and_where(signature_metadata_mapping::Column::Provider.eq(provider))
 						.and_where(
-							signature_metadata_mapping::Column::Provider.eq(provider),
-						)
-						.and_where(
-							signature_metadata_mapping::Column::MatchType
-								.ne(MatchTypeEnum::None),
+							signature_metadata_mapping::Column::MatchType.ne(MatchTypeEnum::None),
 						)
 						.and_where(signature_metadata_mapping::Column::GameId.is_not_null())
 						.to_owned(),

@@ -50,8 +50,7 @@ fn hash_api_key_legacy(token: &str) -> String {
 }
 
 fn hash_api_key_hmac(token: &str) -> String {
-	let mut mac = HmacSha256::new_from_slice(pepper())
-		.expect("HMAC-SHA256 accepts any key length");
+	let mut mac = HmacSha256::new_from_slice(pepper()).expect("HMAC-SHA256 accepts any key length");
 	mac.update(token.as_bytes());
 	hex::encode(mac.finalize().into_bytes())
 }

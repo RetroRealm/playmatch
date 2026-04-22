@@ -61,14 +61,7 @@ use service::providers::igdb::model::{
 /// IGDB-prefilled thin wrapper around `$crate::__provider_id_route_impl`.
 macro_rules! igdb_id_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $model:ty) => {
-		$crate::__provider_id_route_impl!(
-			IgdbClient,
-			"IGDB",
-			$route,
-			$fn_name,
-			$cached_fn,
-			$model
-		);
+		$crate::__provider_id_route_impl!(IgdbClient, "IGDB", $route, $fn_name, $cached_fn, $model);
 	};
 }
 
@@ -76,12 +69,7 @@ macro_rules! igdb_id_route {
 macro_rules! igdb_ids_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $model:ty) => {
 		$crate::__provider_ids_route_impl!(
-			IgdbClient,
-			"IGDB",
-			$route,
-			$fn_name,
-			$cached_fn,
-			$model
+			IgdbClient, "IGDB", $route, $fn_name, $cached_fn, $model
 		);
 	};
 }

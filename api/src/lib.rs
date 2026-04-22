@@ -148,8 +148,9 @@ async fn start() -> anyhow::Result<()> {
 
 	// Install the API key pepper before the server accepts requests. Missing or
 	// malformed pepper is a loud startup panic.
-	let pepper_raw = env::var("API_KEY_PEPPER")
-		.expect("API_KEY_PEPPER environment variable is required (e.g. output of `openssl rand -hex 32`)");
+	let pepper_raw = env::var("API_KEY_PEPPER").expect(
+		"API_KEY_PEPPER environment variable is required (e.g. output of `openssl rand -hex 32`)",
+	);
 	service::db::user::init_pepper(&pepper_raw).unwrap_or_else(|e| panic!("API_KEY_PEPPER: {e}"));
 
 	let igdb_http_client = Client::builder().cookie_store(true).build()?;

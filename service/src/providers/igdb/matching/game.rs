@@ -134,7 +134,7 @@ fn match_clone_of_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match("igdb","game", "matched", "via_parent");
+				crate::metrics::record_metadata_auto_match("igdb", "game", "matched", "via_parent");
 
 				return Ok(());
 			}
@@ -158,7 +158,7 @@ fn match_clone_of_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match("igdb","game", "matched", "via_child");
+				crate::metrics::record_metadata_auto_match("igdb", "game", "matched", "via_child");
 
 				return Ok(());
 			}
@@ -197,7 +197,12 @@ fn match_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match("igdb","game", "matched", "direct_name");
+				crate::metrics::record_metadata_auto_match(
+					"igdb",
+					"game",
+					"matched",
+					"direct_name",
+				);
 
 				return Ok(());
 			}
@@ -217,7 +222,12 @@ fn match_game_to_igdb<'a>(
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match("igdb","game", "matched", "normalized_name");
+				crate::metrics::record_metadata_auto_match(
+					"igdb",
+					"game",
+					"matched",
+					"normalized_name",
+				);
 
 				return Ok(());
 			}
@@ -247,7 +257,8 @@ fn match_game_to_igdb<'a>(
 							&db_conn,
 						)
 						.await?;
-						crate::metrics::record_metadata_auto_match("igdb",
+						crate::metrics::record_metadata_auto_match(
+							"igdb",
 							"game",
 							"matched",
 							"alternative_name",
@@ -270,7 +281,8 @@ fn match_game_to_igdb<'a>(
 							&db_conn,
 						)
 						.await?;
-						crate::metrics::record_metadata_auto_match("igdb",
+						crate::metrics::record_metadata_auto_match(
+							"igdb",
 							"game",
 							"matched",
 							"normalized_alternative_name",
@@ -293,7 +305,7 @@ fn match_game_to_igdb<'a>(
 			&db_conn,
 		)
 		.await?;
-		crate::metrics::record_metadata_auto_match("igdb","game", "failed", "no_direct_match");
+		crate::metrics::record_metadata_auto_match("igdb", "game", "failed", "no_direct_match");
 
 		Ok(())
 	})
@@ -331,22 +343,21 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 		Some(p) => p,
 	};
 
-	let platform_igdb_metadata_mapping =
-		match find_platform_related_signature_metadata_mapping(
-			&platform,
-			MetadataProviderEnum::Igdb,
-			db_conn,
-		)
-		.await?
-		{
-			None => {
-				return Err(anyhow::anyhow!(
-					"Platform {} is missing its igdb metadata mapping, this shouldn't happen...",
-					&platform.name
-				));
-			}
-			Some(plat_map) => plat_map,
-		};
+	let platform_igdb_metadata_mapping = match find_platform_related_signature_metadata_mapping(
+		&platform,
+		MetadataProviderEnum::Igdb,
+		db_conn,
+	)
+	.await?
+	{
+		None => {
+			return Err(anyhow::anyhow!(
+				"Platform {} is missing its igdb metadata mapping, this shouldn't happen...",
+				&platform.name
+			));
+		}
+		Some(plat_map) => plat_map,
+	};
 
 	if platform_igdb_metadata_mapping.match_type != MatchTypeEnum::Automatic
 		&& platform_igdb_metadata_mapping.match_type != MatchTypeEnum::Manual
@@ -373,4 +384,3 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 
 	Ok(platform_igdb_id)
 }
-

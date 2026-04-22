@@ -103,8 +103,14 @@ mod tests {
 
 	#[test]
 	fn rejects_path_traversal() {
-		assert_eq!(sanitise_content_disposition_filename("../../etc/passwd"), None);
-		assert_eq!(sanitise_content_disposition_filename("..\\..\\secret"), None);
+		assert_eq!(
+			sanitise_content_disposition_filename("../../etc/passwd"),
+			None
+		);
+		assert_eq!(
+			sanitise_content_disposition_filename("..\\..\\secret"),
+			None
+		);
 		assert_eq!(sanitise_content_disposition_filename("/abs/path"), None);
 	}
 

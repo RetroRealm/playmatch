@@ -68,24 +68,18 @@ async fn apply_manual_entity_match(
 			let company = find_company_by_name(r#match.name.as_str(), conn)
 				.await?
 				.ok_or(ServiceError::CompanyNotFound)?;
-			let mapping = find_company_related_signature_metadata_mapping(
-				&company,
-				provider_enum,
-				conn,
-			)
-			.await?;
+			let mapping =
+				find_company_related_signature_metadata_mapping(&company, provider_enum, conn)
+					.await?;
 			(company.id, mapping)
 		}
 		ManualTarget::Platform => {
 			let platform = find_platform_by_name(r#match.name.as_str(), conn)
 				.await?
 				.ok_or(ServiceError::PlatformNotFound)?;
-			let mapping = find_platform_related_signature_metadata_mapping(
-				&platform,
-				provider_enum,
-				conn,
-			)
-			.await?;
+			let mapping =
+				find_platform_related_signature_metadata_mapping(&platform, provider_enum, conn)
+					.await?;
 			(platform.id, mapping)
 		}
 	};

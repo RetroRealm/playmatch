@@ -223,9 +223,8 @@ async fn process_envelope(
 
 	let mut outcomes = Vec::with_capacity(envelope.payload.mappings.len());
 	for mapping in envelope.payload.mappings {
-		outcomes.push(
-			process_mapping(game.id, mapping, envelope.user_agent.clone(), db_conn).await,
-		);
+		outcomes
+			.push(process_mapping(game.id, mapping, envelope.user_agent.clone(), db_conn).await);
 	}
 	outcomes
 }

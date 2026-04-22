@@ -38,8 +38,7 @@ macro_rules! __cached_lookup_impl {
 					id
 				);
 				$crate::metrics::record_cache_hit($provider_label, $label);
-				let deserialized =
-					$crate::cache::deserialize_option_redis_value(cached_val)?;
+				let deserialized = $crate::cache::deserialize_option_redis_value(cached_val)?;
 				return Ok(deserialized);
 			}
 			::log::debug!(
@@ -53,12 +52,7 @@ macro_rules! __cached_lookup_impl {
 			let value = client.$fetch(id).await?;
 
 			let payload = $crate::cache::serialize_option_redis_value(value.clone())?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				$lifetime,
-			);
+			$crate::cache::spawn_cache_write(redis_conn.clone(), cache_key, payload, $lifetime);
 
 			Ok(value)
 		}
@@ -98,21 +92,11 @@ macro_rules! __cached_reference_lookup_impl {
 			});
 
 			if let Some(hit) = l1.get(&id).await {
-				::log::debug!(
-					"{} L1 hit for {} with id: {}",
-					$provider_label,
-					$label,
-					id
-				);
+				::log::debug!("{} L1 hit for {} with id: {}", $provider_label, $label, id);
 				$crate::metrics::record_cache_hit($l1_label, $label);
 				return Ok(hit);
 			}
-			::log::debug!(
-				"{} L1 miss for {} with id: {}",
-				$provider_label,
-				$label,
-				id
-			);
+			::log::debug!("{} L1 miss for {} with id: {}", $provider_label, $label, id);
 			$crate::metrics::record_cache_miss($l1_label, $label);
 
 			let cache_key = <$cache_type>::$variant.get_cache_key(&id.to_string());
@@ -121,12 +105,7 @@ macro_rules! __cached_reference_lookup_impl {
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))
 				.await
 			{
-				::log::debug!(
-					"{} L2 hit for {} with id: {}",
-					$provider_label,
-					$label,
-					id
-				);
+				::log::debug!("{} L2 hit for {} with id: {}", $provider_label, $label, id);
 				$crate::metrics::record_cache_hit($provider_label, $label);
 				let deserialized: Option<$ty> =
 					$crate::cache::deserialize_option_redis_value(cached_val)?;
@@ -147,12 +126,7 @@ macro_rules! __cached_reference_lookup_impl {
 			l1.insert(id, value.clone()).await;
 			$crate::metrics::set_cache_l1_entries($label, l1.entry_count());
 			let payload = $crate::cache::serialize_option_redis_value(value.clone())?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				$lifetime,
-			);
+			$crate::cache::spawn_cache_write(redis_conn.clone(), cache_key, payload, $lifetime);
 
 			Ok(value)
 		}
@@ -192,8 +166,7 @@ macro_rules! __cached_lookup_by_slug_impl {
 					slug
 				);
 				$crate::metrics::record_cache_hit($provider_label, $label);
-				let deserialized =
-					$crate::cache::deserialize_option_redis_value(cached_val)?;
+				let deserialized = $crate::cache::deserialize_option_redis_value(cached_val)?;
 				return Ok(deserialized);
 			}
 			::log::debug!(
@@ -207,12 +180,7 @@ macro_rules! __cached_lookup_by_slug_impl {
 			let value = client.$fetch(&slug).await?;
 
 			let payload = $crate::cache::serialize_option_redis_value(value.clone())?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				$lifetime,
-			);
+			$crate::cache::spawn_cache_write(redis_conn.clone(), cache_key, payload, $lifetime);
 
 			Ok(value)
 		}
@@ -239,8 +207,8 @@ macro_rules! __cached_search_impl {
 			redis_conn: &mut ::redis::aio::MultiplexedConnection,
 			query: String,
 		) -> ::anyhow::Result<Vec<$ty>> {
-			let cache_key = <$cache_type>::$variant
-				.get_cache_key(&$crate::cache::normalised_key_hash(&query));
+			let cache_key =
+				<$cache_type>::$variant.get_cache_key(&$crate::cache::normalised_key_hash(&query));
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))
@@ -267,12 +235,7 @@ macro_rules! __cached_search_impl {
 			let values = client.$fetch(&query).await?;
 
 			let payload = ::serde_json::to_string(&values)?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				$lifetime,
-			);
+			$crate::cache::spawn_cache_write(redis_conn.clone(), cache_key, payload, $lifetime);
 
 			Ok(values)
 		}
