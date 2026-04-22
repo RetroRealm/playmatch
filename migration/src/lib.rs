@@ -20,6 +20,7 @@ mod m20250725_063924_add_normalized_name_automatic_match_reason;
 mod m20260418_120000_tune_hot_path_indexes;
 mod m20260420_041040_hash_api_keys;
 mod m20260420_120000_add_source_to_suggestions;
+mod m20260423_000000_index_game_dat_file_import_id_name;
 
 pub struct Migrator;
 
@@ -47,6 +48,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260418_120000_tune_hot_path_indexes::Migration),
 			Box::new(m20260420_041040_hash_api_keys::Migration),
 			Box::new(m20260420_120000_add_source_to_suggestions::Migration),
+			Box::new(m20260423_000000_index_game_dat_file_import_id_name::Migration),
 		]
 	}
 }
