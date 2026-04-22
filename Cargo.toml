@@ -38,3 +38,9 @@ dotenvy = "^0.15"
 
 [build-dependencies]
 built = { version = "^0.8", features = ["chrono", "semver", "git2"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
