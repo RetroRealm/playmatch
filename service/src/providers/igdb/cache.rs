@@ -18,9 +18,9 @@ use crate::providers::igdb::model::{
 	PopularityPrimitive, PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus,
 	Report, ReportType, Screenshot, Theme, Website, WebsiteType,
 };
-use log::{debug, warn};
+use log::debug;
 use moka::future::Cache as L1Cache;
-use redis::AsyncTypedCommands;
+use redis::{AsyncTypedCommands, Expiry};
 use redis::aio::MultiplexedConnection;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -60,15 +60,12 @@ macro_rules! cached_reference_lookup {
 
 			let cache_key = IgdbCacheType::$variant.get_cache_key(&id.to_string());
 
-			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+			if let Ok(Some(cached_val)) = redis_conn
+				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
+				.await
+			{
 				debug!("igdb L2 hit for {} with id: {}", $label, id);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				if let Err(e) = redis_conn
-					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await
-				{
-					warn!("cache ttl refresh failed for {}: {e}", cache_key);
-				}
 				let deserialized: Option<$ty> = deserialize_option_redis_value(cached_val)?;
 				l1.insert(id, deserialized.clone()).await;
 				$crate::metrics::set_cache_l1_entries($label, l1.entry_count());
@@ -103,15 +100,12 @@ macro_rules! cached_lookup {
 		) -> anyhow::Result<Option<$ty>> {
 			let cache_key = IgdbCacheType::$variant.get_cache_key(&id.to_string());
 
-			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+			if let Ok(Some(cached_val)) = redis_conn
+				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
+				.await
+			{
 				debug!("igdb Cache hit for {} with id: {}", $label, id);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				if let Err(e) = redis_conn
-					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await
-				{
-					warn!("cache ttl refresh failed for {}: {e}", cache_key);
-				}
 				let deserialized = deserialize_option_redis_value(cached_val)?;
 				return Ok(deserialized);
 			}
@@ -142,15 +136,12 @@ macro_rules! cached_lookup_by_slug {
 		) -> anyhow::Result<Option<$ty>> {
 			let cache_key = IgdbCacheType::$variant.get_cache_key(&normalised_key_hash(&slug));
 
-			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+			if let Ok(Some(cached_val)) = redis_conn
+				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
+				.await
+			{
 				debug!("igdb Cache hit for {} with slug: {}", $label, slug);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				if let Err(e) = redis_conn
-					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await
-				{
-					warn!("cache ttl refresh failed for {}: {e}", cache_key);
-				}
 				let deserialized = deserialize_option_redis_value(cached_val)?;
 				return Ok(deserialized);
 			}
@@ -181,15 +172,12 @@ macro_rules! cached_search {
 		) -> anyhow::Result<Vec<$ty>> {
 			let cache_key = IgdbCacheType::$variant.get_cache_key(&normalised_key_hash(&query));
 
-			if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+			if let Ok(Some(cached_val)) = redis_conn
+				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
+				.await
+			{
 				debug!("igdb Cache hit for {} query: {}", $label, query);
 				$crate::metrics::record_cache_hit("igdb", $label);
-				if let Err(e) = redis_conn
-					.expire(&cache_key, IGDB_CACHE_LIFETIME as i64)
-					.await
-				{
-					warn!("cache ttl refresh failed for {}: {e}", cache_key);
-				}
 				let deserialized: Vec<$ty> = serde_json::from_str(&cached_val)?;
 				return Ok(deserialized);
 			}

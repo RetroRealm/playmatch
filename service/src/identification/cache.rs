@@ -11,7 +11,7 @@ use crate::error::ServiceResult;
 use entity::{game, signature_metadata_mapping};
 use hex::encode as hex_encode;
 use log::{debug, warn};
-use redis::AsyncTypedCommands;
+use redis::{AsyncTypedCommands, Expiry};
 use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use serde::{Deserialize, Serialize};
@@ -100,18 +100,15 @@ pub async fn find_game_and_metadata_ids_by_filename_size_cached(
 	let key = filename_size_key(file_name, file_size);
 	let cache_key = IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key);
 
-	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+	if let Ok(Some(cached_val)) = redis_conn
+		.get_ex(&cache_key, Expiry::EX(IDENTIFY_CACHE_LIFETIME))
+		.await
+	{
 		debug!("Cache hit for filename+size");
 		crate::metrics::record_cache_hit(
 			"identify",
 			IdentifyCacheType::IdentifyFilenameSize.metric_label(),
 		);
-		if let Err(e) = redis_conn
-			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
-			.await
-		{
-			warn!("cache ttl refresh failed for {cache_key}: {e}");
-		}
 		let deserialized = deserialize_option_redis_value(cached_val)?;
 		return Ok(Cached(deserialized));
 	}
@@ -148,15 +145,12 @@ pub async fn find_game_and_metadata_ids_by_hash_cached(
 ) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
 	let cache_key = r#type.get_cache_key(hash);
 
-	if let Ok(Some(cached_val)) = redis_conn.get(&cache_key).await {
+	if let Ok(Some(cached_val)) = redis_conn
+		.get_ex(&cache_key, Expiry::EX(IDENTIFY_CACHE_LIFETIME))
+		.await
+	{
 		debug!("Cache hit for key: {hash}");
 		crate::metrics::record_cache_hit("identify", r#type.metric_label());
-		if let Err(e) = redis_conn
-			.expire(&cache_key, IDENTIFY_CACHE_LIFETIME as i64)
-			.await
-		{
-			warn!("cache ttl refresh failed for {cache_key}: {e}");
-		}
 		let deserialized = deserialize_option_redis_value(cached_val)?;
 		return Ok(Cached(deserialized));
 	}
