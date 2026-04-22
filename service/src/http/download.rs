@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::http::abstraction::RequestClientExt;
 use futures_util::stream::StreamExt;
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, warn};
 use rand::distr::{Alphanumeric, SampleString};
 use regex::Regex;
 use reqwest::Client;
@@ -36,11 +36,21 @@ pub async fn download_file(
 		&& let Ok(content_disposition) = content_disposition.to_str()
 		&& let Some(filename) = extract_filename(content_disposition)
 	{
-		debug!(
-			"Filename extracted from Content-Disposition header: {:?}",
-			&filename
-		);
-		file_name = Some(filename);
+		match sanitise_content_disposition_filename(&filename) {
+			Some(safe) => {
+				debug!(
+					"Filename extracted from Content-Disposition header: {:?}",
+					&safe
+				);
+				file_name = Some(safe);
+			}
+			None => {
+				warn!(
+					"Content-Disposition filename rejected as unsafe, falling back to random: {:?}",
+					&filename
+				);
+			}
+		}
 	}
 
 	let file_name_final = match &file_name {
@@ -68,4 +78,59 @@ fn extract_filename(content_disposition: &str) -> Option<String> {
 		return captures.get(1).map(|c| c.as_str().to_string());
 	}
 	None
+}
+
+/// Reject Content-Disposition filenames that could escape the target directory
+/// (path separators, leading dot sequences) or are implausibly long.
+/// Returns None on reject; caller falls back to a random name.
+fn sanitise_content_disposition_filename(raw: &str) -> Option<String> {
+	let trimmed = raw.trim().trim_matches('"').trim();
+	if trimmed.is_empty() || trimmed.len() > 255 {
+		return None;
+	}
+	if trimmed.contains('/') || trimmed.contains('\\') {
+		return None;
+	}
+	if trimmed.starts_with('.') {
+		return None;
+	}
+	Some(trimmed.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn rejects_path_traversal() {
+		assert_eq!(sanitise_content_disposition_filename("../../etc/passwd"), None);
+		assert_eq!(sanitise_content_disposition_filename("..\\..\\secret"), None);
+		assert_eq!(sanitise_content_disposition_filename("/abs/path"), None);
+	}
+
+	#[test]
+	fn rejects_leading_dot() {
+		assert_eq!(sanitise_content_disposition_filename(".hidden"), None);
+		assert_eq!(sanitise_content_disposition_filename(".."), None);
+	}
+
+	#[test]
+	fn rejects_empty_or_oversized() {
+		assert_eq!(sanitise_content_disposition_filename(""), None);
+		assert_eq!(sanitise_content_disposition_filename("   "), None);
+		let long = "a".repeat(256);
+		assert_eq!(sanitise_content_disposition_filename(&long), None);
+	}
+
+	#[test]
+	fn accepts_normal_names() {
+		assert_eq!(
+			sanitise_content_disposition_filename("no-intro-snes.zip"),
+			Some("no-intro-snes.zip".to_owned())
+		);
+		assert_eq!(
+			sanitise_content_disposition_filename("  \"quoted name.dat\"  "),
+			Some("quoted name.dat".to_owned())
+		);
+	}
 }

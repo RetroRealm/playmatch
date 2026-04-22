@@ -357,7 +357,22 @@ pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version:
 	file_name
 }
 
+/// Maximum DAT file size accepted by `parse_dat_file`. Largest observed real
+/// DAT is ~78 MiB; 125 MiB gives headroom without unbounded heap growth on
+/// malformed or hostile input.
+const MAX_DAT_BYTES: u64 = 125 * 1024 * 1024;
+
 pub async fn parse_dat_file(path: &Path) -> anyhow::Result<Datafile> {
+	let meta = tokio::fs::metadata(path).await?;
+	if meta.len() > MAX_DAT_BYTES {
+		anyhow::bail!(
+			"dat file {} is {} bytes, exceeds MAX_DAT_BYTES ({})",
+			path.display(),
+			meta.len(),
+			MAX_DAT_BYTES,
+		);
+	}
+
 	let mut dat_file = File::open(path).await?;
 
 	let mut content = Vec::new();
