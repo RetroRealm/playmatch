@@ -1145,7 +1145,11 @@ impl IgdbClient {
 			.request_async(&self.client)
 			.await?;
 
-		debug!("Token result: {token_result:?}");
+		debug!(
+			"igdb oauth refresh ok: token_type={:?} expires_in={:?}",
+			token_result.token_type(),
+			token_result.expires_in(),
+		);
 
 		handler_ref.last_token_request = Some(Utc::now());
 		handler_ref.token_response = Some(token_result);
@@ -1244,11 +1248,11 @@ impl IgdbClient {
 			))
 			.build()?;
 
-		debug!("Request: {req:?}");
+		debug!("igdb request: {} {}", req.method(), req.url().path());
 		if let Some(body) = req.body()
 			&& let Some(bytes) = body.as_bytes()
 		{
-			debug!("Request body: {:?}", std::str::from_utf8(bytes)?);
+			debug!("igdb request body: {:?}", std::str::from_utf8(bytes)?);
 		}
 
 		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
@@ -1256,7 +1260,10 @@ impl IgdbClient {
 		let res = rate_limited_future.await?;
 
 		let body = res.text().await?;
-		debug!("Response: {body}");
+		if log::log_enabled!(log::Level::Debug) {
+			let preview: String = body.chars().take(256).collect();
+			debug!("igdb response (first 256 chars): {preview}");
+		}
 
 		Ok(serde_json::from_str(&body)?)
 	}
