@@ -1,7 +1,4 @@
-use crate::cache::{
-	CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey, deserialize_option_redis_value, normalised_key_hash,
-	serialize_option_redis_value,
-};
+use crate::cache::{CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey};
 use crate::providers::igdb::IgdbClient;
 use crate::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
@@ -18,11 +15,7 @@ use crate::providers::igdb::model::{
 	PopularityPrimitive, PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus,
 	Report, ReportType, Screenshot, Theme, Website, WebsiteType,
 };
-use log::debug;
-use moka::future::Cache as L1Cache;
-use redis::{AsyncTypedCommands, Expiry};
-use redis::aio::MultiplexedConnection;
-use std::sync::OnceLock;
+use redis::AsyncTypedCommands;
 use std::time::Duration;
 
 const IGDB_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24).as_secs(); // 1 day
@@ -30,172 +23,76 @@ const IGDB_CACHE_LIFETIME: u64 = Duration::from_secs(60 * 60 * 24).as_secs(); //
 const L1_MAX_CAPACITY: u64 = 10_000;
 const L1_TIME_TO_IDLE: Duration = Duration::from_secs(15 * 60);
 
-/// Like `cached_lookup!` but adds a per-worker in-process L1 (moka) in front
-/// of Redis. Reserved for small, rarely-changing reference entities where the
-/// cost of keeping a cloned copy per worker is negligible and the call volume
-/// is high. Heavy entities such as `Game` or `Cover` should continue to use
-/// `cached_lookup!` so their payloads live in Redis only.
-macro_rules! cached_reference_lookup {
+/// IGDB-prefilled thin wrapper around `$crate::__cached_lookup_impl`. Keeps the
+/// per-entity invocations below terse; the shared macro body lives in
+/// `service/src/cache/macros.rs`.
+macro_rules! cached_lookup {
 	($fn_name:ident, $ty:ty, $fetch:ident, $variant:ident, $label:literal) => {
-		pub async fn $fn_name(
-			igdb_client: &IgdbClient,
-			redis_conn: &mut MultiplexedConnection,
-			id: i32,
-		) -> anyhow::Result<Option<$ty>> {
-			static L1: OnceLock<L1Cache<i32, Option<$ty>>> = OnceLock::new();
-			let l1 = L1.get_or_init(|| {
-				L1Cache::builder()
-					.max_capacity(L1_MAX_CAPACITY)
-					.time_to_idle(L1_TIME_TO_IDLE)
-					.build()
-			});
-
-			if let Some(hit) = l1.get(&id).await {
-				debug!("igdb L1 hit for {} with id: {}", $label, id);
-				$crate::metrics::record_cache_hit("igdb-l1", $label);
-				return Ok(hit);
-			}
-			debug!("igdb L1 miss for {} with id: {}", $label, id);
-			$crate::metrics::record_cache_miss("igdb-l1", $label);
-
-			let cache_key = IgdbCacheType::$variant.get_cache_key(&id.to_string());
-
-			if let Ok(Some(cached_val)) = redis_conn
-				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
-				.await
-			{
-				debug!("igdb L2 hit for {} with id: {}", $label, id);
-				$crate::metrics::record_cache_hit("igdb", $label);
-				let deserialized: Option<$ty> = deserialize_option_redis_value(cached_val)?;
-				l1.insert(id, deserialized.clone()).await;
-				$crate::metrics::set_cache_l1_entries($label, l1.entry_count());
-				return Ok(deserialized);
-			}
-			debug!("igdb Cache miss for {} with id: {}", $label, id);
-			$crate::metrics::record_cache_miss("igdb", $label);
-
-			let value = igdb_client.$fetch(id).await?;
-
-			l1.insert(id, value.clone()).await;
-			$crate::metrics::set_cache_l1_entries($label, l1.entry_count());
-			let payload = serialize_option_redis_value(value.clone())?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				IGDB_CACHE_LIFETIME,
-			);
-
-			Ok(value)
-		}
+		$crate::__cached_lookup_impl!(
+			$fn_name,
+			&IgdbClient,
+			IgdbCacheType,
+			"igdb",
+			IGDB_CACHE_LIFETIME,
+			$ty,
+			$fetch,
+			$variant,
+			$label
+		);
 	};
 }
 
-macro_rules! cached_lookup {
+/// IGDB-prefilled thin wrapper around `$crate::__cached_reference_lookup_impl`.
+/// Adds a per-worker in-process L1 (moka) in front of Redis for small, hot
+/// reference entities.
+macro_rules! cached_reference_lookup {
 	($fn_name:ident, $ty:ty, $fetch:ident, $variant:ident, $label:literal) => {
-		pub async fn $fn_name(
-			igdb_client: &IgdbClient,
-			redis_conn: &mut MultiplexedConnection,
-			id: i32,
-		) -> anyhow::Result<Option<$ty>> {
-			let cache_key = IgdbCacheType::$variant.get_cache_key(&id.to_string());
-
-			if let Ok(Some(cached_val)) = redis_conn
-				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
-				.await
-			{
-				debug!("igdb Cache hit for {} with id: {}", $label, id);
-				$crate::metrics::record_cache_hit("igdb", $label);
-				let deserialized = deserialize_option_redis_value(cached_val)?;
-				return Ok(deserialized);
-			}
-			debug!("igdb Cache miss for {} with id: {}", $label, id);
-			$crate::metrics::record_cache_miss("igdb", $label);
-
-			let value = igdb_client.$fetch(id).await?;
-
-			let payload = serialize_option_redis_value(value.clone())?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				IGDB_CACHE_LIFETIME,
-			);
-
-			Ok(value)
-		}
+		$crate::__cached_reference_lookup_impl!(
+			$fn_name,
+			&IgdbClient,
+			IgdbCacheType,
+			"igdb",
+			"igdb-l1",
+			L1_MAX_CAPACITY,
+			L1_TIME_TO_IDLE,
+			IGDB_CACHE_LIFETIME,
+			$ty,
+			$fetch,
+			$variant,
+			$label
+		);
 	};
 }
 
 macro_rules! cached_lookup_by_slug {
 	($fn_name:ident, $ty:ty, $fetch:ident, $variant:ident, $label:literal) => {
-		pub async fn $fn_name(
-			igdb_client: &IgdbClient,
-			redis_conn: &mut MultiplexedConnection,
-			slug: String,
-		) -> anyhow::Result<Option<$ty>> {
-			let cache_key = IgdbCacheType::$variant.get_cache_key(&normalised_key_hash(&slug));
-
-			if let Ok(Some(cached_val)) = redis_conn
-				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
-				.await
-			{
-				debug!("igdb Cache hit for {} with slug: {}", $label, slug);
-				$crate::metrics::record_cache_hit("igdb", $label);
-				let deserialized = deserialize_option_redis_value(cached_val)?;
-				return Ok(deserialized);
-			}
-			debug!("igdb Cache miss for {} with slug: {}", $label, slug);
-			$crate::metrics::record_cache_miss("igdb", $label);
-
-			let value = igdb_client.$fetch(&slug).await?;
-
-			let payload = serialize_option_redis_value(value.clone())?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				IGDB_CACHE_LIFETIME,
-			);
-
-			Ok(value)
-		}
+		$crate::__cached_lookup_by_slug_impl!(
+			$fn_name,
+			&IgdbClient,
+			IgdbCacheType,
+			"igdb",
+			IGDB_CACHE_LIFETIME,
+			$ty,
+			$fetch,
+			$variant,
+			$label
+		);
 	};
 }
 
 macro_rules! cached_search {
 	($fn_name:ident, $ty:ty, $fetch:ident, $variant:ident, $label:literal) => {
-		pub async fn $fn_name(
-			igdb_client: &IgdbClient,
-			redis_conn: &mut MultiplexedConnection,
-			query: String,
-		) -> anyhow::Result<Vec<$ty>> {
-			let cache_key = IgdbCacheType::$variant.get_cache_key(&normalised_key_hash(&query));
-
-			if let Ok(Some(cached_val)) = redis_conn
-				.get_ex(&cache_key, Expiry::EX(IGDB_CACHE_LIFETIME))
-				.await
-			{
-				debug!("igdb Cache hit for {} query: {}", $label, query);
-				$crate::metrics::record_cache_hit("igdb", $label);
-				let deserialized: Vec<$ty> = serde_json::from_str(&cached_val)?;
-				return Ok(deserialized);
-			}
-			debug!("igdb Cache miss for {} query: {}", $label, query);
-			$crate::metrics::record_cache_miss("igdb", $label);
-
-			let values = igdb_client.$fetch(&query).await?;
-
-			let payload = serde_json::to_string(&values)?;
-			$crate::cache::spawn_cache_write(
-				redis_conn.clone(),
-				cache_key,
-				payload,
-				IGDB_CACHE_LIFETIME,
-			);
-
-			Ok(values)
-		}
+		$crate::__cached_search_impl!(
+			$fn_name,
+			&IgdbClient,
+			IgdbCacheType,
+			"igdb",
+			IGDB_CACHE_LIFETIME,
+			$ty,
+			$fetch,
+			$variant,
+			$label
+		);
 	};
 }
 

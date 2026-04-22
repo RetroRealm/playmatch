@@ -1,3 +1,5 @@
+mod macros;
+
 use crate::error::ServiceResult;
 use log::warn;
 use redis::AsyncTypedCommands;
