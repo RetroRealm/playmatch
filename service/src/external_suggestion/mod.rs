@@ -13,6 +13,7 @@ use crate::model::validate_optional_hex;
 use chrono::Utc;
 use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
 use entity::signature_metadata_mapping_suggestions::ActiveModel;
+use futures_util::stream::{self, StreamExt};
 use log::{debug, warn};
 use redis::AsyncTypedCommands;
 use redis::aio::MultiplexedConnection;
@@ -26,6 +27,7 @@ const RATE_LIMIT_WINDOW_SECS: i64 = 60;
 const RATE_LIMIT_KEY_PREFIX: &str = "playmatch:ratelimit:external_suggestion:";
 const USER_AGENT_MAX_LEN: usize = 255;
 const PROVIDER_ID_MAX_LEN: usize = MAX_NAME_INPUT_LEN;
+const DRAIN_CONCURRENCY: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnqueueOutcome {
@@ -149,28 +151,53 @@ pub async fn drain_external_suggestions(
 ) -> ServiceResult<DrainStats> {
 	let mut stats = DrainStats::default();
 
-	for _ in 0..batch_limit {
-		let popped: Option<String> = match redis_conn.lpop(QUEUE_KEY, None).await {
-			Ok(v) => v,
-			Err(e) => {
-				warn!("external suggestion queue pop failed: {e}");
-				break;
-			}
-		};
-		let Some(raw) = popped else { break };
+	// Typed AsyncTypedCommands::lpop with a count returns Value; drop to the cmd
+	// builder for a clean Vec<String>.
+	let raws: Vec<String> = match redis::cmd("LPOP")
+		.arg(QUEUE_KEY)
+		.arg(batch_limit)
+		.query_async::<Option<Vec<String>>>(redis_conn)
+		.await
+	{
+		Ok(Some(v)) => v,
+		Ok(None) => Vec::new(),
+		Err(e) => {
+			warn!("external suggestion queue pop failed: {e}");
+			return Ok(stats);
+		}
+	};
 
+	if raws.is_empty() {
+		return Ok(stats);
+	}
+
+	let mut envelopes: Vec<QueuedExternalSuggestion> = Vec::with_capacity(raws.len());
+	for raw in raws {
 		stats.processed_envelopes += 1;
-		let envelope = match serde_json::from_str::<QueuedExternalSuggestion>(&raw) {
-			Ok(e) => e,
+		match serde_json::from_str::<QueuedExternalSuggestion>(&raw) {
+			Ok(envelope) => envelopes.push(envelope),
 			Err(e) => {
 				let preview: String = raw.chars().take(200).collect();
 				warn!("dropping unparseable external suggestion envelope ({e}): {preview}");
 				stats.record(ProcessOutcome::InvalidPayload);
-				continue;
 			}
-		};
+		}
+	}
 
-		process_envelope(envelope, db_conn, &mut stats).await;
+	if envelopes.is_empty() {
+		return Ok(stats);
+	}
+
+	let outcome_batches: Vec<Vec<ProcessOutcome>> = stream::iter(envelopes)
+		.map(|envelope| process_envelope(envelope, db_conn))
+		.buffer_unordered(DRAIN_CONCURRENCY)
+		.collect()
+		.await;
+
+	for batch in outcome_batches {
+		for outcome in batch {
+			stats.record(outcome);
+		}
 	}
 
 	Ok(stats)
@@ -179,37 +206,28 @@ pub async fn drain_external_suggestions(
 async fn process_envelope(
 	envelope: QueuedExternalSuggestion,
 	db_conn: &DbConn,
-	stats: &mut DrainStats,
-) {
+) -> Vec<ProcessOutcome> {
 	if let Err(reason) = validate_envelope_basics(&envelope.payload) {
 		debug!("external suggestion rejected: {reason}");
-		stats.record(ProcessOutcome::InvalidPayload);
-		return;
+		return vec![ProcessOutcome::InvalidPayload];
 	}
 
 	let game = match resolve_game(&envelope.payload, db_conn).await {
 		Ok(Some(g)) => g,
-		Ok(None) => {
-			stats.record(ProcessOutcome::UnknownRom);
-			return;
-		}
+		Ok(None) => return vec![ProcessOutcome::UnknownRom],
 		Err(e) => {
 			warn!("db error while resolving external suggestion game: {e}");
-			stats.record(ProcessOutcome::UnknownRom);
-			return;
+			return vec![ProcessOutcome::UnknownRom];
 		}
 	};
 
+	let mut outcomes = Vec::with_capacity(envelope.payload.mappings.len());
 	for mapping in envelope.payload.mappings {
-		process_mapping(
-			game.id,
-			mapping,
-			envelope.user_agent.clone(),
-			db_conn,
-			stats,
-		)
-		.await;
+		outcomes.push(
+			process_mapping(game.id, mapping, envelope.user_agent.clone(), db_conn).await,
+		);
 	}
+	outcomes
 }
 
 fn validate_envelope_basics(payload: &ExternalGameMatchSuggestionPayload) -> Result<(), String> {
@@ -274,20 +292,17 @@ async fn process_mapping(
 	mapping: ExternalProviderMapping,
 	source: Option<String>,
 	db_conn: &DbConn,
-	stats: &mut DrainStats,
-) {
+) -> ProcessOutcome {
 	let Some(provider) = parse_provider(&mapping.provider) else {
 		debug!(
 			"external suggestion: dropping mapping with unsupported provider '{}'",
 			mapping.provider
 		);
-		stats.record(ProcessOutcome::UnsupportedProvider);
-		return;
+		return ProcessOutcome::UnsupportedProvider;
 	};
 	let provider_id = mapping.provider_id.trim().to_string();
 	if provider_id.is_empty() || provider_id.len() > PROVIDER_ID_MAX_LEN {
-		stats.record(ProcessOutcome::InvalidMapping);
-		return;
+		return ProcessOutcome::InvalidMapping;
 	}
 
 	let existing_mapping =
@@ -303,8 +318,7 @@ async fn process_mapping(
 			Ok(v) => v,
 			Err(e) => {
 				warn!("db error while checking existing mapping: {e}");
-				stats.record(ProcessOutcome::AlreadyMatched);
-				return;
+				return ProcessOutcome::AlreadyMatched;
 			}
 		};
 
@@ -313,8 +327,7 @@ async fn process_mapping(
 			existing.match_type,
 			MatchTypeEnum::Failed | MatchTypeEnum::None
 		) {
-		stats.record(ProcessOutcome::AlreadyMatched);
-		return;
+		return ProcessOutcome::AlreadyMatched;
 	}
 
 	let exists = match suggestion_exists(
@@ -330,14 +343,12 @@ async fn process_mapping(
 		Ok(v) => v,
 		Err(e) => {
 			warn!("db error while checking existing suggestion: {e}");
-			stats.record(ProcessOutcome::DuplicateSuggestion);
-			return;
+			return ProcessOutcome::DuplicateSuggestion;
 		}
 	};
 
 	if exists {
-		stats.record(ProcessOutcome::DuplicateSuggestion);
-		return;
+		return ProcessOutcome::DuplicateSuggestion;
 	}
 
 	let active = ActiveModel {
@@ -351,10 +362,10 @@ async fn process_mapping(
 	};
 
 	match insert_suggestion(active, db_conn).await {
-		Ok(_) => stats.record(ProcessOutcome::Created),
+		Ok(_) => ProcessOutcome::Created,
 		Err(e) => {
 			warn!("failed to insert external suggestion: {e}");
-			stats.record(ProcessOutcome::InvalidPayload);
+			ProcessOutcome::InvalidPayload
 		}
 	}
 }
