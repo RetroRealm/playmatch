@@ -88,6 +88,8 @@ pub enum MatchTypeEnum {
 pub enum MetadataProviderEnum {
 	#[sea_orm(string_value = "igdb")]
 	Igdb,
+	#[sea_orm(string_value = "steamgriddb")]
+	Steamgriddb,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

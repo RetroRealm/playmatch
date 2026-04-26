@@ -81,6 +81,8 @@ pub struct ExternalMetadata {
 pub enum MetadataProvider {
 	/// IGDB (https://www.igdb.com/)
 	IGDB,
+	/// SteamGridDB (https://www.steamgriddb.com/)
+	SteamGridDB,
 }
 
 /// Match types for a game
@@ -172,6 +174,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 	fn from(metadata_provider: MetadataProviderEnum) -> Self {
 		match metadata_provider {
 			MetadataProviderEnum::Igdb => MetadataProvider::IGDB,
+			MetadataProviderEnum::Steamgriddb => MetadataProvider::SteamGridDB,
 		}
 	}
 }
@@ -180,6 +183,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 	fn from(metadata_provider: MetadataProvider) -> Self {
 		match metadata_provider {
 			MetadataProvider::IGDB => MetadataProviderEnum::Igdb,
+			MetadataProvider::SteamGridDB => MetadataProviderEnum::Steamgriddb,
 		}
 	}
 }
