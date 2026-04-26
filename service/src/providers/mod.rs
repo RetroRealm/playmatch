@@ -123,6 +123,9 @@ fn automatic_reason_label(r: AutomaticMatchReasonEnum) -> &'static str {
 		AutomaticMatchReasonEnum::ViaParent => "via_parent",
 		AutomaticMatchReasonEnum::NormalizedName => "normalized_name",
 		AutomaticMatchReasonEnum::NormalizedAlternativeName => "normalized_alternative_name",
+		AutomaticMatchReasonEnum::Md5Hash => "md5_hash",
+		AutomaticMatchReasonEnum::Sha1Hash => "sha1_hash",
+		AutomaticMatchReasonEnum::CrcHash => "crc_hash",
 	}
 }
 

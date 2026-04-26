@@ -28,6 +28,12 @@ pub enum AutomaticMatchReasonEnum {
 	NormalizedName,
 	#[sea_orm(string_value = "normalized_alternative_name")]
 	NormalizedAlternativeName,
+	#[sea_orm(string_value = "md5_hash")]
+	Md5Hash,
+	#[sea_orm(string_value = "sha1_hash")]
+	Sha1Hash,
+	#[sea_orm(string_value = "crc_hash")]
+	CrcHash,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
@@ -90,6 +96,8 @@ pub enum MetadataProviderEnum {
 	Igdb,
 	#[sea_orm(string_value = "steamgriddb")]
 	Steamgriddb,
+	#[sea_orm(string_value = "screenscraper")]
+	Screenscraper,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

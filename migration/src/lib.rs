@@ -24,6 +24,8 @@ mod m20260423_000000_index_game_dat_file_import_id_name;
 mod m20260424_000000_add_api_key_hash_hmac_column;
 mod m20260425_000000_index_smm_platform_provider_match_type;
 mod m20260426_120000_add_steamgriddb_provider_enum_value;
+mod m20260427_120000_add_screenscraper_provider_enum_value;
+mod m20260427_120100_add_hash_automatic_match_reason_enum_values;
 
 pub struct Migrator;
 
@@ -55,6 +57,8 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260424_000000_add_api_key_hash_hmac_column::Migration),
 			Box::new(m20260425_000000_index_smm_platform_provider_match_type::Migration),
 			Box::new(m20260426_120000_add_steamgriddb_provider_enum_value::Migration),
+			Box::new(m20260427_120000_add_screenscraper_provider_enum_value::Migration),
+			Box::new(m20260427_120100_add_hash_automatic_match_reason_enum_values::Migration),
 		]
 	}
 }

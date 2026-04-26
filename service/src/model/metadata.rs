@@ -83,6 +83,8 @@ pub enum MetadataProvider {
 	IGDB,
 	/// SteamGridDB (https://www.steamgriddb.com/)
 	SteamGridDB,
+	/// ScreenScraper (https://www.screenscraper.fr/)
+	ScreenScraper,
 }
 
 /// Match types for a game
@@ -144,6 +146,15 @@ pub enum AutomaticMatchReason {
 
 	/// Matched by the normalized alternative name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
 	NormalizedAlternativeName,
+
+	/// Matched by an MD5 hash of one of the game's files.
+	Md5Hash,
+
+	/// Matched by a SHA-1 hash of one of the game's files.
+	Sha1Hash,
+
+	/// Matched by a CRC32 of one of the game's files.
+	CrcHash,
 }
 
 impl From<entity::signature_metadata_mapping::Model> for ExternalMetadata {
@@ -175,6 +186,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 		match metadata_provider {
 			MetadataProviderEnum::Igdb => MetadataProvider::IGDB,
 			MetadataProviderEnum::Steamgriddb => MetadataProvider::SteamGridDB,
+			MetadataProviderEnum::Screenscraper => MetadataProvider::ScreenScraper,
 		}
 	}
 }
@@ -184,6 +196,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 		match metadata_provider {
 			MetadataProvider::IGDB => MetadataProviderEnum::Igdb,
 			MetadataProvider::SteamGridDB => MetadataProviderEnum::Steamgriddb,
+			MetadataProvider::ScreenScraper => MetadataProviderEnum::Screenscraper,
 		}
 	}
 }
@@ -240,6 +253,9 @@ impl From<AutomaticMatchReasonEnum> for AutomaticMatchReason {
 			AutomaticMatchReasonEnum::NormalizedAlternativeName => {
 				AutomaticMatchReason::NormalizedAlternativeName
 			}
+			AutomaticMatchReasonEnum::Md5Hash => AutomaticMatchReason::Md5Hash,
+			AutomaticMatchReasonEnum::Sha1Hash => AutomaticMatchReason::Sha1Hash,
+			AutomaticMatchReasonEnum::CrcHash => AutomaticMatchReason::CrcHash,
 		}
 	}
 }
