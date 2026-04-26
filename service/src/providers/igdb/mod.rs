@@ -1273,3 +1273,21 @@ impl IgdbClient {
 		Ok(serde_json::from_str(&body)?)
 	}
 }
+
+#[async_trait::async_trait]
+impl crate::providers::MetadataProvider for IgdbClient {
+	fn provider_label(&self) -> &'static str {
+		"igdb"
+	}
+
+	fn provider_enum(&self) -> entity::sea_orm_active_enums::MetadataProviderEnum {
+		entity::sea_orm_active_enums::MetadataProviderEnum::Igdb
+	}
+
+	async fn match_db(
+		self: std::sync::Arc<Self>,
+		db_conn: &sea_orm::DbConn,
+	) -> anyhow::Result<()> {
+		crate::providers::igdb::matching::match_db_to_igdb_entities(self, db_conn).await
+	}
+}

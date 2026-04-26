@@ -80,7 +80,7 @@ use crate::routes::suggestion::{
 use crate::routes::user::{
 	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
 };
-use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_igdb_entities};
+use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_all_providers};
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
@@ -96,6 +96,7 @@ use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::igdb::IgdbClient;
+use service::providers::{MetadataProvider, ProviderRegistry};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -183,6 +184,12 @@ async fn start() -> anyhow::Result<()> {
 	let dat_http_client_arc = Arc::new(dat_http_client);
 	let igdb_client_arc = Arc::new(igdb_client);
 
+	// Build the provider registry. Each constructed provider is registered as
+	// `Arc<dyn MetadataProvider>` so the cron driver can dispatch uniformly.
+	// Today only IGDB is wired; new providers slot in beside it.
+	let providers: ProviderRegistry = vec![igdb_client_arc.clone() as Arc<dyn MetadataProvider>];
+	let providers_arc = Arc::new(providers);
+
 	let redis_client_data = Data::new(redis_client);
 	let redis_conn_for_cron = redis_conn.clone();
 	let redis_conn_data = Data::new(redis_conn);
@@ -242,15 +249,15 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn = conn_arc.clone();
 	let dat_client = dat_http_client_arc.clone();
-	let igdb_client = igdb_client_arc.clone();
+	let providers_for_cron = providers_arc.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
 			let dat_client = dat_client.clone();
-			let igdb_client = igdb_client.clone();
+			let providers = providers_for_cron.clone();
 			Box::pin(async move {
 				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
-				wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
+				wrap_match_db_to_all_providers(providers, conn.clone()).await;
 			})
 		})?)
 		.await?;
@@ -289,7 +296,7 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn = conn_arc.clone();
 	let http_client = dat_http_client_arc.clone();
-	let igdb_client = igdb_client_arc.clone();
+	let providers_for_init = providers_arc.clone();
 
 	let initial_data_init = env::var("INITIAL_DATA_INIT")
 		.unwrap_or("true".to_string())
@@ -304,7 +311,7 @@ async fn start() -> anyhow::Result<()> {
 	if initial_data_init {
 		tokio::spawn(async move {
 			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
-			wrap_match_db_to_igdb_entities(igdb_client, conn.clone()).await;
+			wrap_match_db_to_all_providers(providers_for_init, conn.clone()).await;
 		});
 	}
 

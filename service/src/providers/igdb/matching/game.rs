@@ -8,8 +8,8 @@ use crate::db::platform::{
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::igdb::IgdbClient;
-use crate::providers::igdb::matching::{
-	IGDB_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
+use crate::providers::{
+	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
 	write_auto_match_success,
 };
 use entity::game::Model;
@@ -32,7 +32,7 @@ pub async fn match_games_to_igdb(
 		match_game_to_igdb,
 		igdb_client.clone(),
 		db_conn,
-		IGDB_CHUNK_SIZE,
+		DEFAULT_CHUNK_SIZE,
 	)
 	.await?;
 	debug!("Finished matching games without clone_of id to IGDB");
@@ -44,7 +44,7 @@ pub async fn match_games_to_igdb(
 		match_clone_of_game_to_igdb,
 		igdb_client.clone(),
 		db_conn,
-		IGDB_CHUNK_SIZE,
+		DEFAULT_CHUNK_SIZE,
 	)
 	.await?;
 	debug!("Finished matching games with clone_of id to IGDB");
@@ -56,7 +56,7 @@ pub async fn match_games_to_igdb(
 		match_game_to_igdb,
 		igdb_client.clone(),
 		db_conn,
-		IGDB_CHUNK_SIZE,
+		DEFAULT_CHUNK_SIZE,
 	)
 	.await?;
 	debug!("Finished matching games which failed to match 60 days ago to IGDB");

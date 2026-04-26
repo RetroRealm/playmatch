@@ -1,7 +1,7 @@
 use crate::db::platform::get_unmatched_platforms_with_limit;
 use crate::providers::igdb::IgdbClient;
-use crate::providers::igdb::matching::{
-	IGDB_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
+use crate::providers::{
+	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
 	write_auto_match_success,
 };
 use entity::sea_orm_active_enums::{
@@ -23,7 +23,7 @@ pub async fn match_platforms_to_igdb(
 		match_platform_to_igdb,
 		igdb_client,
 		db_conn,
-		IGDB_CHUNK_SIZE,
+		DEFAULT_CHUNK_SIZE,
 	)
 	.await
 }
