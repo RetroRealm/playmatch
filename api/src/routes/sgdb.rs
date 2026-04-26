@@ -101,6 +101,7 @@ pub async fn search_sgdb_games(
 	Ok(HttpResponse::Ok().json(response))
 }
 
+#[rustfmt::skip]
 macro_rules! sgdb_assets_by_game_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
 		#[utoipa::path(
@@ -132,6 +133,7 @@ macro_rules! sgdb_assets_by_game_route {
 	};
 }
 
+#[rustfmt::skip]
 macro_rules! sgdb_assets_by_platform_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
 		#[utoipa::path(
