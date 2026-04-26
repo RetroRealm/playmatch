@@ -1,4 +1,5 @@
 pub mod igdb;
+pub mod steamgriddb;
 
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
