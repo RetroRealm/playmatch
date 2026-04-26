@@ -1,9 +1,9 @@
 //! Provider-agnostic cache wrappers. Each provider defines a thin prefilled
 //! wrapper macro in its own `cache.rs` so per-entity invocations stay terse.
 //!
-//! The macros assume the following are in scope at the invocation site:
-//! `redis::{AsyncTypedCommands, Expiry, aio::MultiplexedConnection}` and
-//! the `CacheKey` trait from `crate::cache`.
+//! The macros assume `redis::{AsyncTypedCommands, Expiry, aio::MultiplexedConnection}`
+//! is in scope at the invocation site. Cache keys are formatted via
+//! [`crate::cache::provider_cache_key`].
 
 /// L2 (Redis) id-keyed cached lookup. See `providers/igdb/cache.rs` for an
 /// IGDB-prefilled wrapper.
@@ -12,12 +12,11 @@ macro_rules! __cached_lookup_impl {
 	(
 		$fn_name:ident,
 		$client_ty:ty,
-		$cache_type:ty,
 		$provider_label:literal,
+		$segment:literal,
 		$lifetime:expr,
 		$ty:ty,
 		$fetch:ident,
-		$variant:ident,
 		$label:literal
 	) => {
 		pub async fn $fn_name(
@@ -25,7 +24,11 @@ macro_rules! __cached_lookup_impl {
 			redis_conn: &mut ::redis::aio::MultiplexedConnection,
 			id: i32,
 		) -> ::anyhow::Result<Option<$ty>> {
-			let cache_key = <$cache_type>::$variant.get_cache_key(&id.to_string());
+			let cache_key = $crate::cache::provider_cache_key(
+				$provider_label,
+				$segment,
+				&id.to_string(),
+			);
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))
@@ -66,15 +69,14 @@ macro_rules! __cached_reference_lookup_impl {
 	(
 		$fn_name:ident,
 		$client_ty:ty,
-		$cache_type:ty,
 		$provider_label:literal,
+		$segment:literal,
 		$l1_label:literal,
 		$l1_capacity:expr,
 		$l1_time_to_idle:expr,
 		$lifetime:expr,
 		$ty:ty,
 		$fetch:ident,
-		$variant:ident,
 		$label:literal
 	) => {
 		pub async fn $fn_name(
@@ -99,7 +101,11 @@ macro_rules! __cached_reference_lookup_impl {
 			::log::debug!("{} L1 miss for {} with id: {}", $provider_label, $label, id);
 			$crate::metrics::record_cache_miss($l1_label, $label);
 
-			let cache_key = <$cache_type>::$variant.get_cache_key(&id.to_string());
+			let cache_key = $crate::cache::provider_cache_key(
+				$provider_label,
+				$segment,
+				&id.to_string(),
+			);
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))
@@ -139,12 +145,11 @@ macro_rules! __cached_lookup_by_slug_impl {
 	(
 		$fn_name:ident,
 		$client_ty:ty,
-		$cache_type:ty,
 		$provider_label:literal,
+		$segment:literal,
 		$lifetime:expr,
 		$ty:ty,
 		$fetch:ident,
-		$variant:ident,
 		$label:literal
 	) => {
 		pub async fn $fn_name(
@@ -152,8 +157,11 @@ macro_rules! __cached_lookup_by_slug_impl {
 			redis_conn: &mut ::redis::aio::MultiplexedConnection,
 			slug: String,
 		) -> ::anyhow::Result<Option<$ty>> {
-			let cache_key =
-				<$cache_type>::$variant.get_cache_key(&$crate::cache::normalised_key_hash(&slug));
+			let cache_key = $crate::cache::provider_cache_key(
+				$provider_label,
+				$segment,
+				&$crate::cache::normalised_key_hash(&slug),
+			);
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))
@@ -194,12 +202,11 @@ macro_rules! __cached_search_impl {
 	(
 		$fn_name:ident,
 		$client_ty:ty,
-		$cache_type:ty,
 		$provider_label:literal,
+		$segment:literal,
 		$lifetime:expr,
 		$ty:ty,
 		$fetch:ident,
-		$variant:ident,
 		$label:literal
 	) => {
 		pub async fn $fn_name(
@@ -207,8 +214,11 @@ macro_rules! __cached_search_impl {
 			redis_conn: &mut ::redis::aio::MultiplexedConnection,
 			query: String,
 		) -> ::anyhow::Result<Vec<$ty>> {
-			let cache_key =
-				<$cache_type>::$variant.get_cache_key(&$crate::cache::normalised_key_hash(&query));
+			let cache_key = $crate::cache::provider_cache_key(
+				$provider_label,
+				$segment,
+				&$crate::cache::normalised_key_hash(&query),
+			);
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))

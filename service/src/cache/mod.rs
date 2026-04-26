@@ -26,6 +26,12 @@ pub trait CacheKey {
 	fn get_cache_key(&self, identifier: &str) -> String;
 }
 
+/// Format the canonical provider cache key. Layout:
+/// `playmatch:cache:v1:<provider>:<segment>:<identifier>`.
+pub fn provider_cache_key(provider: &str, segment: &str, identifier: &str) -> String {
+	format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:{provider}:{segment}:{identifier}")
+}
+
 pub(crate) fn deserialize_option_redis_value<T: DeserializeOwned>(
 	value: String,
 ) -> ServiceResult<Option<T>> {
