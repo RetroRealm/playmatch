@@ -349,7 +349,7 @@ pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(provider, true, page_size, conn)
+	get_unmatched_games_with_limit(provider, true, true, page_size, conn)
 }
 
 /// Return up to `page_size` games without a successful mapping for `provider` that are
@@ -359,7 +359,29 @@ pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(provider, false, page_size, conn)
+	get_unmatched_games_with_limit(provider, false, true, page_size, conn)
+}
+
+/// Same as [`get_unmatched_games_without_clone_of_with_limit`] but does not require the
+/// game's platform to have a successful mapping for `provider`. Used by providers that
+/// do not run a platform-matching pipeline (for example SteamGridDB, which searches by
+/// game name without needing platform context).
+pub fn get_unmatched_games_without_clone_of_with_limit_no_platform_gate<'a>(
+	provider: MetadataProviderEnum,
+	page_size: u64,
+	conn: DbConn,
+) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
+	get_unmatched_games_with_limit(provider, true, false, page_size, conn)
+}
+
+/// Same as [`get_unmatched_games_with_clone_of_with_limit`] but without the platform
+/// mapping gate. See [`get_unmatched_games_without_clone_of_with_limit_no_platform_gate`].
+pub fn get_unmatched_games_with_clone_of_with_limit_no_platform_gate<'a>(
+	provider: MetadataProviderEnum,
+	page_size: u64,
+	conn: DbConn,
+) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
+	get_unmatched_games_with_limit(provider, false, false, page_size, conn)
 }
 
 /// Return up to `page_size` games whose last automatic match for `provider` failed with
@@ -405,41 +427,48 @@ pub fn get_automatic_match_failed_games_with_limit<'a>(
 fn get_unmatched_games_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	clone_of_null: bool,
+	require_platform_mapping: bool,
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
 	Box::pin(async move {
 		let smm1 = Alias::new("smm1");
 
-		let res = Game::find()
+		let mut query = Game::find()
 			.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
 			.join(
 				JoinType::InnerJoin,
 				dat_file_import::Relation::DatFile.def(),
 			)
-			.join(JoinType::InnerJoin, dat_file::Relation::Platform.def())
-			.join_as(
-				JoinType::InnerJoin,
-				platform::Relation::SignatureMetadataMapping.def(),
-				smm1.clone(),
-			)
+			.join(JoinType::InnerJoin, dat_file::Relation::Platform.def());
+
+		if require_platform_mapping {
+			query = query
+				.join_as(
+					JoinType::InnerJoin,
+					platform::Relation::SignatureMetadataMapping.def(),
+					smm1.clone(),
+				)
+				.filter(
+					Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType)).is_in(
+						vec![
+							MatchTypeEnum::Automatic.as_enum(),
+							MatchTypeEnum::Manual.as_enum(),
+						],
+					),
+				)
+				.filter(
+					Expr::col((smm1.clone(), signature_metadata_mapping::Column::Provider))
+						.eq(provider.as_enum()),
+				);
+		}
+
+		let res = query
 			.filter(if clone_of_null {
 				game::Column::CloneOf.is_null()
 			} else {
 				game::Column::CloneOf.is_not_null()
 			})
-			.filter(
-				Expr::col((smm1.clone(), signature_metadata_mapping::Column::MatchType)).is_in(
-					vec![
-						MatchTypeEnum::Automatic.as_enum(),
-						MatchTypeEnum::Manual.as_enum(),
-					],
-				),
-			)
-			.filter(
-				Expr::col((smm1.clone(), signature_metadata_mapping::Column::Provider))
-					.eq(provider.as_enum()),
-			)
 			.filter(
 				Expr::exists(
 					::sea_orm::sea_query::Query::select()

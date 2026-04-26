@@ -1,6 +1,7 @@
 use crate::db::game::{
 	find_game_parent, get_automatic_match_failed_games_with_limit,
-	get_unmatched_games_with_clone_of_with_limit, get_unmatched_games_without_clone_of_with_limit,
+	get_unmatched_games_with_clone_of_with_limit_no_platform_gate,
+	get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 };
 use crate::db::signature_metadata_mapping::find_signature_metadata_mapping_by_platform_game_company_and_provider;
 use crate::matching::util::{clean_name, normalize_title};
@@ -25,7 +26,7 @@ pub async fn match_games_to_steamgriddb(
 	drive_match_pipeline(
 		"game",
 		MetadataProviderEnum::Steamgriddb,
-		get_unmatched_games_without_clone_of_with_limit,
+		get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 		match_game_to_steamgriddb,
 		client.clone(),
 		db_conn,
@@ -37,7 +38,7 @@ pub async fn match_games_to_steamgriddb(
 	drive_match_pipeline(
 		"game",
 		MetadataProviderEnum::Steamgriddb,
-		get_unmatched_games_with_clone_of_with_limit,
+		get_unmatched_games_with_clone_of_with_limit_no_platform_gate,
 		match_clone_of_game_to_steamgriddb,
 		client.clone(),
 		db_conn,
