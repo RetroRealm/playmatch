@@ -6,12 +6,11 @@ use crate::db::game::{
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
-use crate::db::signature_metadata_mapping::{
-	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
-};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::igdb::IgdbClient;
-use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, PAGE_SIZE};
+use crate::providers::igdb::matching::{
+	IGDB_CHUNK_SIZE, PAGE_SIZE, Target, write_auto_match_failed, write_auto_match_success,
+};
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
@@ -19,7 +18,6 @@ use entity::sea_orm_active_enums::{
 use futures_util::future::BoxFuture;
 use log::{debug, error};
 use sea_orm::DbConn;
-use sea_orm::prelude::Uuid;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -127,14 +125,15 @@ fn match_clone_of_game_to_igdb<'a>(
 					parent_game_igdb_mapping.provider_id.clone().unwrap()
 				);
 
-				create_or_update_signature_metadata_mapping_success(
+				write_auto_match_success(
+					"igdb",
+					MetadataProviderEnum::Igdb,
+					Target::Game(game.id),
 					parent_game_igdb_mapping.provider_id.clone().unwrap(),
-					game.id,
 					AutomaticMatchReasonEnum::ViaParent,
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match("igdb", "game", "matched", "via_parent");
 
 				return Ok(());
 			}
@@ -151,14 +150,15 @@ fn match_clone_of_game_to_igdb<'a>(
 					"Matched Game with parent which is not matched, overriding parent mapping... (Via Child)"
 				);
 
-				create_or_update_signature_metadata_mapping_success(
+				write_auto_match_success(
+					"igdb",
+					MetadataProviderEnum::Igdb,
+					Target::Game(parent_game.id),
 					mapping.provider_id.unwrap(),
-					parent_game.id,
 					AutomaticMatchReasonEnum::ViaChild,
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match("igdb", "game", "matched", "via_child");
 
 				return Ok(());
 			}
@@ -190,19 +190,15 @@ fn match_game_to_igdb<'a>(
 					"Matched Game \"{}\" to IGDB Game ID {} (Direct Match)",
 					&clean_name, search_result.id
 				);
-				create_or_update_signature_metadata_mapping_success(
+				write_auto_match_success(
+					"igdb",
+					MetadataProviderEnum::Igdb,
+					Target::Game(game.id),
 					search_result.id.to_string(),
-					game.id,
 					AutomaticMatchReasonEnum::DirectName,
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match(
-					"igdb",
-					"game",
-					"matched",
-					"direct_name",
-				);
 
 				return Ok(());
 			}
@@ -215,19 +211,15 @@ fn match_game_to_igdb<'a>(
 					"Matched Game \"{}\" to IGDB Game ID {} (Normalized Name Match)",
 					&clean_name, search_result.id
 				);
-				create_or_update_signature_metadata_mapping_success(
+				write_auto_match_success(
+					"igdb",
+					MetadataProviderEnum::Igdb,
+					Target::Game(game.id),
 					search_result.id.to_string(),
-					game.id,
 					AutomaticMatchReasonEnum::NormalizedName,
 					&db_conn,
 				)
 				.await?;
-				crate::metrics::record_metadata_auto_match(
-					"igdb",
-					"game",
-					"matched",
-					"normalized_name",
-				);
 
 				return Ok(());
 			}
@@ -250,19 +242,15 @@ fn match_game_to_igdb<'a>(
 							"Matched Game \"{}\" to IGDB Game ID {} (Alternative Name Match)",
 							&clean_name, search_result.id
 						);
-						create_or_update_signature_metadata_mapping_success(
+						write_auto_match_success(
+							"igdb",
+							MetadataProviderEnum::Igdb,
+							Target::Game(game.id),
 							search_result.id.to_string(),
-							game.id,
 							AutomaticMatchReasonEnum::AlternativeName,
 							&db_conn,
 						)
 						.await?;
-						crate::metrics::record_metadata_auto_match(
-							"igdb",
-							"game",
-							"matched",
-							"alternative_name",
-						);
 
 						return Ok(());
 					}
@@ -274,19 +262,15 @@ fn match_game_to_igdb<'a>(
 							"Matched Game \"{}\" to IGDB Game ID {} (Normalized Alternative Name Match)",
 							&clean_name, search_result.id
 						);
-						create_or_update_signature_metadata_mapping_success(
+						write_auto_match_success(
+							"igdb",
+							MetadataProviderEnum::Igdb,
+							Target::Game(game.id),
 							search_result.id.to_string(),
-							game.id,
 							AutomaticMatchReasonEnum::NormalizedAlternativeName,
 							&db_conn,
 						)
 						.await?;
-						crate::metrics::record_metadata_auto_match(
-							"igdb",
-							"game",
-							"matched",
-							"normalized_alternative_name",
-						);
 
 						return Ok(());
 					}
@@ -295,41 +279,17 @@ fn match_game_to_igdb<'a>(
 		}
 
 		debug!("No match found for Game \"{}\"", &clean_name);
-		create_or_update_signature_metadata_mapping(
-			SignatureMetadataMappingInputBuilder::default()
-				.provider(MetadataProviderEnum::Igdb)
-				.game_id(Some(game.id))
-				.match_type(MatchTypeEnum::Failed)
-				.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
-				.build()?,
+		write_auto_match_failed(
+			"igdb",
+			MetadataProviderEnum::Igdb,
+			Target::Game(game.id),
+			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
 		)
 		.await?;
-		crate::metrics::record_metadata_auto_match("igdb", "game", "failed", "no_direct_match");
 
 		Ok(())
 	})
-}
-
-async fn create_or_update_signature_metadata_mapping_success(
-	provider_id: String,
-	game_id: Uuid,
-	automatic_match_reason: AutomaticMatchReasonEnum,
-	db_conn: &DbConn,
-) -> anyhow::Result<()> {
-	create_or_update_signature_metadata_mapping(
-		SignatureMetadataMappingInputBuilder::default()
-			.provider(MetadataProviderEnum::Igdb)
-			.provider_id(Some(provider_id))
-			.game_id(Some(game_id))
-			.match_type(MatchTypeEnum::Automatic)
-			.automatic_match_reason(Some(automatic_match_reason))
-			.build()?,
-		db_conn,
-	)
-	.await?;
-
-	Ok(())
 }
 
 async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Result<i32> {

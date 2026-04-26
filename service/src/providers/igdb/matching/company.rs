@@ -1,11 +1,10 @@
 use crate::db::company::get_unmatched_companies_with_limit;
-use crate::db::signature_metadata_mapping::{
-	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
-};
 use crate::providers::igdb::IgdbClient;
-use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, PAGE_SIZE};
+use crate::providers::igdb::matching::{
+	IGDB_CHUNK_SIZE, PAGE_SIZE, Target, write_auto_match_failed, write_auto_match_success,
+};
 use entity::sea_orm_active_enums::{
-	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MetadataProviderEnum,
 };
 use log::{debug, error};
 use sea_orm::DbConn;
@@ -55,35 +54,29 @@ async fn match_company_to_igdb(
 				"Matched Company \"{}\" to IGDB Company ID {} (Direct Match)",
 				company.name, search_result.id
 			);
-			create_or_update_signature_metadata_mapping(
-				SignatureMetadataMappingInputBuilder::default()
-					.provider(MetadataProviderEnum::Igdb)
-					.provider_id(Some(search_result.id.to_string()))
-					.company_id(Some(company.id))
-					.match_type(MatchTypeEnum::Automatic)
-					.automatic_match_reason(Some(AutomaticMatchReasonEnum::DirectName))
-					.build()?,
+			write_auto_match_success(
+				"igdb",
+				MetadataProviderEnum::Igdb,
+				Target::Company(company.id),
+				search_result.id.to_string(),
+				AutomaticMatchReasonEnum::DirectName,
 				&db_conn,
 			)
 			.await?;
-			crate::metrics::record_metadata_auto_match("igdb", "company", "matched", "direct_name");
 
 			return Ok(());
 		}
 	}
 
 	debug!("No direct match found for Company: \"{}\"", &company.name);
-	create_or_update_signature_metadata_mapping(
-		SignatureMetadataMappingInputBuilder::default()
-			.provider(MetadataProviderEnum::Igdb)
-			.company_id(Some(company.id))
-			.match_type(MatchTypeEnum::Failed)
-			.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
-			.build()?,
+	write_auto_match_failed(
+		"igdb",
+		MetadataProviderEnum::Igdb,
+		Target::Company(company.id),
+		FailedMatchReasonEnum::NoDirectMatch,
 		&db_conn,
 	)
 	.await?;
-	crate::metrics::record_metadata_auto_match("igdb", "company", "failed", "no_direct_match");
 
 	Ok(())
 }

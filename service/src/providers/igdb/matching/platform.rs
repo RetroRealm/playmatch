@@ -1,11 +1,10 @@
 use crate::db::platform::get_unmatched_platforms_with_limit;
-use crate::db::signature_metadata_mapping::{
-	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
-};
 use crate::providers::igdb::IgdbClient;
-use crate::providers::igdb::matching::{IGDB_CHUNK_SIZE, PAGE_SIZE};
+use crate::providers::igdb::matching::{
+	IGDB_CHUNK_SIZE, PAGE_SIZE, Target, write_auto_match_failed, write_auto_match_success,
+};
 use entity::sea_orm_active_enums::{
-	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MetadataProviderEnum,
 };
 use log::{debug, error};
 use sea_orm::DbConn;
@@ -55,40 +54,29 @@ pub async fn match_platform_to_igdb(
 				"Matched Platform \"{}\" to IGDB Platform ID {} (Direct Match)",
 				platform.name, search_result.id
 			);
-			create_or_update_signature_metadata_mapping(
-				SignatureMetadataMappingInputBuilder::default()
-					.provider(MetadataProviderEnum::Igdb)
-					.provider_id(Some(search_result.id.to_string()))
-					.platform_id(Some(platform.id))
-					.match_type(MatchTypeEnum::Automatic)
-					.automatic_match_reason(Some(AutomaticMatchReasonEnum::DirectName))
-					.build()?,
+			write_auto_match_success(
+				"igdb",
+				MetadataProviderEnum::Igdb,
+				Target::Platform(platform.id),
+				search_result.id.to_string(),
+				AutomaticMatchReasonEnum::DirectName,
 				&db_conn,
 			)
 			.await?;
-			crate::metrics::record_metadata_auto_match(
-				"igdb",
-				"platform",
-				"matched",
-				"direct_name",
-			);
 
 			return Ok(());
 		}
 	}
 
 	debug!("No direct match found for Platform: \"{}\"", &platform.name);
-	create_or_update_signature_metadata_mapping(
-		SignatureMetadataMappingInputBuilder::default()
-			.provider(MetadataProviderEnum::Igdb)
-			.platform_id(Some(platform.id))
-			.match_type(MatchTypeEnum::Failed)
-			.failed_match_reason(Some(FailedMatchReasonEnum::NoDirectMatch))
-			.build()?,
+	write_auto_match_failed(
+		"igdb",
+		MetadataProviderEnum::Igdb,
+		Target::Platform(platform.id),
+		FailedMatchReasonEnum::NoDirectMatch,
 		&db_conn,
 	)
 	.await?;
-	crate::metrics::record_metadata_auto_match("igdb", "platform", "failed", "no_direct_match");
 
 	Ok(())
 }
