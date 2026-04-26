@@ -22,11 +22,13 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 - [x] Hash dat files to skip daily import if nothing changed
 - [x] Support for IGDB as metadata provider
 - [x] Full IGDB entity endpoints exposed through a caching proxy
+- [x] Support for SteamGridDB as metadata provider
+- [x] Support for ScreenScraper as metadata provider
 
 ### Planned
 
 - [ ] Support for more dat files sources (TOSEC, MAME, GoodTools, etc)
-- [ ] Support for more metadata providers (MobyGames, ScreenScraper, SteamGridDB, Launchbox, etc)
+- [ ] Support for more metadata providers (MobyGames, Launchbox, etc)
 - [ ] Support bios and other non-game files, which you can also hash and verify this way
 
 ## Getting Started
