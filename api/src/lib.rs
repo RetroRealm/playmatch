@@ -88,7 +88,7 @@ use actix_web::web::{Data, JsonConfig, PayloadConfig, ServiceConfig, scope};
 use actix_web::{App, HttpResponse, HttpServer, web};
 use actix_web_prom::PrometheusMetricsBuilder;
 use anyhow::anyhow;
-use log::{Level, LevelFilter, debug, error, info};
+use log::{Level, LevelFilter, debug, error, info, warn};
 use migration::{Migrator, MigratorTrait};
 use prometheus::{Encoder, Registry, TextEncoder};
 use reqwest::Client;
@@ -155,11 +155,7 @@ async fn start() -> anyhow::Result<()> {
 	service::db::user::init_pepper(&pepper_raw).unwrap_or_else(|e| panic!("API_KEY_PEPPER: {e}"));
 
 	let igdb_http_client = Client::builder().cookie_store(true).build()?;
-	let igdb_client = IgdbClient::new(
-		env::var("IGDB_CLIENT_ID")?,
-		env::var("IGDB_CLIENT_SECRET")?,
-		igdb_http_client,
-	)?;
+	let igdb_client_opt = build_igdb_client(igdb_http_client);
 
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
@@ -182,65 +178,72 @@ async fn start() -> anyhow::Result<()> {
 
 	let conn_arc = Arc::new(conn);
 	let dat_http_client_arc = Arc::new(dat_http_client);
-	let igdb_client_arc = Arc::new(igdb_client);
 
-	// Build the provider registry. Each constructed provider is registered as
-	// `Arc<dyn MetadataProvider>` so the cron driver can dispatch uniformly.
-	// Today only IGDB is wired; new providers slot in beside it.
-	let providers: ProviderRegistry = vec![igdb_client_arc.clone() as Arc<dyn MetadataProvider>];
+	// Providers whose env vars are absent are skipped with a warn rather than
+	// a panic so self-hosters can run with any subset enabled.
+	let mut providers: ProviderRegistry = Vec::new();
+	if let Some(c) = igdb_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
+	if providers.is_empty() {
+		warn!("No metadata providers configured. Background match cron will be a no-op.");
+	}
 	let providers_arc = Arc::new(providers);
 
 	let redis_client_data = Data::new(redis_client);
 	let redis_conn_for_cron = redis_conn.clone();
 	let redis_conn_data = Data::new(redis_conn);
 	let conn_data = Data::from(conn_arc.clone());
-	let igdb_data = Data::from(igdb_client_arc.clone());
+	let igdb_data = igdb_client_opt.clone().map(Data::from);
+	let igdb_enabled = igdb_data.is_some();
 
 	let serv = HttpServer::new(move || {
-		App::new()
+		let mut app = App::new()
 			.wrap(Compress::default())
 			.wrap(prometheus.clone())
 			.app_data(JsonConfig::default().limit(64 * 1024))
 			.app_data(PayloadConfig::default().limit(256 * 1024))
 			.app_data(conn_data.clone())
-			.app_data(igdb_data.clone())
 			.app_data(redis_client_data.clone())
-			.app_data(redis_conn_data.clone())
-			.service(
-				scope("/api")
-					.wrap(Governor::new(&governor_conf))
-					.wrap(from_fn(user_agent_metric))
-					.wrap(
-						Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
-							.log_level(Level::Debug),
-					)
-					.wrap(
-						DefaultHeaders::new()
-							.add(("X-Version", X_VERSION_HEADER_API))
-							.add((
-								"Strict-Transport-Security",
-								"max-age=31536000; includeSubDomains",
-							))
-							.add(("X-Content-Type-Options", "nosniff"))
-							.add(("Referrer-Policy", "no-referrer"))
-							.add(("Vary", "Origin")),
-					)
-					.wrap(Cors::permissive())
-					.configure(configure_public_api_routes)
-					.service(
-						scope("")
-							.wrap(
-								DefaultHeaders::new()
-									.add(("Cache-Control", "no-store"))
-									.add(("Vary", "Authorization")),
-							)
-							.configure(configure_authenticated_api_routes),
-					),
-			)
-			.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
-				Url::new("playmatch API", "/api-docs/openapi.json"),
-				create_openapi(),
-			)]))
+			.app_data(redis_conn_data.clone());
+		if let Some(d) = &igdb_data {
+			app = app.app_data(d.clone());
+		}
+		app.service(
+			scope("/api")
+				.wrap(Governor::new(&governor_conf))
+				.wrap(from_fn(user_agent_metric))
+				.wrap(
+					Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
+						.log_level(Level::Debug),
+				)
+				.wrap(
+					DefaultHeaders::new()
+						.add(("X-Version", X_VERSION_HEADER_API))
+						.add((
+							"Strict-Transport-Security",
+							"max-age=31536000; includeSubDomains",
+						))
+						.add(("X-Content-Type-Options", "nosniff"))
+						.add(("Referrer-Policy", "no-referrer"))
+						.add(("Vary", "Origin")),
+				)
+				.wrap(Cors::permissive())
+				.configure(move |cfg| configure_public_api_routes(cfg, igdb_enabled))
+				.service(
+					scope("")
+						.wrap(
+							DefaultHeaders::new()
+								.add(("Cache-Control", "no-store"))
+								.add(("Vary", "Authorization")),
+						)
+						.configure(configure_authenticated_api_routes),
+				),
+		)
+		.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
+			Url::new("playmatch API", "/api-docs/openapi.json"),
+			create_openapi(),
+		)]))
 	})
 	.bind(format!("0.0.0.0:{port}"))?
 	.shutdown_timeout(15)
@@ -357,7 +360,36 @@ pub fn main() {
 	}
 }
 
-fn configure_public_api_routes(cfg: &mut ServiceConfig) {
+/// Returns `None` when credentials are absent so self-hosters can run with
+/// any subset of providers enabled rather than panicking at boot.
+fn build_igdb_client(http: Client) -> Option<Arc<IgdbClient>> {
+	let client_id = match env::var("IGDB_CLIENT_ID") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("IGDB_CLIENT_ID not set, IGDB provider disabled");
+			return None;
+		}
+	};
+	let client_secret = match env::var("IGDB_CLIENT_SECRET") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("IGDB_CLIENT_SECRET not set, IGDB provider disabled");
+			return None;
+		}
+	};
+	match IgdbClient::new(client_id, client_secret, http) {
+		Ok(c) => {
+			info!("IGDB provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("IGDB provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
+fn configure_public_api_routes(cfg: &mut ServiceConfig, igdb_enabled: bool) {
 	cfg.service(health)
 		.service(ready)
 		.service(submit_external_game_suggestion)
@@ -368,8 +400,14 @@ fn configure_public_api_routes(cfg: &mut ServiceConfig) {
 		.service(identify_game_with_metadata_ids)
 		.service(identify_game_and_relations)
 		.service(get_playmatch_game_by_id)
-		.service(get_playmatch_game_with_relations_by_id)
-		.service(get_igdb_game_by_id)
+		.service(get_playmatch_game_with_relations_by_id);
+	if igdb_enabled {
+		configure_igdb_routes(cfg);
+	}
+}
+
+fn configure_igdb_routes(cfg: &mut ServiceConfig) {
+	cfg.service(get_igdb_game_by_id)
 		.service(get_igdb_games_by_ids)
 		.service(search_igdb_game_by_name)
 		.service(get_igdb_age_rating_by_id)
