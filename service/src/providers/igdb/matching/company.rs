@@ -1,12 +1,14 @@
 use crate::db::company::get_unmatched_companies_with_limit;
 use crate::providers::igdb::IgdbClient;
 use crate::providers::igdb::matching::{
-	IGDB_CHUNK_SIZE, PAGE_SIZE, Target, write_auto_match_failed, write_auto_match_success,
+	IGDB_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
+	write_auto_match_success,
 };
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MetadataProviderEnum,
 };
-use log::{debug, error};
+use futures_util::future::BoxFuture;
+use log::debug;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -14,69 +16,56 @@ pub async fn match_companies_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	while let Some(inner_page) =
-		get_unmatched_companies_with_limit(MetadataProviderEnum::Igdb, PAGE_SIZE, db_conn).await?
-	{
-		for inner_chunk in inner_page.chunks(IGDB_CHUNK_SIZE) {
-			let mut results = vec![];
-
-			for inner in inner_chunk.iter().cloned() {
-				let igdb_client = igdb_client.clone();
-				let db_conn = db_conn.clone();
-				results.push(tokio::spawn(match_company_to_igdb(
-					inner,
-					igdb_client.clone(),
-					db_conn,
-				)));
-			}
-
-			for result in results {
-				if let Err(e) = result.await? {
-					error!("Error while matching company to IGDB: {e:?}");
-				}
-			}
-		}
-	}
-
-	Ok(())
+	drive_match_pipeline(
+		"company",
+		MetadataProviderEnum::Igdb,
+		get_unmatched_companies_with_limit,
+		match_company_to_igdb,
+		igdb_client,
+		db_conn,
+		IGDB_CHUNK_SIZE,
+	)
+	.await
 }
 
-async fn match_company_to_igdb(
+fn match_company_to_igdb(
 	company: entity::company::Model,
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
-) -> anyhow::Result<()> {
-	let search_results = igdb_client.search_company_by_name(&company.name).await?;
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		let search_results = igdb_client.search_company_by_name(&company.name).await?;
 
-	for search_result in search_results {
-		if search_result.name.to_lowercase() == company.name.to_lowercase() {
-			debug!(
-				"Matched Company \"{}\" to IGDB Company ID {} (Direct Match)",
-				company.name, search_result.id
-			);
-			write_auto_match_success(
-				"igdb",
-				MetadataProviderEnum::Igdb,
-				Target::Company(company.id),
-				search_result.id.to_string(),
-				AutomaticMatchReasonEnum::DirectName,
-				&db_conn,
-			)
-			.await?;
+		for search_result in search_results {
+			if search_result.name.to_lowercase() == company.name.to_lowercase() {
+				debug!(
+					"Matched Company \"{}\" to IGDB Company ID {} (Direct Match)",
+					company.name, search_result.id
+				);
+				write_auto_match_success(
+					"igdb",
+					MetadataProviderEnum::Igdb,
+					Target::Company(company.id),
+					search_result.id.to_string(),
+					AutomaticMatchReasonEnum::DirectName,
+					&db_conn,
+				)
+				.await?;
 
-			return Ok(());
+				return Ok(());
+			}
 		}
-	}
 
-	debug!("No direct match found for Company: \"{}\"", &company.name);
-	write_auto_match_failed(
-		"igdb",
-		MetadataProviderEnum::Igdb,
-		Target::Company(company.id),
-		FailedMatchReasonEnum::NoDirectMatch,
-		&db_conn,
-	)
-	.await?;
+		debug!("No direct match found for Company: \"{}\"", &company.name);
+		write_auto_match_failed(
+			"igdb",
+			MetadataProviderEnum::Igdb,
+			Target::Company(company.id),
+			FailedMatchReasonEnum::NoDirectMatch,
+			&db_conn,
+		)
+		.await?;
 
-	Ok(())
+		Ok(())
+	})
 }

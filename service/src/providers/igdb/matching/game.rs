@@ -9,61 +9,54 @@ use crate::db::platform::{
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::igdb::IgdbClient;
 use crate::providers::igdb::matching::{
-	IGDB_CHUNK_SIZE, PAGE_SIZE, Target, write_auto_match_failed, write_auto_match_success,
+	IGDB_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
+	write_auto_match_success,
 };
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use log::{debug, error};
+use log::debug;
 use sea_orm::DbConn;
-use std::pin::Pin;
 use std::sync::Arc;
-
-type FetchFn =
-	fn(
-		MetadataProviderEnum,
-		u64,
-		DbConn,
-	) -> Pin<Box<dyn Future<Output = Result<Option<Vec<Model>>, anyhow::Error>> + Send>>;
-
-type MatchFn = fn(
-	Model,
-	Arc<IgdbClient>,
-	DbConn,
-) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>;
 
 pub async fn match_games_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
-	match_games_in_batches(
+	drive_match_pipeline(
+		"game",
 		MetadataProviderEnum::Igdb,
 		get_unmatched_games_without_clone_of_with_limit,
 		match_game_to_igdb,
 		igdb_client.clone(),
 		db_conn,
+		IGDB_CHUNK_SIZE,
 	)
 	.await?;
 	debug!("Finished matching games without clone_of id to IGDB");
 
-	match_games_in_batches(
+	drive_match_pipeline(
+		"game",
 		MetadataProviderEnum::Igdb,
 		get_unmatched_games_with_clone_of_with_limit,
 		match_clone_of_game_to_igdb,
 		igdb_client.clone(),
 		db_conn,
+		IGDB_CHUNK_SIZE,
 	)
 	.await?;
 	debug!("Finished matching games with clone_of id to IGDB");
 
-	match_games_in_batches(
+	drive_match_pipeline(
+		"game",
 		MetadataProviderEnum::Igdb,
 		get_automatic_match_failed_games_with_limit,
 		match_game_to_igdb,
 		igdb_client.clone(),
 		db_conn,
+		IGDB_CHUNK_SIZE,
 	)
 	.await?;
 	debug!("Finished matching games which failed to match 60 days ago to IGDB");
@@ -71,39 +64,11 @@ pub async fn match_games_to_igdb(
 	Ok(())
 }
 
-pub async fn match_games_in_batches(
-	provider: MetadataProviderEnum,
-	fetch_fn: FetchFn,
-	match_fn: MatchFn,
-	igdb_client: Arc<IgdbClient>,
-	db_conn: &DbConn,
-) -> anyhow::Result<()> {
-	while let Some(page) = fetch_fn(provider, PAGE_SIZE, db_conn.clone()).await? {
-		for page_chunks in page.chunks(IGDB_CHUNK_SIZE) {
-			let mut results = vec![];
-
-			for game in page_chunks.iter().cloned() {
-				let igdb_client = igdb_client.clone();
-				let db_conn = db_conn.clone();
-				results.push(tokio::spawn(match_fn(game, igdb_client.clone(), db_conn)));
-			}
-
-			for result in results {
-				if let Err(e) = result.await? {
-					error!("Error while matching to IGDB: {e:?}");
-				}
-			}
-		}
-	}
-
-	Ok(())
-}
-
-fn match_clone_of_game_to_igdb<'a>(
+fn match_clone_of_game_to_igdb(
 	game: Model,
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'static, anyhow::Result<()>> {
 	// Basic idea, first check if the parent game is matched to IGDB,
 	// if yes, then we match to the same igdb id,
 	// otherwise we try to match the game to igdb, if it succeeds, we apply the same igdb to the parent game
@@ -168,11 +133,11 @@ fn match_clone_of_game_to_igdb<'a>(
 	})
 }
 
-fn match_game_to_igdb<'a>(
+fn match_game_to_igdb(
 	game: Model,
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
 		let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
 

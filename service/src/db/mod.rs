@@ -19,53 +19,58 @@ pub mod user;
 /// `$fk_column` is the signature_metadata_mapping column pointing back to `$entity`
 /// (e.g. `signature_metadata_mapping::Column::CompanyId`).
 ///
+/// Returns a `BoxFuture` and owns its `DbConn` so the fn is usable as a non-generic
+/// function pointer in the shared matcher pipeline driver.
+///
 /// Expects `signature_metadata_mapping`, `MatchTypeEnum`, sea-orm query traits, and the
 /// entity's prelude type (`$entity`) to be in scope at the call site.
 macro_rules! unmatched_entities_with_limit {
 	($(#[$meta:meta])* $fn:ident, $entity:ident, $model:ty, $column:expr, $fk_column:expr) => {
 		$(#[$meta])*
-		pub async fn $fn(
+		pub fn $fn(
 			provider: ::entity::sea_orm_active_enums::MetadataProviderEnum,
 			limit: u64,
-			conn: &::sea_orm::DbConn,
-		) -> ::anyhow::Result<Option<Vec<$model>>> {
-			use ::sea_orm::ActiveEnum;
-			let rows = $entity::find()
-				.filter(
-					::sea_orm::sea_query::Expr::exists(
-						::sea_orm::sea_query::Query::select()
-							.expr(::sea_orm::sea_query::Expr::val(1))
-							.from(signature_metadata_mapping::Entity)
-							.and_where(
-								::sea_orm::sea_query::Expr::col($fk_column)
-									.equals(($entity, $column)),
-							)
-							.and_where(
-								::sea_orm::sea_query::Expr::col(
-									signature_metadata_mapping::Column::Provider,
+			conn: ::sea_orm::DbConn,
+		) -> ::futures_util::future::BoxFuture<'static, ::anyhow::Result<Option<Vec<$model>>>> {
+			Box::pin(async move {
+				use ::sea_orm::ActiveEnum;
+				let rows = $entity::find()
+					.filter(
+						::sea_orm::sea_query::Expr::exists(
+							::sea_orm::sea_query::Query::select()
+								.expr(::sea_orm::sea_query::Expr::val(1))
+								.from(signature_metadata_mapping::Entity)
+								.and_where(
+									::sea_orm::sea_query::Expr::col($fk_column)
+										.equals(($entity, $column)),
 								)
-								.eq(provider.as_enum()),
-							)
-							.and_where(
-								::sea_orm::sea_query::Expr::col(
-									signature_metadata_mapping::Column::MatchType,
+								.and_where(
+									::sea_orm::sea_query::Expr::col(
+										signature_metadata_mapping::Column::Provider,
+									)
+									.eq(provider.as_enum()),
 								)
-								.ne(MatchTypeEnum::None.as_enum()),
-							)
-							.to_owned(),
+								.and_where(
+									::sea_orm::sea_query::Expr::col(
+										signature_metadata_mapping::Column::MatchType,
+									)
+									.ne(MatchTypeEnum::None.as_enum()),
+								)
+								.to_owned(),
+						)
+						.not(),
 					)
-					.not(),
-				)
-				.order_by_asc($column)
-				.limit(limit)
-				.all(conn)
-				.await?;
+					.order_by_asc($column)
+					.limit(limit)
+					.all(&conn)
+					.await?;
 
-			if rows.is_empty() {
-				Ok(None)
-			} else {
-				Ok(Some(rows))
-			}
+				if rows.is_empty() {
+					Ok(None)
+				} else {
+					Ok(Some(rows))
+				}
+			})
 		}
 	};
 }
