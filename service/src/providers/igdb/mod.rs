@@ -1284,10 +1284,7 @@ impl crate::providers::MetadataProvider for IgdbClient {
 		entity::sea_orm_active_enums::MetadataProviderEnum::Igdb
 	}
 
-	async fn match_db(
-		self: std::sync::Arc<Self>,
-		db_conn: &sea_orm::DbConn,
-	) -> anyhow::Result<()> {
+	async fn match_db(self: std::sync::Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
 		crate::providers::igdb::matching::match_db_to_igdb_entities(self, db_conn).await
 	}
 }

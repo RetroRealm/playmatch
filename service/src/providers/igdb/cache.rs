@@ -231,13 +231,7 @@ cached_lookup!(
 	"franchise",
 	"Franchise"
 );
-cached_lookup!(
-	get_game_by_id_cached,
-	Game,
-	get_game_by_id,
-	"game",
-	"Game"
-);
+cached_lookup!(get_game_by_id_cached, Game, get_game_by_id, "game", "Game");
 cached_lookup_by_slug!(
 	get_game_by_slug_cached,
 	Game,

@@ -24,11 +24,8 @@ macro_rules! __cached_lookup_impl {
 			redis_conn: &mut ::redis::aio::MultiplexedConnection,
 			id: i32,
 		) -> ::anyhow::Result<Option<$ty>> {
-			let cache_key = $crate::cache::provider_cache_key(
-				$provider_label,
-				$segment,
-				&id.to_string(),
-			);
+			let cache_key =
+				$crate::cache::provider_cache_key($provider_label, $segment, &id.to_string());
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))
@@ -101,11 +98,8 @@ macro_rules! __cached_reference_lookup_impl {
 			::log::debug!("{} L1 miss for {} with id: {}", $provider_label, $label, id);
 			$crate::metrics::record_cache_miss($l1_label, $label);
 
-			let cache_key = $crate::cache::provider_cache_key(
-				$provider_label,
-				$segment,
-				&id.to_string(),
-			);
+			let cache_key =
+				$crate::cache::provider_cache_key($provider_label, $segment, &id.to_string());
 
 			if let Ok(Some(cached_val)) = redis_conn
 				.get_ex(&cache_key, ::redis::Expiry::EX($lifetime))

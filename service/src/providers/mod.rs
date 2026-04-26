@@ -29,8 +29,7 @@ pub type FetchPageFn<M> =
 /// Function pointer signature for the per-entity match callback used by
 /// [`drive_match_pipeline`]. Receives one entity, an `Arc` clone of the
 /// provider client, and an owned `DbConn`.
-pub type MatchEntityFn<M, C> =
-	fn(M, Arc<C>, DbConn) -> BoxFuture<'static, anyhow::Result<()>>;
+pub type MatchEntityFn<M, C> = fn(M, Arc<C>, DbConn) -> BoxFuture<'static, anyhow::Result<()>>;
 
 /// Identifies which entity table a match write targets. Carries the FK value
 /// so the writer helpers can populate the matching column on the

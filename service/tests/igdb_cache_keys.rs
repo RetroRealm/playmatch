@@ -37,8 +37,5 @@ fn igdb_compound_segments_preserve_embedded_colons() {
 
 #[test]
 fn provider_segment_appears_after_version() {
-	assert!(
-		provider_cache_key("foo", "game", "1")
-			.starts_with("playmatch:cache:v1:foo:game:")
-	);
+	assert!(provider_cache_key("foo", "game", "1").starts_with("playmatch:cache:v1:foo:game:"));
 }

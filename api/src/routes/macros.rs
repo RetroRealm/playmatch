@@ -111,10 +111,20 @@ macro_rules! __provider_entity_routes_impl {
 		$model:ty
 	) => {
 		$crate::__provider_id_route_impl!(
-			$client_ty, $tag, $singular_route, $singular_fn, $cached_fn, $model
+			$client_ty,
+			$tag,
+			$singular_route,
+			$singular_fn,
+			$cached_fn,
+			$model
 		);
 		$crate::__provider_ids_route_impl!(
-			$client_ty, $tag, $plural_route, $plural_fn, $cached_fn, $model
+			$client_ty,
+			$tag,
+			$plural_route,
+			$plural_fn,
+			$cached_fn,
+			$model
 		);
 	};
 }

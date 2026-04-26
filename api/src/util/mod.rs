@@ -33,10 +33,7 @@ pub async fn wrap_download_and_parse_dats(
 	record_background_job("dat_ingest", result, started.elapsed().as_secs_f64());
 }
 
-pub async fn wrap_match_db_to_all_providers(
-	registry: Arc<ProviderRegistry>,
-	conn: Arc<DbConn>,
-) {
+pub async fn wrap_match_db_to_all_providers(registry: Arc<ProviderRegistry>, conn: Arc<DbConn>) {
 	if registry.is_empty() {
 		info!("No metadata providers registered, skipping match cycle");
 		return;
