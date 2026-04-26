@@ -104,14 +104,14 @@ pub async fn search_sgdb_games(
 macro_rules! sgdb_assets_by_game_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
 		#[utoipa::path(
-					get,
-					context_path = "/api",
-					tag = "SteamGridDB",
-					params(SgdbGameAssetQuery),
-					responses(
-						(status = 200, description = $tag_summary, body = Vec<SgdbAsset>)
-					)
-				)]
+							get,
+							context_path = "/api",
+							tag = "SteamGridDB",
+							params(SgdbGameAssetQuery),
+							responses(
+								(status = 200, description = $tag_summary, body = Vec<SgdbAsset>)
+							)
+						)]
 		#[get($route)]
 		pub async fn $fn_name(
 			query: Query<SgdbGameAssetQuery>,
@@ -135,14 +135,14 @@ macro_rules! sgdb_assets_by_game_route {
 macro_rules! sgdb_assets_by_platform_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
 		#[utoipa::path(
-					get,
-					context_path = "/api",
-					tag = "SteamGridDB",
-					params(SgdbPlatformAssetQuery),
-					responses(
-						(status = 200, description = $tag_summary, body = Vec<SgdbAsset>)
-					)
-				)]
+							get,
+							context_path = "/api",
+							tag = "SteamGridDB",
+							params(SgdbPlatformAssetQuery),
+							responses(
+								(status = 200, description = $tag_summary, body = Vec<SgdbAsset>)
+							)
+						)]
 		#[get($route)]
 		pub async fn $fn_name(
 			query: Query<SgdbPlatformAssetQuery>,
