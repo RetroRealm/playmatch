@@ -353,12 +353,12 @@ impl ScreenScraperClient {
 		if max == 0 {
 			return;
 		}
-		if today * QUOTA_SOFT_LIMIT_DENOMINATOR >= max * QUOTA_SOFT_LIMIT_NUMERATOR {
-			if !self.quota_exhausted.swap(true, Ordering::Relaxed) {
-				warn!(
-					"screenscraper quota near limit ({today}/{max}); short-circuiting remaining match cycle"
-				);
-			}
+		if today * QUOTA_SOFT_LIMIT_DENOMINATOR >= max * QUOTA_SOFT_LIMIT_NUMERATOR
+			&& !self.quota_exhausted.swap(true, Ordering::Relaxed)
+		{
+			warn!(
+				"screenscraper quota near limit ({today}/{max}); short-circuiting remaining match cycle"
+			);
 		}
 	}
 }
