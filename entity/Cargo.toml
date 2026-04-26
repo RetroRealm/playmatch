@@ -7,3 +7,4 @@ edition.workspace = true
 sea-orm = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
+strum = { version = "^0.28", features = ["derive"] }

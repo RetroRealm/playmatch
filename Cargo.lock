@@ -1313,6 +1313,7 @@ dependencies = [
  "chrono",
  "sea-orm",
  "serde",
+ "strum 0.28.0",
 ]
 
 [[package]]

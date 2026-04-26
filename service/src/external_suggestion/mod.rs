@@ -279,11 +279,11 @@ async fn resolve_game(
 	Ok(None)
 }
 
+/// Backed by `strum::EnumString` on `MetadataProviderEnum`, so adding a new
+/// enum variant automatically extends what this fn accepts.
 fn parse_provider(raw: &str) -> Option<MetadataProviderEnum> {
-	match raw.trim().to_ascii_uppercase().as_str() {
-		"IGDB" => Some(MetadataProviderEnum::Igdb),
-		_ => None,
-	}
+	use std::str::FromStr;
+	MetadataProviderEnum::from_str(raw.trim()).ok()
 }
 
 async fn process_mapping(
@@ -366,5 +366,33 @@ async fn process_mapping(
 			warn!("failed to insert external suggestion: {e}");
 			ProcessOutcome::InvalidPayload
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::parse_provider;
+	use entity::sea_orm_active_enums::MetadataProviderEnum;
+
+	#[test]
+	fn parse_provider_accepts_canonical_lowercase() {
+		assert_eq!(parse_provider("igdb"), Some(MetadataProviderEnum::Igdb));
+	}
+
+	#[test]
+	fn parse_provider_is_case_insensitive() {
+		assert_eq!(parse_provider("IGDB"), Some(MetadataProviderEnum::Igdb));
+		assert_eq!(parse_provider("Igdb"), Some(MetadataProviderEnum::Igdb));
+	}
+
+	#[test]
+	fn parse_provider_trims_whitespace() {
+		assert_eq!(parse_provider("  igdb  "), Some(MetadataProviderEnum::Igdb));
+	}
+
+	#[test]
+	fn parse_provider_rejects_unknown() {
+		assert_eq!(parse_provider("not_a_provider"), None);
+		assert_eq!(parse_provider(""), None);
 	}
 }
