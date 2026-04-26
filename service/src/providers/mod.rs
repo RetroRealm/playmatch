@@ -1,4 +1,5 @@
 pub mod igdb;
+pub mod screenscraper;
 pub mod steamgriddb;
 
 use crate::db::signature_metadata_mapping::{
