@@ -93,6 +93,10 @@ use crate::routes::r#match::{
 	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
 };
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
+use crate::routes::screenscraper::{
+	__path_get_ss_game_by_id, __path_get_ss_game_by_rom_name, __path_list_ss_systems,
+	__path_search_ss_games,
+};
 use crate::routes::sgdb::{
 	__path_get_sgdb_game_by_id, __path_get_sgdb_game_by_platform, __path_get_sgdb_grids_by_game,
 	__path_get_sgdb_grids_by_platform, __path_get_sgdb_heroes_by_game,
@@ -142,6 +146,9 @@ use service::providers::igdb::model::{
 	PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective, PopularityPrimitive,
 	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
 	Screenshot, Theme, Website, WebsiteType,
+};
+use service::providers::screenscraper::model::{
+	SsEntityRef, SsGame, SsLocalizedName, SsRom, SsSystem, SsSystemNames,
 };
 use service::providers::steamgriddb::model::{
 	AssetFilters, SgdbAsset, SgdbAssetMime, SgdbAssetType, SgdbAuthor, SgdbContentTag, SgdbGame,
@@ -356,7 +363,11 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		get_sgdb_logos_by_game,
 		get_sgdb_logos_by_platform,
 		get_sgdb_icons_by_game,
-		get_sgdb_icons_by_platform
+		get_sgdb_icons_by_platform,
+		list_ss_systems,
+		get_ss_game_by_id,
+		search_ss_games,
+		get_ss_game_by_rom_name
 	),
 	components(schemas(
 		GameMetadataMatchResult,
@@ -483,7 +494,13 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		SgdbAssetType,
 		SgdbContentTag,
 		SgdbTriState,
-		AssetFilters
+		AssetFilters,
+		SsGame,
+		SsLocalizedName,
+		SsRom,
+		SsSystem,
+		SsSystemNames,
+		SsEntityRef
 	))
 )]
 pub struct ApiDoc;

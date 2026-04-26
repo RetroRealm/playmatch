@@ -72,6 +72,9 @@ use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
 };
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
+use crate::routes::screenscraper::{
+	get_ss_game_by_id, get_ss_game_by_rom_name, list_ss_systems, search_ss_games,
+};
 use crate::routes::sgdb::{
 	get_sgdb_game_by_id, get_sgdb_game_by_platform, get_sgdb_grids_by_game,
 	get_sgdb_grids_by_platform, get_sgdb_heroes_by_game, get_sgdb_heroes_by_platform,
@@ -102,6 +105,7 @@ use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::igdb::IgdbClient;
+use service::providers::screenscraper::ScreenScraperClient;
 use service::providers::steamgriddb::SteamGridDbClient;
 use service::providers::{MetadataProvider, ProviderRegistry};
 use std::env;
@@ -167,6 +171,9 @@ async fn start() -> anyhow::Result<()> {
 	let sgdb_http_client = Client::builder().cookie_store(false).build()?;
 	let sgdb_client_opt = build_sgdb_client(sgdb_http_client);
 
+	let ss_http_client = Client::builder().cookie_store(false).build()?;
+	let ss_client_opt = build_screenscraper_client(ss_http_client);
+
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
 	let dat_http_client = Client::builder().cookie_store(false).build()?;
@@ -198,6 +205,9 @@ async fn start() -> anyhow::Result<()> {
 	if let Some(c) = sgdb_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
+	if let Some(c) = ss_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
 	if providers.is_empty() {
 		warn!("No metadata providers configured. Background match cron will be a no-op.");
 	}
@@ -211,6 +221,8 @@ async fn start() -> anyhow::Result<()> {
 	let igdb_enabled = igdb_data.is_some();
 	let sgdb_data = sgdb_client_opt.clone().map(Data::from);
 	let sgdb_enabled = sgdb_data.is_some();
+	let ss_data = ss_client_opt.clone().map(Data::from);
+	let ss_enabled = ss_data.is_some();
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -225,6 +237,9 @@ async fn start() -> anyhow::Result<()> {
 			app = app.app_data(d.clone());
 		}
 		if let Some(d) = &sgdb_data {
+			app = app.app_data(d.clone());
+		}
+		if let Some(d) = &ss_data {
 			app = app.app_data(d.clone());
 		}
 		app.service(
@@ -247,7 +262,9 @@ async fn start() -> anyhow::Result<()> {
 						.add(("Vary", "Origin")),
 				)
 				.wrap(Cors::permissive())
-				.configure(move |cfg| configure_public_api_routes(cfg, igdb_enabled, sgdb_enabled))
+				.configure(move |cfg| {
+					configure_public_api_routes(cfg, igdb_enabled, sgdb_enabled, ss_enabled)
+				})
 				.service(
 					scope("")
 						.wrap(
@@ -378,6 +395,58 @@ pub fn main() {
 	}
 }
 
+/// Returns `None` when developer credentials are absent so self-hosters can
+/// run without the ScreenScraper integration. User credentials are optional;
+/// without them ScreenScraper heavily throttles and frequently rejects
+/// requests, so warn loudly to set the operator's expectations.
+fn build_screenscraper_client(http: Client) -> Option<Arc<ScreenScraperClient>> {
+	let dev_id = match env::var("SCREENSCRAPER_DEV_ID") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("SCREENSCRAPER_DEV_ID not set, ScreenScraper provider disabled");
+			return None;
+		}
+	};
+	let dev_password = match env::var("SCREENSCRAPER_DEV_PASSWORD") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("SCREENSCRAPER_DEV_PASSWORD not set, ScreenScraper provider disabled");
+			return None;
+		}
+	};
+	let user_id = env::var("SCREENSCRAPER_USER_ID")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	let user_password = env::var("SCREENSCRAPER_USER_PASSWORD")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	let user = match (user_id, user_password) {
+		(Some(id), Some(pw)) => Some((id, pw)),
+		(None, None) => {
+			warn!(
+				"SCREENSCRAPER_USER_ID/SCREENSCRAPER_USER_PASSWORD not set; ScreenScraper will run anonymously and is heavily throttled"
+			);
+			None
+		}
+		_ => {
+			warn!(
+				"SCREENSCRAPER_USER_ID and SCREENSCRAPER_USER_PASSWORD must be set together; treating as anonymous"
+			);
+			None
+		}
+	};
+	match ScreenScraperClient::new(dev_id, dev_password, user, http) {
+		Ok(c) => {
+			info!("ScreenScraper provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("ScreenScraper provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
 /// Returns `None` when the API key is absent so self-hosters can run without
 /// the SGDB integration.
 fn build_sgdb_client(http: Client) -> Option<Arc<SteamGridDbClient>> {
@@ -429,7 +498,12 @@ fn build_igdb_client(http: Client) -> Option<Arc<IgdbClient>> {
 	}
 }
 
-fn configure_public_api_routes(cfg: &mut ServiceConfig, igdb_enabled: bool, sgdb_enabled: bool) {
+fn configure_public_api_routes(
+	cfg: &mut ServiceConfig,
+	igdb_enabled: bool,
+	sgdb_enabled: bool,
+	ss_enabled: bool,
+) {
 	cfg.service(health)
 		.service(ready)
 		.service(submit_external_game_suggestion)
@@ -447,6 +521,16 @@ fn configure_public_api_routes(cfg: &mut ServiceConfig, igdb_enabled: bool, sgdb
 	if sgdb_enabled {
 		configure_sgdb_routes(cfg);
 	}
+	if ss_enabled {
+		configure_screenscraper_routes(cfg);
+	}
+}
+
+fn configure_screenscraper_routes(cfg: &mut ServiceConfig) {
+	cfg.service(list_ss_systems)
+		.service(get_ss_game_by_id)
+		.service(search_ss_games)
+		.service(get_ss_game_by_rom_name);
 }
 
 fn configure_sgdb_routes(cfg: &mut ServiceConfig) {
