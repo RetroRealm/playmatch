@@ -93,3 +93,28 @@ macro_rules! __provider_ids_route_impl {
 		}
 	};
 }
+
+/// Pastes the singular-id and bulk-ids route impls together. Kept as two impls
+/// because utoipa cannot toggle `body = $model` vs `body = Vec<$model>` inside
+/// a single derive input. Pluralisation is irregular, so both fn names and
+/// both routes are passed explicitly.
+#[macro_export]
+macro_rules! __provider_entity_routes_impl {
+	(
+		$client_ty:ty,
+		$tag:literal,
+		$singular_route:literal,
+		$singular_fn:ident,
+		$plural_route:literal,
+		$plural_fn:ident,
+		$cached_fn:ident,
+		$model:ty
+	) => {
+		$crate::__provider_id_route_impl!(
+			$client_ty, $tag, $singular_route, $singular_fn, $cached_fn, $model
+		);
+		$crate::__provider_ids_route_impl!(
+			$client_ty, $tag, $plural_route, $plural_fn, $cached_fn, $model
+		);
+	};
+}
