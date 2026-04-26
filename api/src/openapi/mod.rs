@@ -93,6 +93,13 @@ use crate::routes::r#match::{
 	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
 };
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
+use crate::routes::sgdb::{
+	__path_get_sgdb_game_by_id, __path_get_sgdb_game_by_platform, __path_get_sgdb_grids_by_game,
+	__path_get_sgdb_grids_by_platform, __path_get_sgdb_heroes_by_game,
+	__path_get_sgdb_heroes_by_platform, __path_get_sgdb_icons_by_game,
+	__path_get_sgdb_icons_by_platform, __path_get_sgdb_logos_by_game,
+	__path_get_sgdb_logos_by_platform, __path_search_sgdb_games,
+};
 use crate::routes::suggestion::{
 	__path_approve_suggestion, __path_create_company_suggestion, __path_create_game_suggestion,
 	__path_create_platform_suggestion, __path_delete_suggestion, __path_get_all_suggestions,
@@ -135,6 +142,11 @@ use service::providers::igdb::model::{
 	PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective, PopularityPrimitive,
 	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
 	Screenshot, Theme, Website, WebsiteType,
+};
+use service::providers::steamgriddb::model::{
+	AssetFilters, SgdbAsset, SgdbAssetMime, SgdbAssetType, SgdbAuthor, SgdbContentTag, SgdbGame,
+	SgdbGridDimension, SgdbGridStyle, SgdbHeroDimension, SgdbHeroStyle, SgdbIconStyle,
+	SgdbLogoStyle, SgdbPlatform, SgdbTriState,
 };
 use utoipa::OpenApi;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
@@ -333,7 +345,18 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		get_all_companies,
 		get_company_by_id,
 		get_all_platforms,
-		get_platform_by_id
+		get_platform_by_id,
+		get_sgdb_game_by_id,
+		get_sgdb_game_by_platform,
+		search_sgdb_games,
+		get_sgdb_grids_by_game,
+		get_sgdb_grids_by_platform,
+		get_sgdb_heroes_by_game,
+		get_sgdb_heroes_by_platform,
+		get_sgdb_logos_by_game,
+		get_sgdb_logos_by_platform,
+		get_sgdb_icons_by_game,
+		get_sgdb_icons_by_platform
 	),
 	components(schemas(
 		GameMetadataMatchResult,
@@ -445,7 +468,22 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		Theme,
 		UpdatedMatchResult,
 		Website,
-		WebsiteType
+		WebsiteType,
+		SgdbGame,
+		SgdbAsset,
+		SgdbAuthor,
+		SgdbPlatform,
+		SgdbGridStyle,
+		SgdbHeroStyle,
+		SgdbLogoStyle,
+		SgdbIconStyle,
+		SgdbGridDimension,
+		SgdbHeroDimension,
+		SgdbAssetMime,
+		SgdbAssetType,
+		SgdbContentTag,
+		SgdbTriState,
+		AssetFilters
 	))
 )]
 pub struct ApiDoc;

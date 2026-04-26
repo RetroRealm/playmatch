@@ -72,6 +72,12 @@ use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
 };
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
+use crate::routes::sgdb::{
+	get_sgdb_game_by_id, get_sgdb_game_by_platform, get_sgdb_grids_by_game,
+	get_sgdb_grids_by_platform, get_sgdb_heroes_by_game, get_sgdb_heroes_by_platform,
+	get_sgdb_icons_by_game, get_sgdb_icons_by_platform, get_sgdb_logos_by_game,
+	get_sgdb_logos_by_platform, search_sgdb_games,
+};
 use crate::routes::suggestion::{
 	approve_suggestion, create_company_suggestion, create_game_suggestion,
 	create_platform_suggestion, delete_suggestion, get_all_suggestions, get_suggestion_by_id,
@@ -96,6 +102,7 @@ use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::igdb::IgdbClient;
+use service::providers::steamgriddb::SteamGridDbClient;
 use service::providers::{MetadataProvider, ProviderRegistry};
 use std::env;
 use std::sync::Arc;
@@ -157,6 +164,9 @@ async fn start() -> anyhow::Result<()> {
 	let igdb_http_client = Client::builder().cookie_store(true).build()?;
 	let igdb_client_opt = build_igdb_client(igdb_http_client);
 
+	let sgdb_http_client = Client::builder().cookie_store(false).build()?;
+	let sgdb_client_opt = build_sgdb_client(sgdb_http_client);
+
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
 	let dat_http_client = Client::builder().cookie_store(false).build()?;
@@ -185,6 +195,9 @@ async fn start() -> anyhow::Result<()> {
 	if let Some(c) = igdb_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
+	if let Some(c) = sgdb_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
 	if providers.is_empty() {
 		warn!("No metadata providers configured. Background match cron will be a no-op.");
 	}
@@ -196,6 +209,8 @@ async fn start() -> anyhow::Result<()> {
 	let conn_data = Data::from(conn_arc.clone());
 	let igdb_data = igdb_client_opt.clone().map(Data::from);
 	let igdb_enabled = igdb_data.is_some();
+	let sgdb_data = sgdb_client_opt.clone().map(Data::from);
+	let sgdb_enabled = sgdb_data.is_some();
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -207,6 +222,9 @@ async fn start() -> anyhow::Result<()> {
 			.app_data(redis_client_data.clone())
 			.app_data(redis_conn_data.clone());
 		if let Some(d) = &igdb_data {
+			app = app.app_data(d.clone());
+		}
+		if let Some(d) = &sgdb_data {
 			app = app.app_data(d.clone());
 		}
 		app.service(
@@ -229,7 +247,7 @@ async fn start() -> anyhow::Result<()> {
 						.add(("Vary", "Origin")),
 				)
 				.wrap(Cors::permissive())
-				.configure(move |cfg| configure_public_api_routes(cfg, igdb_enabled))
+				.configure(move |cfg| configure_public_api_routes(cfg, igdb_enabled, sgdb_enabled))
 				.service(
 					scope("")
 						.wrap(
@@ -360,6 +378,28 @@ pub fn main() {
 	}
 }
 
+/// Returns `None` when the API key is absent so self-hosters can run without
+/// the SGDB integration.
+fn build_sgdb_client(http: Client) -> Option<Arc<SteamGridDbClient>> {
+	let bearer = match env::var("STEAMGRIDDB_API_KEY") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("STEAMGRIDDB_API_KEY not set, SteamGridDB provider disabled");
+			return None;
+		}
+	};
+	match SteamGridDbClient::new(bearer, http) {
+		Ok(c) => {
+			info!("SteamGridDB provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("SteamGridDB provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
 /// Returns `None` when credentials are absent so self-hosters can run with
 /// any subset of providers enabled rather than panicking at boot.
 fn build_igdb_client(http: Client) -> Option<Arc<IgdbClient>> {
@@ -389,7 +429,7 @@ fn build_igdb_client(http: Client) -> Option<Arc<IgdbClient>> {
 	}
 }
 
-fn configure_public_api_routes(cfg: &mut ServiceConfig, igdb_enabled: bool) {
+fn configure_public_api_routes(cfg: &mut ServiceConfig, igdb_enabled: bool, sgdb_enabled: bool) {
 	cfg.service(health)
 		.service(ready)
 		.service(submit_external_game_suggestion)
@@ -404,6 +444,23 @@ fn configure_public_api_routes(cfg: &mut ServiceConfig, igdb_enabled: bool) {
 	if igdb_enabled {
 		configure_igdb_routes(cfg);
 	}
+	if sgdb_enabled {
+		configure_sgdb_routes(cfg);
+	}
+}
+
+fn configure_sgdb_routes(cfg: &mut ServiceConfig) {
+	cfg.service(get_sgdb_game_by_id)
+		.service(get_sgdb_game_by_platform)
+		.service(search_sgdb_games)
+		.service(get_sgdb_grids_by_game)
+		.service(get_sgdb_grids_by_platform)
+		.service(get_sgdb_heroes_by_game)
+		.service(get_sgdb_heroes_by_platform)
+		.service(get_sgdb_logos_by_game)
+		.service(get_sgdb_logos_by_platform)
+		.service(get_sgdb_icons_by_game)
+		.service(get_sgdb_icons_by_platform);
 }
 
 fn configure_igdb_routes(cfg: &mut ServiceConfig) {

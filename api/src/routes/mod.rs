@@ -16,6 +16,7 @@ pub mod identify;
 pub mod igdb;
 pub mod r#match;
 pub mod platform;
+pub mod sgdb;
 pub mod suggestion;
 pub mod user;
 
