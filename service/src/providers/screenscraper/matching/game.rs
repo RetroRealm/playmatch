@@ -8,11 +8,11 @@ use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
 use crate::matching::util::{clean_name, normalize_title};
+use crate::providers::MetadataProvider;
 use crate::providers::screenscraper::ScreenScraperClient;
 use crate::providers::screenscraper::model::SsGame;
 use crate::providers::{
-	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
-	write_auto_match_success,
+	Target, drive_match_pipeline, write_auto_match_failed, write_auto_match_success,
 };
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
@@ -27,6 +27,7 @@ pub async fn match_games_to_screenscraper(
 	client: Arc<ScreenScraperClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
+	let chunk_size = client.chunk_size();
 	drive_match_pipeline(
 		"game",
 		MetadataProviderEnum::Screenscraper,
@@ -34,7 +35,7 @@ pub async fn match_games_to_screenscraper(
 		match_game_to_screenscraper,
 		client.clone(),
 		db_conn,
-		DEFAULT_CHUNK_SIZE,
+		chunk_size,
 	)
 	.await?;
 	debug!("Finished matching games without clone_of id to ScreenScraper");
@@ -46,7 +47,7 @@ pub async fn match_games_to_screenscraper(
 		match_clone_of_game_to_screenscraper,
 		client.clone(),
 		db_conn,
-		DEFAULT_CHUNK_SIZE,
+		chunk_size,
 	)
 	.await?;
 	debug!("Finished matching games with clone_of id to ScreenScraper");
@@ -58,7 +59,7 @@ pub async fn match_games_to_screenscraper(
 		match_game_to_screenscraper,
 		client,
 		db_conn,
-		DEFAULT_CHUNK_SIZE,
+		chunk_size,
 	)
 	.await?;
 	debug!("Finished retrying previously failed ScreenScraper game matches");

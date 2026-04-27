@@ -1,8 +1,8 @@
 use crate::db::platform::get_unmatched_platforms_with_limit;
+use crate::providers::MetadataProvider;
 use crate::providers::screenscraper::ScreenScraperClient;
 use crate::providers::{
-	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
-	write_auto_match_success,
+	Target, drive_match_pipeline, write_auto_match_failed, write_auto_match_success,
 };
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MetadataProviderEnum,
@@ -16,6 +16,7 @@ pub async fn match_platforms_to_screenscraper(
 	client: Arc<ScreenScraperClient>,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
+	let chunk_size = client.chunk_size();
 	drive_match_pipeline(
 		"platform",
 		MetadataProviderEnum::Screenscraper,
@@ -23,7 +24,7 @@ pub async fn match_platforms_to_screenscraper(
 		match_platform_to_screenscraper,
 		client,
 		db_conn,
-		DEFAULT_CHUNK_SIZE,
+		chunk_size,
 	)
 	.await
 }

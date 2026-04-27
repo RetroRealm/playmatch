@@ -5,15 +5,15 @@ use crate::providers::screenscraper::model::{
 };
 use anyhow::{Context, anyhow};
 use entity::sea_orm_active_enums::MetadataProviderEnum;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
-use tokio::sync::{Mutex, OnceCell};
-use tower::limit::{RateLimit, RateLimitLayer};
+use tokio::sync::{Mutex, OnceCell, Semaphore};
+use tokio::time::sleep;
 use tower::retry::Retry;
 use tower::{Service, ServiceBuilder, ServiceExt};
 
@@ -27,9 +27,18 @@ pub const API_URL: &str = "https://api.screenscraper.fr/api2";
 /// `devid`/`devpassword` calls without `softname` get rejected.
 const SOFTNAME: &str = "playmatch";
 
-const RATELIMIT_AMOUNT: u64 = 1;
-const RATELIMIT_DURATION_MS: u64 = 1200;
+/// Per-thread courtesy interval after every request. Skyscraper's maintainer
+/// recommends ~1.2s between calls so ScreenScraper does not flag the client
+/// as abusive; we apply it per-permit so concurrent threads each pace
+/// themselves rather than sharing a single global token bucket.
+const POST_REQUEST_DELAY_MS: u64 = 1200;
 const MAX_RETRIES: usize = 3;
+
+/// Hard ceiling on the concurrency we will scale up to from
+/// `ssuser.maxthreads`. Defends against pathological response payloads
+/// returning a huge number that would otherwise spawn that many tokio
+/// tasks per match-cycle page.
+const MAX_CONCURRENCY: usize = 16;
 
 /// At or above this fraction of the daily request budget we stop the cycle
 /// early so the cron resumes after the daily reset rather than burning the
@@ -52,13 +61,15 @@ const INCIDENT_PHRASES: &[&str] = &[
 
 pub struct ScreenScraperClient {
 	client: Client,
-	service: Mutex<RateLimit<Retry<RetryPolicy, Client>>>,
+	service: Mutex<Retry<RetryPolicy, Client>>,
 	dev_id: String,
 	dev_password: String,
 	user: Option<(String, String)>,
 	quota_exhausted: AtomicBool,
 	systems_cache: OnceCell<Arc<Vec<SsSystem>>>,
 	redis_conn: redis::aio::MultiplexedConnection,
+	concurrency: AtomicUsize,
+	permits: Arc<Semaphore>,
 }
 
 impl ScreenScraperClient {
@@ -69,14 +80,9 @@ impl ScreenScraperClient {
 		client: Client,
 		redis_conn: redis::aio::MultiplexedConnection,
 	) -> anyhow::Result<Self> {
-		let rate_limit_layer = RateLimitLayer::new(
-			RATELIMIT_AMOUNT,
-			Duration::from_millis(RATELIMIT_DURATION_MS),
-		);
 		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy(MAX_RETRIES));
 
 		let service = ServiceBuilder::new()
-			.layer(rate_limit_layer)
 			.layer(retry_layer)
 			.service(client.clone());
 
@@ -89,6 +95,8 @@ impl ScreenScraperClient {
 			quota_exhausted: AtomicBool::new(false),
 			systems_cache: OnceCell::new(),
 			redis_conn,
+			concurrency: AtomicUsize::new(1),
+			permits: Arc::new(Semaphore::new(1)),
 		})
 	}
 
@@ -297,6 +305,7 @@ impl ScreenScraperClient {
 					.is_some_and(|h| h.success.eq_ignore_ascii_case("false"));
 				if let Some(resp) = env.response.as_ref() {
 					self.update_quota_from(&resp.ssuser);
+					self.update_concurrency_from(&resp.ssuser);
 				}
 				if header_signals_failure {
 					return Err(anyhow!(
@@ -323,8 +332,14 @@ impl ScreenScraperClient {
 
 		debug!("screenscraper request: {} {url_for_log}", req.method());
 
-		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
-		let res = rate_limited_future.await?;
+		// Owned permit so we can hold it across the request future and the
+		// post-request sleep without borrowing self. The mutex around the
+		// retry stack only serialises the brief poll-readiness call; the
+		// HTTP work itself runs unlocked, gated by the semaphore.
+		let _permit = self.permits.clone().acquire_owned().await?;
+
+		let inflight = self.service.lock().await.ready().await?.call(req);
+		let res = inflight.await?;
 		let status = res.status();
 		let content_type = res
 			.headers()
@@ -337,6 +352,10 @@ impl ScreenScraperClient {
 			let preview: String = body.chars().take(256).collect();
 			debug!("screenscraper response (status={status}, first 256): {preview}");
 		}
+
+		// Hold the permit through the courtesy interval so each thread
+		// paces itself before releasing the slot for the next caller.
+		sleep(Duration::from_millis(POST_REQUEST_DELAY_MS)).await;
 
 		Ok((status, content_type, body))
 	}
@@ -351,6 +370,37 @@ impl ScreenScraperClient {
 			);
 		}
 	}
+
+	/// Probe the per-account thread budget from the response envelope and
+	/// grow our semaphore + chunk-size accordingly. `OnceCell`-cached probe
+	/// via `list_systems` means this runs at most once per process restart;
+	/// the cap is enforced both here (clamped target) and in `chunk_size()`.
+	fn update_concurrency_from(&self, user: &Option<SsUser>) {
+		let Some(user) = user else { return };
+		let Some(target) = parse_maxthreads(user) else {
+			return;
+		};
+		let current = self.concurrency.load(Ordering::Relaxed);
+		if target > current {
+			self.permits.add_permits(target - current);
+			self.concurrency.store(target, Ordering::Relaxed);
+			info!(
+				"screenscraper concurrency raised to {target} from ssuser.maxthreads (was {current})"
+			);
+		}
+	}
+}
+
+/// Returns the clamped concurrency target, or `None` if the field is
+/// missing or unparseable. We default to 1 in those cases by leaving the
+/// existing value untouched.
+fn parse_maxthreads(user: &SsUser) -> Option<usize> {
+	let raw = user.maxthreads.as_deref()?;
+	let parsed = raw.parse::<usize>().ok()?;
+	if parsed == 0 {
+		return None;
+	}
+	Some(parsed.min(MAX_CONCURRENCY))
 }
 
 fn parsed_quota(user: &SsUser) -> Option<(u64, u64)> {
@@ -432,7 +482,9 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 	}
 
 	fn chunk_size(&self) -> usize {
-		1
+		self.concurrency
+			.load(Ordering::Relaxed)
+			.clamp(1, MAX_CONCURRENCY)
 	}
 
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
@@ -526,5 +578,45 @@ mod tests {
 			maxthreads: None,
 		};
 		assert!(!quota_should_mark_exhausted(&user));
+	}
+
+	fn user_with_maxthreads(value: Option<&str>) -> SsUser {
+		SsUser {
+			requeststoday: None,
+			maxrequestsperday: None,
+			maxrequestspermin: None,
+			maxthreads: value.map(str::to_string),
+		}
+	}
+
+	#[test]
+	fn parse_maxthreads_accepts_typical_tier_values() {
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("1"))), Some(1));
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("5"))), Some(5));
+		assert_eq!(
+			parse_maxthreads(&user_with_maxthreads(Some("16"))),
+			Some(16)
+		);
+	}
+
+	#[test]
+	fn parse_maxthreads_clamps_to_max_concurrency() {
+		assert_eq!(
+			parse_maxthreads(&user_with_maxthreads(Some("100"))),
+			Some(MAX_CONCURRENCY)
+		);
+		assert_eq!(
+			parse_maxthreads(&user_with_maxthreads(Some("17"))),
+			Some(MAX_CONCURRENCY)
+		);
+	}
+
+	#[test]
+	fn parse_maxthreads_rejects_garbage_and_missing() {
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(None)), None);
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some(""))), None);
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("abc"))), None);
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("0"))), None);
+		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("-1"))), None);
 	}
 }
