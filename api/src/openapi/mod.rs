@@ -92,6 +92,10 @@ use crate::routes::igdb::{
 use crate::routes::r#match::{
 	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
 };
+use crate::routes::mobygames::{
+	__path_get_mg_game_by_id, __path_get_mg_game_covers, __path_get_mg_game_screenshots,
+	__path_list_mg_genres, __path_list_mg_platforms, __path_search_mg_games,
+};
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
 use crate::routes::screenscraper::{
 	__path_get_ss_game_by_id, __path_get_ss_game_by_rom_name, __path_list_ss_systems,
@@ -146,6 +150,10 @@ use service::providers::igdb::model::{
 	PlatformVersionReleaseDate, PlatformWebsite, PlayerPerspective, PopularityPrimitive,
 	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
 	Screenshot, Theme, Website, WebsiteType,
+};
+use service::providers::mobygames::model::{
+	MgAltTitle, MgCover, MgCoverGroup, MgCoversResp, MgGame, MgGamePlatformBrief, MgGenre,
+	MgPlatform, MgSampleCover, MgSampleScreenshot, MgScreenshot, MgScreenshotsResp,
 };
 use service::providers::screenscraper::model::{
 	SsEntityRef, SsGame, SsLocalizedName, SsRom, SsSystem, SsSystemNames,
@@ -367,7 +375,13 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		list_ss_systems,
 		get_ss_game_by_id,
 		search_ss_games,
-		get_ss_game_by_rom_name
+		get_ss_game_by_rom_name,
+		list_mg_platforms,
+		list_mg_genres,
+		get_mg_game_by_id,
+		search_mg_games,
+		get_mg_game_covers,
+		get_mg_game_screenshots
 	),
 	components(schemas(
 		GameMetadataMatchResult,
@@ -500,7 +514,19 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		SsRom,
 		SsSystem,
 		SsSystemNames,
-		SsEntityRef
+		SsEntityRef,
+		MgGame,
+		MgAltTitle,
+		MgGamePlatformBrief,
+		MgSampleCover,
+		MgSampleScreenshot,
+		MgPlatform,
+		MgGenre,
+		MgCover,
+		MgCoverGroup,
+		MgCoversResp,
+		MgScreenshot,
+		MgScreenshotsResp
 	))
 )]
 pub struct ApiDoc;

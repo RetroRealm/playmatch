@@ -15,6 +15,7 @@ pub mod health;
 pub mod identify;
 pub mod igdb;
 pub mod r#match;
+pub mod mobygames;
 pub mod platform;
 pub mod screenscraper;
 pub mod sgdb;

@@ -71,6 +71,10 @@ use crate::routes::igdb::{
 use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
 };
+use crate::routes::mobygames::{
+	get_mg_game_by_id, get_mg_game_covers, get_mg_game_screenshots, list_mg_genres,
+	list_mg_platforms, search_mg_games,
+};
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::screenscraper::{
 	get_ss_game_by_id, get_ss_game_by_rom_name, list_ss_systems, search_ss_games,
@@ -105,6 +109,7 @@ use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::igdb::IgdbClient;
+use service::providers::mobygames::MobyGamesClient;
 use service::providers::screenscraper::ScreenScraperClient;
 use service::providers::steamgriddb::SteamGridDbClient;
 use service::providers::{MetadataProvider, ProviderRegistry};
@@ -171,6 +176,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let ss_http_client = Client::builder().cookie_store(false).build()?;
 
+	let mg_http_client = Client::builder().cookie_store(false).build()?;
+
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
 	let dat_http_client = Client::builder().cookie_store(false).build()?;
@@ -183,6 +190,7 @@ async fn start() -> anyhow::Result<()> {
 	let igdb_client_opt = build_igdb_client(igdb_http_client, redis_conn.clone());
 	let sgdb_client_opt = build_sgdb_client(sgdb_http_client, redis_conn.clone());
 	let ss_client_opt = build_screenscraper_client(ss_http_client, redis_conn.clone());
+	let mg_client_opt = build_mobygames_client(mg_http_client, redis_conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.mask_unmatched_patterns("UNKNOWN")
@@ -209,6 +217,9 @@ async fn start() -> anyhow::Result<()> {
 	if let Some(c) = ss_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
+	if let Some(c) = mg_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
 	if providers.is_empty() {
 		warn!("No metadata providers configured. Background match cron will be a no-op.");
 	}
@@ -224,6 +235,8 @@ async fn start() -> anyhow::Result<()> {
 	let sgdb_enabled = sgdb_data.is_some();
 	let ss_data = ss_client_opt.clone().map(Data::from);
 	let ss_enabled = ss_data.is_some();
+	let mg_data = mg_client_opt.clone().map(Data::from);
+	let mg_enabled = mg_data.is_some();
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -241,6 +254,9 @@ async fn start() -> anyhow::Result<()> {
 			app = app.app_data(d.clone());
 		}
 		if let Some(d) = &ss_data {
+			app = app.app_data(d.clone());
+		}
+		if let Some(d) = &mg_data {
 			app = app.app_data(d.clone());
 		}
 		app.service(
@@ -264,7 +280,13 @@ async fn start() -> anyhow::Result<()> {
 				)
 				.wrap(Cors::permissive())
 				.configure(move |cfg| {
-					configure_public_api_routes(cfg, igdb_enabled, sgdb_enabled, ss_enabled)
+					configure_public_api_routes(
+						cfg,
+						igdb_enabled,
+						sgdb_enabled,
+						ss_enabled,
+						mg_enabled,
+					)
 				})
 				.service(
 					scope("")
@@ -452,6 +474,32 @@ fn build_screenscraper_client(
 }
 
 /// Returns `None` when the API key is absent so self-hosters can run without
+/// the MobyGames integration. The MobyGames API requires a paid subscription;
+/// the cheapest tier permits 1 request every 5 seconds.
+fn build_mobygames_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+) -> Option<Arc<MobyGamesClient>> {
+	let api_key = match env::var("MOBYGAMES_API_KEY") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("MOBYGAMES_API_KEY not set, MobyGames provider disabled");
+			return None;
+		}
+	};
+	match MobyGamesClient::new(api_key, http, redis_conn) {
+		Ok(c) => {
+			info!("MobyGames provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("MobyGames provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
+/// Returns `None` when the API key is absent so self-hosters can run without
 /// the SGDB integration.
 fn build_sgdb_client(
 	http: Client,
@@ -513,6 +561,7 @@ fn configure_public_api_routes(
 	igdb_enabled: bool,
 	sgdb_enabled: bool,
 	ss_enabled: bool,
+	mg_enabled: bool,
 ) {
 	cfg.service(health)
 		.service(ready)
@@ -534,6 +583,18 @@ fn configure_public_api_routes(
 	if ss_enabled {
 		configure_screenscraper_routes(cfg);
 	}
+	if mg_enabled {
+		configure_mobygames_routes(cfg);
+	}
+}
+
+fn configure_mobygames_routes(cfg: &mut ServiceConfig) {
+	cfg.service(list_mg_platforms)
+		.service(list_mg_genres)
+		.service(get_mg_game_by_id)
+		.service(search_mg_games)
+		.service(get_mg_game_covers)
+		.service(get_mg_game_screenshots);
 }
 
 fn configure_screenscraper_routes(cfg: &mut ServiceConfig) {

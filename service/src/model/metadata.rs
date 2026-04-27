@@ -85,6 +85,8 @@ pub enum MetadataProvider {
 	SteamGridDB,
 	/// ScreenScraper (https://www.screenscraper.fr/)
 	ScreenScraper,
+	/// MobyGames (https://www.mobygames.com/)
+	MobyGames,
 }
 
 /// Match types for a game
@@ -187,6 +189,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 			MetadataProviderEnum::Igdb => MetadataProvider::IGDB,
 			MetadataProviderEnum::Steamgriddb => MetadataProvider::SteamGridDB,
 			MetadataProviderEnum::Screenscraper => MetadataProvider::ScreenScraper,
+			MetadataProviderEnum::Mobygames => MetadataProvider::MobyGames,
 		}
 	}
 }
@@ -197,6 +200,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 			MetadataProvider::IGDB => MetadataProviderEnum::Igdb,
 			MetadataProvider::SteamGridDB => MetadataProviderEnum::Steamgriddb,
 			MetadataProvider::ScreenScraper => MetadataProviderEnum::Screenscraper,
+			MetadataProvider::MobyGames => MetadataProviderEnum::Mobygames,
 		}
 	}
 }

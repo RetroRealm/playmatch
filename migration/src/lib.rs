@@ -26,6 +26,7 @@ mod m20260425_000000_index_smm_platform_provider_match_type;
 mod m20260426_120000_add_steamgriddb_provider_enum_value;
 mod m20260427_120000_add_screenscraper_provider_enum_value;
 mod m20260427_120100_add_hash_automatic_match_reason_enum_values;
+mod m20260428_120000_add_mobygames_provider_enum_value;
 
 pub struct Migrator;
 
@@ -59,6 +60,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260426_120000_add_steamgriddb_provider_enum_value::Migration),
 			Box::new(m20260427_120000_add_screenscraper_provider_enum_value::Migration),
 			Box::new(m20260427_120100_add_hash_automatic_match_reason_enum_values::Migration),
+			Box::new(m20260428_120000_add_mobygames_provider_enum_value::Migration),
 		]
 	}
 }

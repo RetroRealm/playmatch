@@ -98,6 +98,8 @@ pub enum MetadataProviderEnum {
 	Steamgriddb,
 	#[sea_orm(string_value = "screenscraper")]
 	Screenscraper,
+	#[sea_orm(string_value = "mobygames")]
+	Mobygames,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
