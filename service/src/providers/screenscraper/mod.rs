@@ -348,10 +348,9 @@ impl ScreenScraperClient {
 			.map(|s| s.to_string());
 		let body = res.text().await?;
 
-		if log::log_enabled!(log::Level::Debug) {
-			let preview: String = body.chars().take(256).collect();
-			debug!("screenscraper response (status={status}, first 256): {preview}");
-		}
+		// Body preview deliberately omitted: the response embeds an `ssuser`
+		// block with the account username, numeric user id, tier, and last
+		// visit, which would leak through the debug logs.
 
 		// Hold the permit through the courtesy interval so each thread
 		// paces itself before releasing the slot for the next caller.

@@ -9,7 +9,13 @@ pub const REGION_PRIORITY: &[&str] = &[
 	"wor", "us", "eu", "ss", "au", "jp", "br", "asi", "cn", "ko", "de", "fr",
 ];
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+// SsHeader, SsUser and SsServeurs are deliberately deserialize-only: the
+// `ssuser` block carries account-private fields (numid, niveau, last visit,
+// quota counters) and must never reach a response body or OpenAPI schema.
+// Keep them off `Serialize` and `ToSchema` so future refactors cannot leak
+// them by accident.
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct SsHeader {
 	#[serde(default)]
 	pub success: String,
@@ -19,7 +25,7 @@ pub struct SsHeader {
 	pub api_version: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SsUser {
 	#[serde(default)]
 	pub requeststoday: Option<String>,
@@ -31,7 +37,7 @@ pub struct SsUser {
 	pub maxthreads: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SsServeurs {
 	#[serde(default)]
 	pub closefornomember: Option<String>,
