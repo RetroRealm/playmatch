@@ -38,6 +38,7 @@ pub fn match_platform_to_screenscraper(
 			return Ok(());
 		}
 
+		let mut redis_conn = client.redis_conn().clone();
 		let systems = client.list_systems().await?;
 		let target_lower = platform.name.to_lowercase();
 
@@ -55,6 +56,7 @@ pub fn match_platform_to_screenscraper(
 						system.id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
 						&db_conn,
+						&mut redis_conn,
 					)
 					.await?;
 					return Ok(());
@@ -72,6 +74,7 @@ pub fn match_platform_to_screenscraper(
 			Target::Platform(platform.id),
 			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
+			&mut redis_conn,
 		)
 		.await?;
 

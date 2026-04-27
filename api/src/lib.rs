@@ -166,13 +166,10 @@ async fn start() -> anyhow::Result<()> {
 	service::db::user::init_pepper(&pepper_raw).unwrap_or_else(|e| panic!("API_KEY_PEPPER: {e}"));
 
 	let igdb_http_client = Client::builder().cookie_store(true).build()?;
-	let igdb_client_opt = build_igdb_client(igdb_http_client);
 
 	let sgdb_http_client = Client::builder().cookie_store(false).build()?;
-	let sgdb_client_opt = build_sgdb_client(sgdb_http_client);
 
 	let ss_http_client = Client::builder().cookie_store(false).build()?;
-	let ss_client_opt = build_screenscraper_client(ss_http_client);
 
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
@@ -182,6 +179,10 @@ async fn start() -> anyhow::Result<()> {
 
 	let redis_conn = redis_client.get_multiplexed_async_connection().await?;
 	info!("Connected to Redis");
+
+	let igdb_client_opt = build_igdb_client(igdb_http_client, redis_conn.clone());
+	let sgdb_client_opt = build_sgdb_client(sgdb_http_client, redis_conn.clone());
+	let ss_client_opt = build_screenscraper_client(ss_http_client, redis_conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.mask_unmatched_patterns("UNKNOWN")
@@ -399,7 +400,10 @@ pub fn main() {
 /// run without the ScreenScraper integration. User credentials are optional;
 /// without them ScreenScraper heavily throttles and frequently rejects
 /// requests, so warn loudly to set the operator's expectations.
-fn build_screenscraper_client(http: Client) -> Option<Arc<ScreenScraperClient>> {
+fn build_screenscraper_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+) -> Option<Arc<ScreenScraperClient>> {
 	let dev_id = match env::var("SCREENSCRAPER_DEV_ID") {
 		Ok(v) if !v.trim().is_empty() => v,
 		_ => {
@@ -435,7 +439,7 @@ fn build_screenscraper_client(http: Client) -> Option<Arc<ScreenScraperClient>> 
 			None
 		}
 	};
-	match ScreenScraperClient::new(dev_id, dev_password, user, http) {
+	match ScreenScraperClient::new(dev_id, dev_password, user, http, redis_conn) {
 		Ok(c) => {
 			info!("ScreenScraper provider enabled");
 			Some(Arc::new(c))
@@ -449,7 +453,10 @@ fn build_screenscraper_client(http: Client) -> Option<Arc<ScreenScraperClient>> 
 
 /// Returns `None` when the API key is absent so self-hosters can run without
 /// the SGDB integration.
-fn build_sgdb_client(http: Client) -> Option<Arc<SteamGridDbClient>> {
+fn build_sgdb_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+) -> Option<Arc<SteamGridDbClient>> {
 	let bearer = match env::var("STEAMGRIDDB_API_KEY") {
 		Ok(v) if !v.trim().is_empty() => v,
 		_ => {
@@ -457,7 +464,7 @@ fn build_sgdb_client(http: Client) -> Option<Arc<SteamGridDbClient>> {
 			return None;
 		}
 	};
-	match SteamGridDbClient::new(bearer, http) {
+	match SteamGridDbClient::new(bearer, http, redis_conn) {
 		Ok(c) => {
 			info!("SteamGridDB provider enabled");
 			Some(Arc::new(c))
@@ -471,7 +478,10 @@ fn build_sgdb_client(http: Client) -> Option<Arc<SteamGridDbClient>> {
 
 /// Returns `None` when credentials are absent so self-hosters can run with
 /// any subset of providers enabled rather than panicking at boot.
-fn build_igdb_client(http: Client) -> Option<Arc<IgdbClient>> {
+fn build_igdb_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+) -> Option<Arc<IgdbClient>> {
 	let client_id = match env::var("IGDB_CLIENT_ID") {
 		Ok(v) if !v.trim().is_empty() => v,
 		_ => {
@@ -486,7 +496,7 @@ fn build_igdb_client(http: Client) -> Option<Arc<IgdbClient>> {
 			return None;
 		}
 	};
-	match IgdbClient::new(client_id, client_secret, http) {
+	match IgdbClient::new(client_id, client_secret, http, redis_conn) {
 		Ok(c) => {
 			info!("IGDB provider enabled");
 			Some(Arc::new(c))

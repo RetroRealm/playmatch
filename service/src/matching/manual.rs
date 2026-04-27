@@ -1,4 +1,3 @@
-use crate::cache::CacheKey;
 use crate::db::company::{find_company_by_name, find_company_related_signature_metadata_mapping};
 use crate::db::game::{
 	find_all_children_of_game, find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_sha1,
@@ -13,7 +12,7 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::error::{ServiceError, ServiceResult};
-use crate::identification::cache::{IdentifyCacheType, filename_size_key};
+use crate::identification::cache::collect_identify_cache_keys;
 use crate::model::matching::{CompanyOrPlatformMatchRequest, GameMatchData, GameMatchRequest};
 use crate::model::{
 	GameMatchType, GameMetadataMatchResult, GameMetadataMatchResultBuilder, UpdatedMatchResult,
@@ -289,22 +288,6 @@ pub async fn apply_manual_game_match_by_game(
 	debug!("Updated {} games", results.len());
 
 	Ok(results)
-}
-
-fn collect_identify_cache_keys(file: &game_file::Model, out: &mut Vec<String>) {
-	if let Some(sha256) = &file.sha256 {
-		out.push(IdentifyCacheType::IdentifySha256.get_cache_key(sha256));
-	}
-	if let Some(sha1) = &file.sha1 {
-		out.push(IdentifyCacheType::IdentifySha1.get_cache_key(sha1));
-	}
-	if let Some(md5) = &file.md5 {
-		out.push(IdentifyCacheType::IdentifyMd5.get_cache_key(md5));
-	}
-	if let Some(size) = file.file_size_in_bytes {
-		let key = filename_size_key(&file.file_name, size);
-		out.push(IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key));
-	}
 }
 
 pub fn build_result(

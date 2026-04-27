@@ -34,6 +34,7 @@ fn match_company_to_igdb(
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
+		let mut redis_conn = igdb_client.redis_conn().clone();
 		let search_results = igdb_client.search_company_by_name(&company.name).await?;
 
 		for search_result in search_results {
@@ -49,6 +50,7 @@ fn match_company_to_igdb(
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 
@@ -63,6 +65,7 @@ fn match_company_to_igdb(
 			Target::Company(company.id),
 			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
+			&mut redis_conn,
 		)
 		.await?;
 

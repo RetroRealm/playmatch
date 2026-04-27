@@ -76,6 +76,7 @@ fn match_clone_of_game_to_screenscraper(
 			return Ok(());
 		}
 
+		let mut redis_conn = client.redis_conn().clone();
 		let parent_game = find_game_parent(&game, &db_conn).await?;
 
 		if let Some(parent_game) = parent_game {
@@ -99,6 +100,7 @@ fn match_clone_of_game_to_screenscraper(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 				return Ok(());
@@ -122,6 +124,7 @@ fn match_clone_of_game_to_screenscraper(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 			}
@@ -141,9 +144,12 @@ fn match_game_to_screenscraper(
 			return Ok(());
 		}
 
+		let mut redis_conn = client.redis_conn().clone();
 		let system_id = get_game_platform_screenscraper_id(&game, &db_conn).await?;
 
-		if let Some(()) = try_match_by_hashes(&game, system_id, &client, &db_conn).await? {
+		if let Some(()) =
+			try_match_by_hashes(&game, system_id, &client, &db_conn, &mut redis_conn).await?
+		{
 			return Ok(());
 		}
 
@@ -170,6 +176,7 @@ fn match_game_to_screenscraper(
 						candidate.id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
 						&db_conn,
+						&mut redis_conn,
 					)
 					.await?;
 					return Ok(());
@@ -191,6 +198,7 @@ fn match_game_to_screenscraper(
 						candidate.id.to_string(),
 						AutomaticMatchReasonEnum::NormalizedName,
 						&db_conn,
+						&mut redis_conn,
 					)
 					.await?;
 					return Ok(());
@@ -205,6 +213,7 @@ fn match_game_to_screenscraper(
 			Target::Game(game.id),
 			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
+			&mut redis_conn,
 		)
 		.await?;
 
@@ -220,6 +229,7 @@ async fn try_match_by_hashes(
 	system_id: i32,
 	client: &ScreenScraperClient,
 	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<Option<()>> {
 	let files = get_game_files_from_game_id(game.id, db_conn).await?;
 	if files.is_empty() {
@@ -233,7 +243,14 @@ async fn try_match_by_hashes(
 		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty())
 			&& let Some(found) = client.get_game_by_md5(system_id, md5).await?
 		{
-			record_hash_match(game, &found, AutomaticMatchReasonEnum::Md5Hash, db_conn).await?;
+			record_hash_match(
+				game,
+				&found,
+				AutomaticMatchReasonEnum::Md5Hash,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
 			return Ok(Some(()));
 		}
 		if client.is_quota_exhausted() {
@@ -242,7 +259,14 @@ async fn try_match_by_hashes(
 		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty())
 			&& let Some(found) = client.get_game_by_sha1(system_id, sha1).await?
 		{
-			record_hash_match(game, &found, AutomaticMatchReasonEnum::Sha1Hash, db_conn).await?;
+			record_hash_match(
+				game,
+				&found,
+				AutomaticMatchReasonEnum::Sha1Hash,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
 			return Ok(Some(()));
 		}
 		if client.is_quota_exhausted() {
@@ -251,7 +275,14 @@ async fn try_match_by_hashes(
 		if let Some(crc) = file.crc.as_deref().filter(|s| !s.is_empty())
 			&& let Some(found) = client.get_game_by_crc(system_id, crc).await?
 		{
-			record_hash_match(game, &found, AutomaticMatchReasonEnum::CrcHash, db_conn).await?;
+			record_hash_match(
+				game,
+				&found,
+				AutomaticMatchReasonEnum::CrcHash,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
 			return Ok(Some(()));
 		}
 	}
@@ -264,6 +295,7 @@ async fn record_hash_match(
 	found: &SsGame,
 	reason: AutomaticMatchReasonEnum,
 	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
 	debug!(
 		"Matched Game \"{}\" to ScreenScraper Game ID {} ({:?})",
@@ -276,6 +308,7 @@ async fn record_hash_match(
 		found.id.to_string(),
 		reason,
 		db_conn,
+		redis_conn,
 	)
 	.await
 }

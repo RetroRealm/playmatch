@@ -7,13 +7,15 @@ use crate::db::game::{
 	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
 	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
 };
+use crate::db::game_file::get_game_files_from_game_id;
 use crate::error::ServiceResult;
-use entity::{game, signature_metadata_mapping};
+use entity::{game, game_file, signature_metadata_mapping};
 use hex::encode as hex_encode;
 use log::{debug, warn};
 use redis::aio::MultiplexedConnection;
 use redis::{AsyncTypedCommands, Expiry};
 use sea_orm::DbConn;
+use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
@@ -87,6 +89,51 @@ pub async fn delete_identify_cache(
 	debug!("Deleting cache for key: {cache_key}");
 	if let Err(e) = redis_conn.del(&cache_key).await {
 		warn!("cache delete failed for {cache_key}: {e}");
+	}
+	Ok(())
+}
+
+/// Push every identify cache key derived from `file` (sha256, sha1, md5,
+/// filename+size) into `out`. Skips fields that are missing on the model so
+/// the caller can pipeline a single `DEL` over only the keys that exist.
+pub fn collect_identify_cache_keys(file: &game_file::Model, out: &mut Vec<String>) {
+	if let Some(sha256) = &file.sha256 {
+		out.push(IdentifyCacheType::IdentifySha256.get_cache_key(sha256));
+	}
+	if let Some(sha1) = &file.sha1 {
+		out.push(IdentifyCacheType::IdentifySha1.get_cache_key(sha1));
+	}
+	if let Some(md5) = &file.md5 {
+		out.push(IdentifyCacheType::IdentifyMd5.get_cache_key(md5));
+	}
+	if let Some(size) = file.file_size_in_bytes {
+		let key = filename_size_key(&file.file_name, size);
+		out.push(IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key));
+	}
+}
+
+/// Bust every identify cache key derived from the game's files. Soft
+/// consistency: a cache miss already in flight at the moment of this call can
+/// still write stale data after the `DEL` completes; the next mapping write or
+/// the 7-day TTL eventually heals it.
+pub async fn bust_identify_cache_for_game(
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+	game_id: Uuid,
+) -> ServiceResult<()> {
+	let files = get_game_files_from_game_id(game_id, db_conn).await?;
+	let mut keys: Vec<String> = Vec::new();
+	for file in &files {
+		collect_identify_cache_keys(file, &mut keys);
+	}
+	if keys.is_empty() {
+		return Ok(());
+	}
+	if let Err(e) = redis_conn.del(&keys).await {
+		warn!(
+			"identify cache bust failed for game {game_id} ({} keys): {e}",
+			keys.len()
+		);
 	}
 	Ok(())
 }

@@ -30,10 +30,15 @@ pub struct SteamGridDbClient {
 	client: Client,
 	service: Mutex<RateLimit<Retry<RetryPolicy, Client>>>,
 	bearer: String,
+	redis_conn: redis::aio::MultiplexedConnection,
 }
 
 impl SteamGridDbClient {
-	pub fn new(bearer: String, client: Client) -> anyhow::Result<Self> {
+	pub fn new(
+		bearer: String,
+		client: Client,
+		redis_conn: redis::aio::MultiplexedConnection,
+	) -> anyhow::Result<Self> {
 		let rate_limit_layer = RateLimitLayer::new(
 			RATELIMIT_AMOUNT,
 			Duration::from_millis(RATELIMIT_DURATION_MS),
@@ -49,7 +54,12 @@ impl SteamGridDbClient {
 			client,
 			bearer,
 			service: Mutex::new(service),
+			redis_conn,
 		})
+	}
+
+	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	pub async fn get_game_by_id(&self, id: i64) -> anyhow::Result<Option<SgdbGame>> {

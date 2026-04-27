@@ -71,6 +71,7 @@ pub async fn write_auto_match_success(
 	provider_id: String,
 	reason: AutomaticMatchReasonEnum,
 	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
 	let mut builder = SignatureMetadataMappingInputBuilder::default();
 	target.apply(&mut builder);
@@ -81,6 +82,10 @@ pub async fn write_auto_match_success(
 		.automatic_match_reason(Some(reason))
 		.build()?;
 	create_or_update_signature_metadata_mapping(input, db_conn).await?;
+	if let Target::Game(game_id) = target {
+		crate::identification::cache::bust_identify_cache_for_game(redis_conn, db_conn, game_id)
+			.await?;
+	}
 	record_metadata_auto_match(
 		provider_label,
 		target.entity_label(),
@@ -96,6 +101,7 @@ pub async fn write_auto_match_failed(
 	target: Target,
 	reason: FailedMatchReasonEnum,
 	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
 	let mut builder = SignatureMetadataMappingInputBuilder::default();
 	target.apply(&mut builder);
@@ -105,6 +111,10 @@ pub async fn write_auto_match_failed(
 		.failed_match_reason(Some(reason))
 		.build()?;
 	create_or_update_signature_metadata_mapping(input, db_conn).await?;
+	if let Target::Game(game_id) = target {
+		crate::identification::cache::bust_identify_cache_for_game(redis_conn, db_conn, game_id)
+			.await?;
+	}
 	record_metadata_auto_match(
 		provider_label,
 		target.entity_label(),

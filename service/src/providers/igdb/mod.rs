@@ -93,10 +93,16 @@ pub struct IgdbClient {
 	service: Mutex<RateLimit<Retry<RetryPolicy, Client>>>,
 	oauth2handler: RwLock<OAuth2Handler>,
 	client_id: String,
+	redis_conn: redis::aio::MultiplexedConnection,
 }
 
 impl IgdbClient {
-	pub fn new(client_id: String, client_secret: String, client: Client) -> anyhow::Result<Self> {
+	pub fn new(
+		client_id: String,
+		client_secret: String,
+		client: Client,
+		redis_conn: redis::aio::MultiplexedConnection,
+	) -> anyhow::Result<Self> {
 		let rate_limit_layer = RateLimitLayer::new(
 			IGDB_RATELIMIT_AMOUNT,
 			Duration::from_millis(IGDB_RATELIMIT_DURATION_MS),
@@ -128,7 +134,12 @@ impl IgdbClient {
 				token_response: None,
 				last_token_request: None,
 			}),
+			redis_conn,
 		})
+	}
+
+	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	pub async fn search_company_by_name(&self, name: &str) -> anyhow::Result<Vec<Company>> {

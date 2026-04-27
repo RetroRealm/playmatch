@@ -74,6 +74,7 @@ fn match_clone_of_game_to_igdb(
 	// otherwise we try to match the game to igdb, if it succeeds, we apply the same igdb to the parent game
 
 	Box::pin(async move {
+		let mut redis_conn = igdb_client.redis_conn().clone();
 		let parent_game = find_game_parent(&game, &db_conn).await?;
 
 		if let Some(parent_game) = parent_game {
@@ -97,6 +98,7 @@ fn match_clone_of_game_to_igdb(
 					parent_game_igdb_mapping.provider_id.clone().unwrap(),
 					AutomaticMatchReasonEnum::ViaParent,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 
@@ -122,6 +124,7 @@ fn match_clone_of_game_to_igdb(
 					mapping.provider_id.unwrap(),
 					AutomaticMatchReasonEnum::ViaChild,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 
@@ -139,6 +142,7 @@ fn match_game_to_igdb(
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
+		let mut redis_conn = igdb_client.redis_conn().clone();
 		let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
 
 		let clean_name = clean_name(&game.name).to_lowercase();
@@ -162,6 +166,7 @@ fn match_game_to_igdb(
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 
@@ -183,6 +188,7 @@ fn match_game_to_igdb(
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::NormalizedName,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 
@@ -214,6 +220,7 @@ fn match_game_to_igdb(
 							search_result.id.to_string(),
 							AutomaticMatchReasonEnum::AlternativeName,
 							&db_conn,
+							&mut redis_conn,
 						)
 						.await?;
 
@@ -234,6 +241,7 @@ fn match_game_to_igdb(
 							search_result.id.to_string(),
 							AutomaticMatchReasonEnum::NormalizedAlternativeName,
 							&db_conn,
+							&mut redis_conn,
 						)
 						.await?;
 
@@ -250,6 +258,7 @@ fn match_game_to_igdb(
 			Target::Game(game.id),
 			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
+			&mut redis_conn,
 		)
 		.await?;
 

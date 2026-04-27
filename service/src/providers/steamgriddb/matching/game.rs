@@ -68,6 +68,7 @@ fn match_clone_of_game_to_steamgriddb(
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
+		let mut redis_conn = client.redis_conn().clone();
 		let parent_game = find_game_parent(&game, &db_conn).await?;
 
 		if let Some(parent_game) = parent_game {
@@ -98,6 +99,7 @@ fn match_clone_of_game_to_steamgriddb(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 				return Ok(());
@@ -128,6 +130,7 @@ fn match_clone_of_game_to_steamgriddb(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 			}
@@ -143,6 +146,7 @@ fn match_game_to_steamgriddb(
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
+		let mut redis_conn = client.redis_conn().clone();
 		let cleaned = clean_name(&game.name).to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
 
@@ -162,6 +166,7 @@ fn match_game_to_steamgriddb(
 					candidate.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 				return Ok(());
@@ -182,6 +187,7 @@ fn match_game_to_steamgriddb(
 					candidate.id.to_string(),
 					AutomaticMatchReasonEnum::NormalizedName,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 				return Ok(());
@@ -195,6 +201,7 @@ fn match_game_to_steamgriddb(
 			Target::Game(game.id),
 			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
+			&mut redis_conn,
 		)
 		.await?;
 

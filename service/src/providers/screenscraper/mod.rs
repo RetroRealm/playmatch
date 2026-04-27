@@ -58,6 +58,7 @@ pub struct ScreenScraperClient {
 	user: Option<(String, String)>,
 	quota_exhausted: AtomicBool,
 	systems_cache: OnceCell<Arc<Vec<SsSystem>>>,
+	redis_conn: redis::aio::MultiplexedConnection,
 }
 
 impl ScreenScraperClient {
@@ -66,6 +67,7 @@ impl ScreenScraperClient {
 		dev_password: String,
 		user: Option<(String, String)>,
 		client: Client,
+		redis_conn: redis::aio::MultiplexedConnection,
 	) -> anyhow::Result<Self> {
 		let rate_limit_layer = RateLimitLayer::new(
 			RATELIMIT_AMOUNT,
@@ -86,11 +88,16 @@ impl ScreenScraperClient {
 			user,
 			quota_exhausted: AtomicBool::new(false),
 			systems_cache: OnceCell::new(),
+			redis_conn,
 		})
 	}
 
 	pub fn is_quota_exhausted(&self) -> bool {
 		self.quota_exhausted.load(Ordering::Relaxed)
+	}
+
+	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	pub async fn list_systems(&self) -> anyhow::Result<Arc<Vec<SsSystem>>> {
@@ -336,30 +343,37 @@ impl ScreenScraperClient {
 
 	fn update_quota_from(&self, user: &Option<SsUser>) {
 		let Some(user) = user else { return };
-		let Some(today) = user
-			.requeststoday
-			.as_deref()
-			.and_then(|s| s.parse::<u64>().ok())
-		else {
-			return;
-		};
-		let Some(max) = user
-			.maxrequestsperday
-			.as_deref()
-			.and_then(|s| s.parse::<u64>().ok())
-		else {
-			return;
-		};
-		if max == 0 {
-			return;
-		}
-		if today * QUOTA_SOFT_LIMIT_DENOMINATOR >= max * QUOTA_SOFT_LIMIT_NUMERATOR
-			&& !self.quota_exhausted.swap(true, Ordering::Relaxed)
+		if quota_should_mark_exhausted(user) && !self.quota_exhausted.swap(true, Ordering::Relaxed)
 		{
+			let (today, max) = parsed_quota(user).unwrap_or((0, 0));
 			warn!(
 				"screenscraper quota near limit ({today}/{max}); short-circuiting remaining match cycle"
 			);
 		}
+	}
+}
+
+fn parsed_quota(user: &SsUser) -> Option<(u64, u64)> {
+	let today = user
+		.requeststoday
+		.as_deref()
+		.and_then(|s| s.parse::<u64>().ok())?;
+	let max = user
+		.maxrequestsperday
+		.as_deref()
+		.and_then(|s| s.parse::<u64>().ok())?;
+	if max == 0 {
+		return None;
+	}
+	Some((today, max))
+}
+
+fn quota_should_mark_exhausted(user: &SsUser) -> bool {
+	match parsed_quota(user) {
+		Some((today, max)) => {
+			today * QUOTA_SOFT_LIMIT_DENOMINATOR >= max * QUOTA_SOFT_LIMIT_NUMERATOR
+		}
+		None => false,
 	}
 }
 
@@ -433,17 +447,6 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use reqwest::Client;
-
-	fn client() -> ScreenScraperClient {
-		ScreenScraperClient::new(
-			"dev".into(),
-			"devpw".into(),
-			Some(("user".into(), "userpw".into())),
-			Client::new(),
-		)
-		.unwrap()
-	}
 
 	#[test]
 	fn parse_or_incident_rejects_each_french_phrase() {
@@ -481,29 +484,47 @@ mod tests {
 		assert!(logged.contains("gameid=42"));
 	}
 
-	#[tokio::test]
-	async fn update_quota_flips_at_or_above_95_percent() {
-		let c = client();
-		let user = Some(SsUser {
+	#[test]
+	fn quota_marks_exhausted_at_or_above_95_percent() {
+		let user = SsUser {
 			requeststoday: Some("950".into()),
 			maxrequestsperday: Some("1000".into()),
 			maxrequestspermin: None,
 			maxthreads: None,
-		});
-		c.update_quota_from(&user);
-		assert!(c.is_quota_exhausted());
+		};
+		assert!(quota_should_mark_exhausted(&user));
 	}
 
-	#[tokio::test]
-	async fn update_quota_does_not_flip_below_95_percent() {
-		let c = client();
-		let user = Some(SsUser {
+	#[test]
+	fn quota_does_not_mark_exhausted_below_95_percent() {
+		let user = SsUser {
 			requeststoday: Some("900".into()),
 			maxrequestsperday: Some("1000".into()),
 			maxrequestspermin: None,
 			maxthreads: None,
-		});
-		c.update_quota_from(&user);
-		assert!(!c.is_quota_exhausted());
+		};
+		assert!(!quota_should_mark_exhausted(&user));
+	}
+
+	#[test]
+	fn quota_does_not_mark_exhausted_with_unparseable_max() {
+		let user = SsUser {
+			requeststoday: Some("950".into()),
+			maxrequestsperday: None,
+			maxrequestspermin: None,
+			maxthreads: None,
+		};
+		assert!(!quota_should_mark_exhausted(&user));
+	}
+
+	#[test]
+	fn quota_does_not_mark_exhausted_with_zero_max() {
+		let user = SsUser {
+			requeststoday: Some("0".into()),
+			maxrequestsperday: Some("0".into()),
+			maxrequestspermin: None,
+			maxthreads: None,
+		};
+		assert!(!quota_should_mark_exhausted(&user));
 	}
 }

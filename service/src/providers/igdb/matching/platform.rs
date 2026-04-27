@@ -34,6 +34,7 @@ pub fn match_platform_to_igdb(
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
+		let mut redis_conn = igdb_client.redis_conn().clone();
 		let search_results = igdb_client.search_platforms_by_name(&platform.name).await?;
 
 		for search_result in search_results {
@@ -49,6 +50,7 @@ pub fn match_platform_to_igdb(
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					&db_conn,
+					&mut redis_conn,
 				)
 				.await?;
 
@@ -63,6 +65,7 @@ pub fn match_platform_to_igdb(
 			Target::Platform(platform.id),
 			FailedMatchReasonEnum::NoDirectMatch,
 			&db_conn,
+			&mut redis_conn,
 		)
 		.await?;
 
