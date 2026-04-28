@@ -14,34 +14,44 @@ pub const REGION_PRIORITY: &[&str] = &[
 // quota counters) and must never reach a response body or OpenAPI schema.
 // Keep them off `Serialize` and `ToSchema` so future refactors cannot leak
 // them by accident.
+//
+// ScreenScraper inconsistently returns numeric fields as either strings
+// (`"1"`) or integers (`1`) across endpoints and over time. Every field
+// historically declared `Option<String>` here uses the flexible
+// deserializer below so the parse does not break when SS flips a field
+// type mid-deploy.
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SsHeader {
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_flexible_string")]
 	pub success: String,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub error: Option<String>,
-	#[serde(rename = "APIversion", default)]
+	#[serde(
+		rename = "APIversion",
+		default,
+		deserialize_with = "de_opt_flexible_string"
+	)]
 	pub api_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SsUser {
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub requeststoday: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxrequestsperday: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxrequestspermin: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxthreads: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SsServeurs {
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub closefornomember: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub closeforleecher: Option<String>,
 }
 
@@ -137,13 +147,13 @@ pub struct SsLocalizedName {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SsRom {
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub romfilename: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub rommd5: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub romsha1: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub romcrc: Option<String>,
 }
 
@@ -163,9 +173,9 @@ pub struct SsGame {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SsEntityRef {
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub id: Option<String>,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub text: Option<String>,
 }
 
@@ -198,13 +208,43 @@ impl SsGame {
 }
 
 fn de_string_i32<'de, D: Deserializer<'de>>(d: D) -> Result<i32, D::Error> {
-	let s = String::deserialize(d)?;
+	let s = de_flexible_string(d)?;
 	s.parse::<i32>().map_err(D::Error::custom)
 }
 
 fn de_string_i64<'de, D: Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
-	let s = String::deserialize(d)?;
+	let s = de_flexible_string(d)?;
 	s.parse::<i64>().map_err(D::Error::custom)
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FlexibleScalar {
+	Str(String),
+	Int(i64),
+	UInt(u64),
+	Float(f64),
+	Bool(bool),
+}
+
+impl FlexibleScalar {
+	fn into_string(self) -> String {
+		match self {
+			Self::Str(s) => s,
+			Self::Int(i) => i.to_string(),
+			Self::UInt(u) => u.to_string(),
+			Self::Float(f) => f.to_string(),
+			Self::Bool(b) => b.to_string(),
+		}
+	}
+}
+
+fn de_flexible_string<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+	Ok(FlexibleScalar::deserialize(d)?.into_string())
+}
+
+fn de_opt_flexible_string<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+	Ok(Option::<FlexibleScalar>::deserialize(d)?.map(FlexibleScalar::into_string))
 }
 
 #[cfg(test)]

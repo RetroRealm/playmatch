@@ -1,9 +1,10 @@
+use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
 use entity::{
 	launchbox_game, launchbox_game_alternate_name, launchbox_game_image, launchbox_import,
 	launchbox_platform,
 };
 use sea_orm::ActiveValue::Set;
-use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::sea_query::{Expr, Func, OnConflict};
 use sea_orm::{
 	ColumnTrait, DbConn, DbErr, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect,
 };
@@ -34,12 +35,9 @@ pub async fn search_lb_games(
 ) -> Result<Vec<launchbox_game::Model>, DbErr> {
 	let pattern = format!("%{}%", query.to_lowercase());
 	let mut q = launchbox_game::Entity::find()
-		.filter(Expr::cust_with_values("lower(name) LIKE ?", [pattern]));
+		.filter(Expr::expr(Func::lower(Expr::col(launchbox_game::Column::Name))).like(pattern));
 	if let Some(p) = platform_name {
-		q = q.filter(Expr::cust_with_values(
-			"lower(platform_name) = ?",
-			[p.to_lowercase()],
-		));
+		q = q.filter(launchbox_game::Column::PlatformName.eq_ignore_case(p));
 	}
 	q.order_by(launchbox_game::Column::Name, Order::Asc)
 		.limit(LB_SEARCH_LIMIT)
@@ -53,10 +51,11 @@ pub async fn find_lb_game_by_platform_and_name(
 	conn: &DbConn,
 ) -> Result<Option<launchbox_game::Model>, DbErr> {
 	launchbox_game::Entity::find()
-		.filter(Expr::cust_with_values(
-			"lower(platform_name) = ? AND lower(name) = ?",
-			[platform_name.to_lowercase(), name.to_lowercase()],
-		))
+		.filter(
+			launchbox_game::Column::PlatformName
+				.eq_ignore_case(platform_name)
+				.and(launchbox_game::Column::Name.eq_ignore_case(name)),
+		)
 		.one(conn)
 		.await
 }
@@ -109,10 +108,7 @@ pub async fn find_lb_platform_by_name_lower(
 	conn: &DbConn,
 ) -> Result<Option<launchbox_platform::Model>, DbErr> {
 	launchbox_platform::Entity::find()
-		.filter(Expr::cust_with_values(
-			"lower(name) = ?",
-			[name.to_lowercase()],
-		))
+		.filter(launchbox_platform::Column::Name.eq_ignore_case(name))
 		.one(conn)
 		.await
 }

@@ -26,7 +26,7 @@ use tokio::fs as tokio_fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 
-pub const DEFAULT_METADATA_URL: &str = "https://gamesdb.launchbox-app.com/metadata.zip";
+pub const DEFAULT_METADATA_URL: &str = "https://gamesdb.launchbox-app.com/Metadata.zip";
 const LB_TMP_DIR: &str = "tmp/launchbox";
 const LB_BATCH_SIZE: usize = 2000;
 const LB_CHANNEL_DEPTH: usize = 8;
