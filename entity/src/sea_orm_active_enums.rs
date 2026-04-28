@@ -100,6 +100,8 @@ pub enum MetadataProviderEnum {
 	Screenscraper,
 	#[sea_orm(string_value = "mobygames")]
 	Mobygames,
+	#[sea_orm(string_value = "launchbox")]
+	Launchbox,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
