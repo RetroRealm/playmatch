@@ -384,6 +384,76 @@ pub fn get_unmatched_games_with_clone_of_with_limit_no_platform_gate<'a>(
 	get_unmatched_games_with_limit(provider, false, false, page_size, conn)
 }
 
+/// Return up to `page_size` games where this `provider` is currently `Failed`
+/// AND at least one other provider has matched the same game with a non-null
+/// `matched_name`. Used by the cross-provider name propagation pass; no age
+/// gate so freshly-failed rows are immediately eligible once any sibling lands
+/// a match. Returns `Ok(None)` when there is nothing left to process.
+pub fn get_failed_games_for_cross_pass_with_limit<'a>(
+	provider: MetadataProviderEnum,
+	page_size: u64,
+	conn: DbConn,
+) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
+	Box::pin(async move {
+		let smm_self = Alias::new("smm_self");
+		let smm_sibling = Alias::new("smm_sibling");
+
+		let res = Game::find()
+			.join_as(
+				JoinType::InnerJoin,
+				game::Relation::SignatureMetadataMapping.def(),
+				smm_self.clone(),
+			)
+			.join_as(
+				JoinType::InnerJoin,
+				game::Relation::SignatureMetadataMapping.def(),
+				smm_sibling.clone(),
+			)
+			.filter(
+				Expr::col((
+					smm_self.clone(),
+					signature_metadata_mapping::Column::Provider,
+				))
+				.eq(provider.as_enum())
+				.and(
+					Expr::col((smm_self, signature_metadata_mapping::Column::MatchType))
+						.eq(MatchTypeEnum::Failed.as_enum()),
+				)
+				.and(
+					Expr::col((
+						smm_sibling.clone(),
+						signature_metadata_mapping::Column::Provider,
+					))
+					.ne(provider.as_enum()),
+				)
+				.and(
+					Expr::col((
+						smm_sibling.clone(),
+						signature_metadata_mapping::Column::MatchType,
+					))
+					.is_in([
+						MatchTypeEnum::Automatic.as_enum(),
+						MatchTypeEnum::Manual.as_enum(),
+					]),
+				)
+				.and(
+					Expr::col((smm_sibling, signature_metadata_mapping::Column::MatchedName))
+						.is_not_null(),
+				),
+			)
+			.order_by_asc(game::Column::Id)
+			.limit(page_size)
+			.all(&conn)
+			.await?;
+
+		if res.is_empty() {
+			Ok(None)
+		} else {
+			Ok(Some(res))
+		}
+	})
+}
+
 /// Return up to `page_size` games whose last automatic match for `provider` failed with
 /// `NoDirectMatch` more than 60 days ago. Used to retry stale failures.
 /// Returns `Ok(None)` when there is nothing left to process.

@@ -252,3 +252,73 @@ async fn get_game_platform_mobygames_id(game: &Model, db_conn: &DbConn) -> anyho
 		)
 	})
 }
+
+pub fn match_game_via_sibling_name_mobygames(
+	game: Model,
+	sibling_names: Vec<String>,
+	client: Arc<MobyGamesClient>,
+	db_conn: DbConn,
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		let mut redis_conn = client.redis_conn().clone();
+		let platform_id = get_game_platform_mobygames_id(&game, &db_conn).await?;
+		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
+		tried.insert(cleaned_playmatch);
+
+		for sibling in sibling_names {
+			let q = clean_name(&sibling).to_lowercase();
+			if !tried.insert(q.clone()) {
+				continue;
+			}
+			let q_norm = normalize_title(&q);
+			let candidates = client.search_games(Some(platform_id), &q).await?;
+
+			for c in &candidates {
+				for name in c.iter_candidate_titles() {
+					if name.to_lowercase() == q {
+						debug!(
+							"Cross-matched Game \"{}\" to MobyGames Game ID {} via sibling \"{}\" (Direct)",
+							&game.name, c.game_id, &sibling
+						);
+						write_auto_match_success(
+							"mobygames",
+							MetadataProviderEnum::Mobygames,
+							Target::Game(game.id),
+							c.game_id.to_string(),
+							AutomaticMatchReasonEnum::CrossProviderDirectName,
+							Some(c.title.clone()),
+							&db_conn,
+							&mut redis_conn,
+						)
+						.await?;
+						return Ok(());
+					}
+				}
+			}
+			for c in &candidates {
+				for name in c.iter_candidate_titles() {
+					if normalize_title(&name.to_lowercase()) == q_norm {
+						debug!(
+							"Cross-matched Game \"{}\" to MobyGames Game ID {} via sibling \"{}\" (Normalized)",
+							&game.name, c.game_id, &sibling
+						);
+						write_auto_match_success(
+							"mobygames",
+							MetadataProviderEnum::Mobygames,
+							Target::Game(game.id),
+							c.game_id.to_string(),
+							AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+							Some(c.title.clone()),
+							&db_conn,
+							&mut redis_conn,
+						)
+						.await?;
+						return Ok(());
+					}
+				}
+			}
+		}
+		Ok(())
+	})
+}

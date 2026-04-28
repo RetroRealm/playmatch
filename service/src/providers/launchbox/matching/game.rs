@@ -293,3 +293,113 @@ async fn get_game_platform_launchbox_name(
 		)
 	})
 }
+
+pub fn match_game_via_sibling_name_launchbox(
+	game: Model,
+	sibling_names: Vec<String>,
+	client: Arc<LaunchBoxClient>,
+	db_conn: DbConn,
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		let mut redis_conn = client.redis_conn().clone();
+		let platform_name = get_game_platform_launchbox_name(&game, &db_conn).await?;
+		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
+		tried.insert(cleaned_playmatch);
+
+		for sibling in sibling_names {
+			let q = clean_name(&sibling).to_lowercase();
+			if !tried.insert(q.clone()) {
+				continue;
+			}
+			let q_norm = normalize_title(&q);
+
+			if let Some(found) =
+				find_lb_game_by_platform_and_name(&platform_name, &q, &db_conn).await?
+			{
+				debug!(
+					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct)",
+					&game.name, found.database_id, &sibling
+				);
+				write_auto_match_success(
+					"launchbox",
+					MetadataProviderEnum::Launchbox,
+					Target::Game(game.id),
+					found.database_id.to_string(),
+					AutomaticMatchReasonEnum::CrossProviderDirectName,
+					Some(found.name),
+					&db_conn,
+					&mut redis_conn,
+				)
+				.await?;
+				return Ok(());
+			}
+
+			if let Some(found) =
+				find_lb_game_by_platform_and_alternate_name(&platform_name, &q, &db_conn).await?
+			{
+				debug!(
+					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct alt)",
+					&game.name, found.database_id, &sibling
+				);
+				write_auto_match_success(
+					"launchbox",
+					MetadataProviderEnum::Launchbox,
+					Target::Game(game.id),
+					found.database_id.to_string(),
+					AutomaticMatchReasonEnum::CrossProviderDirectName,
+					Some(found.name),
+					&db_conn,
+					&mut redis_conn,
+				)
+				.await?;
+				return Ok(());
+			}
+
+			if let Some(found) =
+				find_lb_game_by_platform_and_name(&platform_name, &q_norm, &db_conn).await?
+				&& normalize_title(&found.name.to_lowercase()) == q_norm
+			{
+				debug!(
+					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized)",
+					&game.name, found.database_id, &sibling
+				);
+				write_auto_match_success(
+					"launchbox",
+					MetadataProviderEnum::Launchbox,
+					Target::Game(game.id),
+					found.database_id.to_string(),
+					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+					Some(found.name),
+					&db_conn,
+					&mut redis_conn,
+				)
+				.await?;
+				return Ok(());
+			}
+
+			if let Some(found) =
+				find_lb_game_by_platform_and_alternate_name(&platform_name, &q_norm, &db_conn)
+					.await?
+			{
+				debug!(
+					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized alt)",
+					&game.name, found.database_id, &sibling
+				);
+				write_auto_match_success(
+					"launchbox",
+					MetadataProviderEnum::Launchbox,
+					Target::Game(game.id),
+					found.database_id.to_string(),
+					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+					Some(found.name),
+					&db_conn,
+					&mut redis_conn,
+				)
+				.await?;
+				return Ok(());
+			}
+		}
+		Ok(())
+	})
+}

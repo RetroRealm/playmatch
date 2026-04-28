@@ -1298,4 +1298,19 @@ impl crate::providers::MetadataProvider for IgdbClient {
 	async fn match_db(self: std::sync::Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
 		crate::providers::igdb::matching::match_db_to_igdb_entities(self, db_conn).await
 	}
+
+	async fn match_via_sibling_names(
+		self: std::sync::Arc<Self>,
+		db_conn: &sea_orm::DbConn,
+	) -> anyhow::Result<()> {
+		crate::providers::drive_cross_match_pipeline(
+			"igdb",
+			entity::sea_orm_active_enums::MetadataProviderEnum::Igdb,
+			crate::providers::igdb::matching::game::match_game_via_sibling_name_igdb,
+			self,
+			db_conn,
+			crate::providers::DEFAULT_CHUNK_SIZE,
+		)
+		.await
+	}
 }

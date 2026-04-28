@@ -493,6 +493,25 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 		}
 		matching::match_db_to_screenscraper_entities(self, db_conn).await
 	}
+
+	async fn match_via_sibling_names(
+		self: Arc<Self>,
+		db_conn: &sea_orm::DbConn,
+	) -> anyhow::Result<()> {
+		if self.is_quota_exhausted() {
+			warn!("screenscraper quota exhausted at cross-pass start, skipping");
+			return Ok(());
+		}
+		crate::providers::drive_cross_match_pipeline(
+			"screenscraper",
+			MetadataProviderEnum::Screenscraper,
+			matching::game::match_game_via_sibling_name_screenscraper,
+			self,
+			db_conn,
+			crate::providers::DEFAULT_CHUNK_SIZE,
+		)
+		.await
+	}
 }
 
 #[cfg(test)]

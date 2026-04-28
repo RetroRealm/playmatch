@@ -246,3 +246,73 @@ async fn get_game_platform_emuready_id(game: &Model, db_conn: &DbConn) -> anyhow
 		)
 	})
 }
+
+pub fn match_game_via_sibling_name_emuready(
+	game: Model,
+	sibling_names: Vec<String>,
+	client: Arc<EmuReadyClient>,
+	db_conn: DbConn,
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		let mut redis_conn = client.redis_conn().clone();
+		let system_id = get_game_platform_emuready_id(&game, &db_conn).await?;
+		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
+		tried.insert(cleaned_playmatch);
+
+		for sibling in sibling_names {
+			let q = clean_name(&sibling).to_lowercase();
+			if !tried.insert(q.clone()) {
+				continue;
+			}
+			let q_norm = normalize_title(&q);
+			let candidates = client.search_games(&system_id, &q).await?;
+
+			for c in &candidates {
+				if c.title.to_lowercase() == q {
+					debug!(
+						"Cross-matched Game \"{}\" to EmuReady Game ID {} via sibling \"{}\" (Direct)",
+						&game.name, c.id, &sibling
+					);
+					write_auto_match_success(
+						"emuready",
+						MetadataProviderEnum::EmuReady,
+						Target::Game(game.id),
+						c.id.clone(),
+						AutomaticMatchReasonEnum::CrossProviderDirectName,
+						Some(c.title.clone()),
+						&db_conn,
+						&mut redis_conn,
+					)
+					.await?;
+					return Ok(());
+				}
+			}
+			for c in &candidates {
+				let normalised = c
+					.normalized_title
+					.clone()
+					.unwrap_or_else(|| normalize_title(&c.title.to_lowercase()));
+				if normalised == q_norm {
+					debug!(
+						"Cross-matched Game \"{}\" to EmuReady Game ID {} via sibling \"{}\" (Normalized)",
+						&game.name, c.id, &sibling
+					);
+					write_auto_match_success(
+						"emuready",
+						MetadataProviderEnum::EmuReady,
+						Target::Game(game.id),
+						c.id.clone(),
+						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+						Some(c.title.clone()),
+						&db_conn,
+						&mut redis_conn,
+					)
+					.await?;
+					return Ok(());
+				}
+			}
+		}
+		Ok(())
+	})
+}

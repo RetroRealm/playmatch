@@ -1,5 +1,5 @@
 mod company;
-mod game;
+pub mod game;
 mod platform;
 
 use self::game::match_games_to_igdb;

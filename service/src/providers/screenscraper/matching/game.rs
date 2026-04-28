@@ -365,3 +365,79 @@ async fn get_game_platform_screenscraper_id(game: &Model, db_conn: &DbConn) -> a
 		)
 	})
 }
+
+pub fn match_game_via_sibling_name_screenscraper(
+	game: Model,
+	sibling_names: Vec<String>,
+	client: Arc<ScreenScraperClient>,
+	db_conn: DbConn,
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		if client.is_quota_exhausted() {
+			return Ok(());
+		}
+		let mut redis_conn = client.redis_conn().clone();
+		let system_id = get_game_platform_screenscraper_id(&game, &db_conn).await?;
+		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
+		tried.insert(cleaned_playmatch);
+
+		for sibling in sibling_names {
+			if client.is_quota_exhausted() {
+				return Ok(());
+			}
+			let q = clean_name(&sibling).to_lowercase();
+			if !tried.insert(q.clone()) {
+				continue;
+			}
+			let q_norm = normalize_title(&q);
+			let candidates = client.search_games(system_id, &q).await?;
+
+			for c in &candidates {
+				for name in c.iter_candidate_names() {
+					if name.to_lowercase() == q {
+						debug!(
+							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Direct)",
+							&game.name, c.id, &sibling
+						);
+						write_auto_match_success(
+							"screenscraper",
+							MetadataProviderEnum::Screenscraper,
+							Target::Game(game.id),
+							c.id.to_string(),
+							AutomaticMatchReasonEnum::CrossProviderDirectName,
+							c.iter_candidate_names().next().map(str::to_string),
+							&db_conn,
+							&mut redis_conn,
+						)
+						.await?;
+						return Ok(());
+					}
+				}
+			}
+			for c in &candidates {
+				for name in c.iter_candidate_names() {
+					if normalize_title(&name.to_lowercase()) == q_norm {
+						debug!(
+							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Normalized)",
+							&game.name, c.id, &sibling
+						);
+						write_auto_match_success(
+							"screenscraper",
+							MetadataProviderEnum::Screenscraper,
+							Target::Game(game.id),
+							c.id.to_string(),
+							AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+							c.iter_candidate_names().next().map(str::to_string),
+							&db_conn,
+							&mut redis_conn,
+						)
+						.await?;
+						return Ok(());
+					}
+				}
+			}
+		}
+		Ok(())
+	})
+}

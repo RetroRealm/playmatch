@@ -42,6 +42,33 @@ pub struct SignatureMetadataMappingInput {
 	pub matched_name: Option<String>,
 }
 
+/// Look up sibling provider mappings for a game, returning each sibling
+/// provider's canonical title as recorded in `matched_name`. Used by the
+/// cross-provider name pass: the caller filters its own provider out via
+/// `own_provider` so the result only contains usable foreign-provider
+/// queries. Mappings without a `matched_name` are skipped entirely.
+pub async fn find_sibling_matched_names(
+	game_id: Uuid,
+	own_provider: MetadataProviderEnum,
+	conn: &DbConn,
+) -> Result<Vec<(MetadataProviderEnum, String)>, DbErr> {
+	let rows = signature_metadata_mapping::Entity::find()
+		.filter(signature_metadata_mapping::Column::GameId.eq(game_id))
+		.filter(signature_metadata_mapping::Column::Provider.ne(own_provider))
+		.filter(
+			signature_metadata_mapping::Column::MatchType
+				.eq(MatchTypeEnum::Automatic)
+				.or(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::Manual)),
+		)
+		.filter(signature_metadata_mapping::Column::MatchedName.is_not_null())
+		.all(conn)
+		.await?;
+	Ok(rows
+		.into_iter()
+		.filter_map(|m| m.matched_name.map(|n| (m.provider, n)))
+		.collect())
+}
+
 /// Look up the mapping that targets the given platform, game, company and provider tuple.
 pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provider(
 	platform_id: Option<Uuid>,

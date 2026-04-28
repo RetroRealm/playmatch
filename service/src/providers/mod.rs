@@ -36,6 +36,13 @@ pub type FetchPageFn<M> =
 /// provider client, and an owned `DbConn`.
 pub type MatchEntityFn<M, C> = fn(M, Arc<C>, DbConn) -> BoxFuture<'static, anyhow::Result<()>>;
 
+/// Function pointer signature for the per-entity callback used by
+/// [`drive_cross_match_pipeline`]. Receives one entity, the deduped sibling
+/// matched-names to attempt, an `Arc` clone of the provider client, and an
+/// owned `DbConn`.
+pub type CrossMatchFn<C> =
+	fn(entity::game::Model, Vec<String>, Arc<C>, DbConn) -> BoxFuture<'static, anyhow::Result<()>>;
+
 /// Identifies which entity table a match write targets. Carries the FK value
 /// so the writer helpers can populate the matching column on the
 /// `signature_metadata_mapping` row.
@@ -193,6 +200,57 @@ where
 	Ok(())
 }
 
+/// Drive a cross-provider name retry pass for `provider`. Pages through
+/// games that this provider failed to match while at least one sibling
+/// provider has a non-null `matched_name`, then dispatches `match_fn` per
+/// game with the deduped sibling names. Per-entity errors are logged and do
+/// not abort the loop.
+pub async fn drive_cross_match_pipeline<C>(
+	label: &'static str,
+	provider: MetadataProviderEnum,
+	match_fn: CrossMatchFn<C>,
+	client: Arc<C>,
+	db_conn: &DbConn,
+	chunk_size: usize,
+) -> anyhow::Result<()>
+where
+	C: Send + Sync + 'static,
+{
+	while let Some(page) = crate::db::game::get_failed_games_for_cross_pass_with_limit(
+		provider,
+		DEFAULT_PAGE_SIZE,
+		db_conn.clone(),
+	)
+	.await?
+	{
+		for chunk in page.chunks(chunk_size) {
+			let mut handles = Vec::with_capacity(chunk.len());
+			for game in chunk.iter().cloned() {
+				let client = client.clone();
+				let conn = db_conn.clone();
+				handles.push(tokio::spawn(async move {
+					let siblings =
+						crate::db::signature_metadata_mapping::find_sibling_matched_names(
+							game.id, provider, &conn,
+						)
+						.await?;
+					if siblings.is_empty() {
+						return Ok(());
+					}
+					let names: Vec<String> = siblings.into_iter().map(|(_, n)| n).collect();
+					match_fn(game, names, client, conn).await
+				}));
+			}
+			for handle in handles {
+				if let Err(e) = handle.await? {
+					error!("Error while cross-matching {label} to provider: {e:?}");
+				}
+			}
+		}
+	}
+	Ok(())
+}
+
 /// Implemented by every metadata provider that participates in the
 /// background match cron.
 ///
@@ -221,13 +279,24 @@ pub trait MetadataProvider: Send + Sync + 'static {
 	/// `Arc<Self>` receiver so the impl can hand the same `Arc` into
 	/// `tokio::spawn` without requiring `Self: Clone`.
 	async fn match_db(self: Arc<Self>, db_conn: &DbConn) -> anyhow::Result<()>;
+
+	/// Cross-provider name retry pass. Default no-op so providers can opt in
+	/// individually. Runs as a second wave after every provider's primary
+	/// `match_db` has finished, so each provider's cross-pass sees the full
+	/// set of sibling `matched_name` values regardless of registry order.
+	async fn match_via_sibling_names(self: Arc<Self>, _db_conn: &DbConn) -> anyhow::Result<()> {
+		Ok(())
+	}
 }
 
 /// Cron runs providers in registration order.
 pub type ProviderRegistry = Vec<Arc<dyn MetadataProvider>>;
 
 /// Per-provider failures are logged and recorded as `{label}_match` failure
-/// metrics; they do not stop other providers.
+/// metrics; they do not stop other providers. After every provider's primary
+/// cycle finishes, a second wave runs `match_via_sibling_names` so each
+/// provider can use the full set of sibling matched_names recorded across
+/// the registry.
 pub async fn match_db_to_all_providers(
 	registry: &ProviderRegistry,
 	db_conn: &DbConn,
@@ -253,6 +322,28 @@ pub async fn match_db_to_all_providers(
 			started.elapsed().as_secs_f64(),
 		);
 	}
+
+	for provider in registry {
+		let label = provider.provider_label();
+		info!("Starting cross-provider name retry pass for '{label}'");
+		let started = Instant::now();
+		let result = match provider.clone().match_via_sibling_names(db_conn).await {
+			Ok(()) => {
+				info!("Finished cross-provider name retry pass for '{label}'");
+				"success"
+			}
+			Err(e) => {
+				error!("Provider '{label}' cross-provider name pass failed: {e:?}");
+				"failure"
+			}
+		};
+		record_background_job(
+			&format!("{label}_cross_match"),
+			result,
+			started.elapsed().as_secs_f64(),
+		);
+	}
+
 	record_background_job(
 		"provider_match_all",
 		"success",

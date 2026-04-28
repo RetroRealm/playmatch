@@ -324,3 +324,71 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 
 	Ok(platform_igdb_id)
 }
+
+pub fn match_game_via_sibling_name_igdb(
+	game: Model,
+	sibling_names: Vec<String>,
+	igdb_client: Arc<IgdbClient>,
+	db_conn: DbConn,
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		let mut redis_conn = igdb_client.redis_conn().clone();
+		let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
+		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
+		tried.insert(cleaned_playmatch);
+
+		for sibling in sibling_names {
+			let q = clean_name(&sibling).to_lowercase();
+			if !tried.insert(q.clone()) {
+				continue;
+			}
+			let q_norm = normalize_title(&q);
+			let candidates = igdb_client
+				.search_game_by_name_and_platform(&q, platform_igdb_id)
+				.await?;
+
+			for c in &candidates {
+				if c.name.to_lowercase() == q {
+					debug!(
+						"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" (Direct)",
+						&game.name, c.id, &sibling
+					);
+					write_auto_match_success(
+						"igdb",
+						MetadataProviderEnum::Igdb,
+						Target::Game(game.id),
+						c.id.to_string(),
+						AutomaticMatchReasonEnum::CrossProviderDirectName,
+						Some(c.name.clone()),
+						&db_conn,
+						&mut redis_conn,
+					)
+					.await?;
+					return Ok(());
+				}
+			}
+			for c in &candidates {
+				if normalize_title(&c.name.to_lowercase()) == q_norm {
+					debug!(
+						"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" (Normalized)",
+						&game.name, c.id, &sibling
+					);
+					write_auto_match_success(
+						"igdb",
+						MetadataProviderEnum::Igdb,
+						Target::Game(game.id),
+						c.id.to_string(),
+						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+						Some(c.name.clone()),
+						&db_conn,
+						&mut redis_conn,
+					)
+					.await?;
+					return Ok(());
+				}
+			}
+		}
+		Ok(())
+	})
+}

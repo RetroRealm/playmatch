@@ -343,4 +343,19 @@ impl crate::providers::MetadataProvider for SteamGridDbClient {
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
 		matching::match_steamgriddb_to_db_games(self, db_conn).await
 	}
+
+	async fn match_via_sibling_names(
+		self: Arc<Self>,
+		db_conn: &sea_orm::DbConn,
+	) -> anyhow::Result<()> {
+		crate::providers::drive_cross_match_pipeline(
+			"steamgriddb",
+			MetadataProviderEnum::Steamgriddb,
+			matching::game::match_game_via_sibling_name_steamgriddb,
+			self,
+			db_conn,
+			crate::providers::DEFAULT_CHUNK_SIZE,
+		)
+		.await
+	}
 }

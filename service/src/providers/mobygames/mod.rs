@@ -284,6 +284,21 @@ impl crate::providers::MetadataProvider for MobyGamesClient {
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
 		matching::match_db_to_mobygames_entities(self, db_conn).await
 	}
+
+	async fn match_via_sibling_names(
+		self: Arc<Self>,
+		db_conn: &sea_orm::DbConn,
+	) -> anyhow::Result<()> {
+		crate::providers::drive_cross_match_pipeline(
+			"mobygames",
+			MetadataProviderEnum::Mobygames,
+			matching::game::match_game_via_sibling_name_mobygames,
+			self,
+			db_conn,
+			crate::providers::DEFAULT_CHUNK_SIZE,
+		)
+		.await
+	}
 }
 
 #[cfg(test)]

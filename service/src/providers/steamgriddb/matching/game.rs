@@ -17,6 +17,7 @@ use entity::sea_orm_active_enums::{
 use futures_util::future::BoxFuture;
 use log::debug;
 use sea_orm::DbConn;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 pub async fn match_games_to_steamgriddb(
@@ -209,6 +210,71 @@ fn match_game_to_steamgriddb(
 		)
 		.await?;
 
+		Ok(())
+	})
+}
+
+pub fn match_game_via_sibling_name_steamgriddb(
+	game: Model,
+	sibling_names: Vec<String>,
+	client: Arc<SteamGridDbClient>,
+	db_conn: DbConn,
+) -> BoxFuture<'static, anyhow::Result<()>> {
+	Box::pin(async move {
+		let mut redis_conn = client.redis_conn().clone();
+		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let mut tried: HashSet<String> = HashSet::new();
+		tried.insert(cleaned_playmatch);
+
+		for sibling in sibling_names {
+			let q = clean_name(&sibling).to_lowercase();
+			if !tried.insert(q.clone()) {
+				continue;
+			}
+			let q_norm = normalize_title(&q);
+			let candidates = client.search_games(&q).await?;
+
+			for c in &candidates {
+				if c.name.to_lowercase() == q {
+					debug!(
+						"Cross-matched Game \"{}\" to SteamGridDB Game ID {} via sibling \"{}\" (Direct)",
+						&game.name, c.id, &sibling
+					);
+					write_auto_match_success(
+						"steamgriddb",
+						MetadataProviderEnum::Steamgriddb,
+						Target::Game(game.id),
+						c.id.to_string(),
+						AutomaticMatchReasonEnum::CrossProviderDirectName,
+						Some(c.name.clone()),
+						&db_conn,
+						&mut redis_conn,
+					)
+					.await?;
+					return Ok(());
+				}
+			}
+			for c in &candidates {
+				if normalize_title(&c.name.to_lowercase()) == q_norm {
+					debug!(
+						"Cross-matched Game \"{}\" to SteamGridDB Game ID {} via sibling \"{}\" (Normalized)",
+						&game.name, c.id, &sibling
+					);
+					write_auto_match_success(
+						"steamgriddb",
+						MetadataProviderEnum::Steamgriddb,
+						Target::Game(game.id),
+						c.id.to_string(),
+						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+						Some(c.name.clone()),
+						&db_conn,
+						&mut redis_conn,
+					)
+					.await?;
+					return Ok(());
+				}
+			}
+		}
 		Ok(())
 	})
 }
