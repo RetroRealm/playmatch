@@ -89,6 +89,8 @@ pub enum MetadataProvider {
 	MobyGames,
 	/// LaunchBox Games Database (https://gamesdb.launchbox-app.com/)
 	LaunchBox,
+	/// EmuReady (https://www.emuready.com/)
+	EmuReady,
 }
 
 /// Match types for a game
@@ -193,6 +195,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 			MetadataProviderEnum::Screenscraper => MetadataProvider::ScreenScraper,
 			MetadataProviderEnum::Mobygames => MetadataProvider::MobyGames,
 			MetadataProviderEnum::Launchbox => MetadataProvider::LaunchBox,
+			MetadataProviderEnum::EmuReady => MetadataProvider::EmuReady,
 		}
 	}
 }
@@ -205,6 +208,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 			MetadataProvider::ScreenScraper => MetadataProviderEnum::Screenscraper,
 			MetadataProvider::MobyGames => MetadataProviderEnum::Mobygames,
 			MetadataProvider::LaunchBox => MetadataProviderEnum::Launchbox,
+			MetadataProvider::EmuReady => MetadataProviderEnum::EmuReady,
 		}
 	}
 }

@@ -102,6 +102,8 @@ pub enum MetadataProviderEnum {
 	Mobygames,
 	#[sea_orm(string_value = "launchbox")]
 	Launchbox,
+	#[sea_orm(string_value = "emuready")]
+	EmuReady,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

@@ -29,6 +29,7 @@ mod m20260427_120100_add_hash_automatic_match_reason_enum_values;
 mod m20260428_120000_add_mobygames_provider_enum_value;
 mod m20260428_120100_add_launchbox_provider_enum_value;
 mod m20260428_120200_create_launchbox_tables;
+mod m20260428_120300_add_emuready_provider_enum_value;
 
 pub struct Migrator;
 
@@ -65,6 +66,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260428_120000_add_mobygames_provider_enum_value::Migration),
 			Box::new(m20260428_120100_add_launchbox_provider_enum_value::Migration),
 			Box::new(m20260428_120200_create_launchbox_tables::Migration),
+			Box::new(m20260428_120300_add_emuready_provider_enum_value::Migration),
 		]
 	}
 }
