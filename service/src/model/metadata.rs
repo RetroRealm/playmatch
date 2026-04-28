@@ -161,6 +161,12 @@ pub enum AutomaticMatchReason {
 
 	/// Matched by a CRC32 of one of the game's files.
 	CrcHash,
+
+	/// Matched by another provider's canonical title via cross-provider name propagation, exact lower-case compare.
+	CrossProviderDirectName,
+
+	/// Matched by another provider's canonical title via cross-provider name propagation, after normalisation.
+	CrossProviderNormalizedName,
 }
 
 impl From<entity::signature_metadata_mapping::Model> for ExternalMetadata {
@@ -268,6 +274,12 @@ impl From<AutomaticMatchReasonEnum> for AutomaticMatchReason {
 			AutomaticMatchReasonEnum::Md5Hash => AutomaticMatchReason::Md5Hash,
 			AutomaticMatchReasonEnum::Sha1Hash => AutomaticMatchReason::Sha1Hash,
 			AutomaticMatchReasonEnum::CrcHash => AutomaticMatchReason::CrcHash,
+			AutomaticMatchReasonEnum::CrossProviderDirectName => {
+				AutomaticMatchReason::CrossProviderDirectName
+			}
+			AutomaticMatchReasonEnum::CrossProviderNormalizedName => {
+				AutomaticMatchReason::CrossProviderNormalizedName
+			}
 		}
 	}
 }

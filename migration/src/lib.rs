@@ -30,6 +30,8 @@ mod m20260428_120000_add_mobygames_provider_enum_value;
 mod m20260428_120100_add_launchbox_provider_enum_value;
 mod m20260428_120200_create_launchbox_tables;
 mod m20260428_120300_add_emuready_provider_enum_value;
+mod m20260428_120400_add_matched_name_to_signature_metadata_mapping;
+mod m20260428_120500_add_cross_provider_name_match_reasons;
 
 pub struct Migrator;
 
@@ -67,6 +69,8 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260428_120100_add_launchbox_provider_enum_value::Migration),
 			Box::new(m20260428_120200_create_launchbox_tables::Migration),
 			Box::new(m20260428_120300_add_emuready_provider_enum_value::Migration),
+			Box::new(m20260428_120400_add_matched_name_to_signature_metadata_mapping::Migration),
+			Box::new(m20260428_120500_add_cross_provider_name_match_reasons::Migration),
 		]
 	}
 }

@@ -140,6 +140,8 @@ fn automatic_reason_label(r: AutomaticMatchReasonEnum) -> &'static str {
 		AutomaticMatchReasonEnum::Md5Hash => "md5_hash",
 		AutomaticMatchReasonEnum::Sha1Hash => "sha1_hash",
 		AutomaticMatchReasonEnum::CrcHash => "crc_hash",
+		AutomaticMatchReasonEnum::CrossProviderDirectName => "cross_provider_direct_name",
+		AutomaticMatchReasonEnum::CrossProviderNormalizedName => "cross_provider_normalized_name",
 	}
 }
 
