@@ -166,17 +166,20 @@ fn match_game_to_screenscraper(
 		let candidates = client.search_games(system_id, &cleaned).await?;
 
 		for candidate in &candidates {
+			let Some(candidate_id) = candidate.id else {
+				continue;
+			};
 			for name in candidate.iter_candidate_names() {
 				if name.to_lowercase() == cleaned {
 					debug!(
 						"Matched Game \"{}\" to ScreenScraper Game ID {} (Direct Match)",
-						&cleaned, candidate.id
+						&cleaned, candidate_id
 					);
 					write_auto_match_success(
 						"screenscraper",
 						MetadataProviderEnum::Screenscraper,
 						Target::Game(game.id),
-						candidate.id.to_string(),
+						candidate_id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
 						candidate.iter_candidate_names().next().map(str::to_string),
 						&db_conn,
@@ -189,17 +192,20 @@ fn match_game_to_screenscraper(
 		}
 
 		for candidate in &candidates {
+			let Some(candidate_id) = candidate.id else {
+				continue;
+			};
 			for name in candidate.iter_candidate_names() {
 				if normalize_title(&name.to_lowercase()) == cleaned_normalized {
 					debug!(
 						"Matched Game \"{}\" to ScreenScraper Game ID {} (Normalized Match)",
-						&cleaned, candidate.id
+						&cleaned, candidate_id
 					);
 					write_auto_match_success(
 						"screenscraper",
 						MetadataProviderEnum::Screenscraper,
 						Target::Game(game.id),
-						candidate.id.to_string(),
+						candidate_id.to_string(),
 						AutomaticMatchReasonEnum::NormalizedName,
 						candidate.iter_candidate_names().next().map(str::to_string),
 						&db_conn,
@@ -302,15 +308,22 @@ async fn record_hash_match(
 	db_conn: &DbConn,
 	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
+	let Some(found_id) = found.id else {
+		debug!(
+			"ScreenScraper hash response missing id for Game \"{}\"; skipping",
+			game.name
+		);
+		return Ok(());
+	};
 	debug!(
 		"Matched Game \"{}\" to ScreenScraper Game ID {} ({:?})",
-		game.name, found.id, reason
+		game.name, found_id, reason
 	);
 	write_auto_match_success(
 		"screenscraper",
 		MetadataProviderEnum::Screenscraper,
 		Target::Game(game.id),
-		found.id.to_string(),
+		found_id.to_string(),
 		reason,
 		found.iter_candidate_names().next().map(str::to_string),
 		db_conn,
@@ -394,17 +407,18 @@ pub fn match_game_via_sibling_name_screenscraper(
 			let candidates = client.search_games(system_id, &q).await?;
 
 			for c in &candidates {
+				let Some(candidate_id) = c.id else { continue };
 				for name in c.iter_candidate_names() {
 					if name.to_lowercase() == q {
 						debug!(
 							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Direct)",
-							&game.name, c.id, &sibling
+							&game.name, candidate_id, &sibling
 						);
 						write_auto_match_success(
 							"screenscraper",
 							MetadataProviderEnum::Screenscraper,
 							Target::Game(game.id),
-							c.id.to_string(),
+							candidate_id.to_string(),
 							AutomaticMatchReasonEnum::CrossProviderDirectName,
 							c.iter_candidate_names().next().map(str::to_string),
 							&db_conn,
@@ -416,17 +430,18 @@ pub fn match_game_via_sibling_name_screenscraper(
 				}
 			}
 			for c in &candidates {
+				let Some(candidate_id) = c.id else { continue };
 				for name in c.iter_candidate_names() {
 					if normalize_title(&name.to_lowercase()) == q_norm {
 						debug!(
 							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Normalized)",
-							&game.name, c.id, &sibling
+							&game.name, candidate_id, &sibling
 						);
 						write_auto_match_success(
 							"screenscraper",
 							MetadataProviderEnum::Screenscraper,
 							Target::Game(game.id),
-							c.id.to_string(),
+							candidate_id.to_string(),
 							AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 							c.iter_candidate_names().next().map(str::to_string),
 							&db_conn,

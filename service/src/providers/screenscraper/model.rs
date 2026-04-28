@@ -157,10 +157,14 @@ pub struct SsRom {
 	pub romcrc: Option<String>,
 }
 
+// `id` is `Option<i64>` because ScreenScraper sometimes returns game entries
+// without an `id` field (typically placeholder / unmatched stubs). The
+// matcher filters those out at the use site rather than failing the whole
+// envelope deserialise.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SsGame {
-	#[serde(deserialize_with = "de_string_i64")]
-	pub id: i64,
+	#[serde(default, deserialize_with = "de_opt_string_i64")]
+	pub id: Option<i64>,
 	#[serde(default)]
 	pub noms: Vec<SsLocalizedName>,
 	#[serde(default)]
@@ -212,9 +216,15 @@ fn de_string_i32<'de, D: Deserializer<'de>>(d: D) -> Result<i32, D::Error> {
 	s.parse::<i32>().map_err(D::Error::custom)
 }
 
-fn de_string_i64<'de, D: Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
-	let s = de_flexible_string(d)?;
-	s.parse::<i64>().map_err(D::Error::custom)
+fn de_opt_string_i64<'de, D: Deserializer<'de>>(d: D) -> Result<Option<i64>, D::Error> {
+	match Option::<FlexibleScalar>::deserialize(d)? {
+		None => Ok(None),
+		Some(scalar) => scalar
+			.into_string()
+			.parse::<i64>()
+			.map(Some)
+			.map_err(D::Error::custom),
+	}
 }
 
 #[derive(Deserialize)]
@@ -277,14 +287,14 @@ mod tests {
 		}"#;
 		let env: SsEnvelope<JeuPayload> = serde_json::from_str(body).unwrap();
 		let jeu = env.response.unwrap().payload.jeu;
-		assert_eq!(jeu.id, 42);
+		assert_eq!(jeu.id, Some(42));
 		assert_eq!(jeu.noms.len(), 2);
 	}
 
 	#[test]
 	fn iter_candidate_names_prioritises_known_regions_then_extras() {
 		let game = SsGame {
-			id: 1,
+			id: Some(1),
 			noms: vec![
 				SsLocalizedName {
 					region: "ko".into(),
