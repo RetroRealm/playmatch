@@ -125,6 +125,7 @@ async fn apply_manual_entity_match(
 			.automatic_match_reason(None)
 			.comment(r#match.comment.clone())
 			.manually_matched_by(r#match.user_id)
+			.matched_name(r#match.matched_name.clone())
 			.build()?,
 		conn,
 	)
@@ -252,6 +253,7 @@ pub async fn apply_manual_game_match_by_game(
 				.automatic_match_reason(None)
 				.comment(r#match.comment.clone())
 				.manually_matched_by(r#match.user_id)
+				.matched_name(r#match.matched_name.clone())
 				.build()?,
 			db_conn,
 		)

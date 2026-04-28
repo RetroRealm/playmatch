@@ -38,6 +38,8 @@ pub struct SignatureMetadataMappingInput {
 	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
 	#[builder(default)]
 	pub manually_matched_by: Option<Uuid>,
+	#[builder(default)]
+	pub matched_name: Option<String>,
 }
 
 /// Look up the mapping that targets the given platform, game, company and provider tuple.
@@ -92,6 +94,9 @@ pub async fn create_or_update_signature_metadata_mapping(
 	active_model.comment = Set(input.comment);
 	active_model.automatic_match_reason = Set(input.automatic_match_reason);
 	active_model.manually_matched_by = Set(input.manually_matched_by);
+	if input.matched_name.is_some() {
+		active_model.matched_name = Set(input.matched_name);
+	}
 	active_model.updated_at = Set(Utc::now().fixed_offset());
 
 	active_model = active_model.save(db_conn).await?;

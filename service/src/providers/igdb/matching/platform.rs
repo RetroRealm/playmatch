@@ -49,6 +49,7 @@ pub fn match_platform_to_igdb(
 					Target::Platform(platform.id),
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
+					Some(search_result.name.clone()),
 					&db_conn,
 					&mut redis_conn,
 				)

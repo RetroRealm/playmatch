@@ -97,6 +97,7 @@ fn match_clone_of_game_to_launchbox(
 					Target::Game(game.id),
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
+					mapping.matched_name.clone(),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -121,6 +122,7 @@ fn match_clone_of_game_to_launchbox(
 					Target::Game(parent_game.id),
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
+					mapping.matched_name,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -157,6 +159,7 @@ fn match_game_to_launchbox(
 				Target::Game(game.id),
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::DirectName,
+				Some(found.name.clone()),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -177,6 +180,7 @@ fn match_game_to_launchbox(
 				Target::Game(game.id),
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::AlternativeName,
+				Some(found.name.clone()),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -198,6 +202,7 @@ fn match_game_to_launchbox(
 				Target::Game(game.id),
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::NormalizedName,
+				Some(found.name.clone()),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -222,6 +227,7 @@ fn match_game_to_launchbox(
 				Target::Game(game.id),
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::NormalizedAlternativeName,
+				Some(found.name.clone()),
 				&db_conn,
 				&mut redis_conn,
 			)

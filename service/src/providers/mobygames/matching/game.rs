@@ -94,6 +94,7 @@ fn match_clone_of_game_to_mobygames(
 					Target::Game(game.id),
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
+					mapping.matched_name.clone(),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -118,6 +119,7 @@ fn match_clone_of_game_to_mobygames(
 					Target::Game(parent_game.id),
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
+					mapping.matched_name,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -156,6 +158,7 @@ fn match_game_to_mobygames(
 						Target::Game(game.id),
 						candidate.game_id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
+						Some(candidate.title.clone()),
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -178,6 +181,7 @@ fn match_game_to_mobygames(
 						Target::Game(game.id),
 						candidate.game_id.to_string(),
 						AutomaticMatchReasonEnum::NormalizedName,
+						Some(candidate.title.clone()),
 						&db_conn,
 						&mut redis_conn,
 					)

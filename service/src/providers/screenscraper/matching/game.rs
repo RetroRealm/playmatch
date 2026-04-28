@@ -100,6 +100,7 @@ fn match_clone_of_game_to_screenscraper(
 					Target::Game(game.id),
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
+					mapping.matched_name.clone(),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -124,6 +125,7 @@ fn match_clone_of_game_to_screenscraper(
 					Target::Game(parent_game.id),
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
+					mapping.matched_name,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -176,6 +178,7 @@ fn match_game_to_screenscraper(
 						Target::Game(game.id),
 						candidate.id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
+						candidate.iter_candidate_names().next().map(str::to_string),
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -198,6 +201,7 @@ fn match_game_to_screenscraper(
 						Target::Game(game.id),
 						candidate.id.to_string(),
 						AutomaticMatchReasonEnum::NormalizedName,
+						candidate.iter_candidate_names().next().map(str::to_string),
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -308,6 +312,7 @@ async fn record_hash_match(
 		Target::Game(game.id),
 		found.id.to_string(),
 		reason,
+		found.iter_candidate_names().next().map(str::to_string),
 		db_conn,
 		redis_conn,
 	)

@@ -199,6 +199,7 @@ pub async fn accept_suggestion(
 				provider_id: suggestion.provider_id.clone(),
 				manual_match_type: ManualMatchMode::Community,
 				user_id: suggestion.created_by,
+				matched_name: None,
 			},
 			db_conn,
 			redis_conn,

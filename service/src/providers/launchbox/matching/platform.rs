@@ -46,8 +46,9 @@ pub fn match_platform_to_launchbox(
 				"launchbox",
 				MetadataProviderEnum::Launchbox,
 				Target::Platform(platform.id),
-				found.name,
+				found.name.clone(),
 				AutomaticMatchReasonEnum::DirectName,
+				Some(found.name),
 				&db_conn,
 				&mut redis_conn,
 			)

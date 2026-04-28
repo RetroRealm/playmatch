@@ -49,6 +49,7 @@ fn match_company_to_igdb(
 					Target::Company(company.id),
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
+					Some(search_result.name.clone()),
 					&db_conn,
 					&mut redis_conn,
 				)

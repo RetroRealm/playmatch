@@ -74,6 +74,9 @@ pub struct CompanyOrPlatformMatchRequest {
 
 	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
 	pub user_id: Option<Uuid>,
+
+	/// Optional canonical title from the provider for cross-provider name propagation.
+	pub matched_name: Option<String>,
 }
 
 impl CompanyOrPlatformMatchRequest {
@@ -119,6 +122,9 @@ pub struct GameMatchRequest {
 
 	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
 	pub user_id: Option<Uuid>,
+
+	/// Optional canonical title from the provider for cross-provider name propagation.
+	pub matched_name: Option<String>,
 }
 
 impl GameMatchRequest {
@@ -156,6 +162,8 @@ pub struct GameMatchData {
 
 	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
 	pub user_id: Option<Uuid>,
+
+	pub matched_name: Option<String>,
 }
 
 impl From<GameMatchRequest> for GameMatchData {
@@ -166,6 +174,7 @@ impl From<GameMatchRequest> for GameMatchData {
 			provider_id: request.provider_id,
 			manual_match_type: request.manual_match_type,
 			user_id: request.user_id,
+			matched_name: request.matched_name,
 		}
 	}
 }

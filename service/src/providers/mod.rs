@@ -67,12 +67,14 @@ impl Target {
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn write_auto_match_success(
 	provider_label: &'static str,
 	provider_enum: MetadataProviderEnum,
 	target: Target,
 	provider_id: String,
 	reason: AutomaticMatchReasonEnum,
+	matched_name: Option<String>,
 	db_conn: &DbConn,
 	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
@@ -83,6 +85,7 @@ pub async fn write_auto_match_success(
 		.provider_id(Some(provider_id))
 		.match_type(MatchTypeEnum::Automatic)
 		.automatic_match_reason(Some(reason))
+		.matched_name(matched_name)
 		.build()?;
 	create_or_update_signature_metadata_mapping(input, db_conn).await?;
 	if let Target::Game(game_id) = target {

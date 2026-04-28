@@ -97,6 +97,7 @@ fn match_clone_of_game_to_igdb(
 					Target::Game(game.id),
 					parent_game_igdb_mapping.provider_id.clone().unwrap(),
 					AutomaticMatchReasonEnum::ViaParent,
+					parent_game_igdb_mapping.matched_name.clone(),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -123,6 +124,7 @@ fn match_clone_of_game_to_igdb(
 					Target::Game(parent_game.id),
 					mapping.provider_id.unwrap(),
 					AutomaticMatchReasonEnum::ViaChild,
+					mapping.matched_name,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -165,6 +167,7 @@ fn match_game_to_igdb(
 					Target::Game(game.id),
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
+					Some(search_result.name.clone()),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -187,6 +190,7 @@ fn match_game_to_igdb(
 					Target::Game(game.id),
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::NormalizedName,
+					Some(search_result.name.clone()),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -219,6 +223,7 @@ fn match_game_to_igdb(
 							Target::Game(game.id),
 							search_result.id.to_string(),
 							AutomaticMatchReasonEnum::AlternativeName,
+							Some(search_result.name.clone()),
 							&db_conn,
 							&mut redis_conn,
 						)
@@ -240,6 +245,7 @@ fn match_game_to_igdb(
 							Target::Game(game.id),
 							search_result.id.to_string(),
 							AutomaticMatchReasonEnum::NormalizedAlternativeName,
+							Some(search_result.name.clone()),
 							&db_conn,
 							&mut redis_conn,
 						)
