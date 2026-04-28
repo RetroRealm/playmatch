@@ -1,3 +1,4 @@
+pub mod emuready;
 pub mod igdb;
 pub mod launchbox;
 pub mod mobygames;

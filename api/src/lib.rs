@@ -114,6 +114,7 @@ use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
+use service::providers::emuready::EmuReadyClient;
 use service::providers::igdb::IgdbClient;
 use service::providers::launchbox::LaunchBoxClient;
 use service::providers::mobygames::MobyGamesClient;
@@ -187,6 +188,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let lb_http_client = Client::builder().cookie_store(false).build()?;
 
+	let er_http_client = Client::builder().cookie_store(false).build()?;
+
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
 	let dat_http_client = Client::builder().cookie_store(false).build()?;
@@ -201,6 +204,7 @@ async fn start() -> anyhow::Result<()> {
 	let ss_client_opt = build_screenscraper_client(ss_http_client, redis_conn.clone());
 	let mg_client_opt = build_mobygames_client(mg_http_client, redis_conn.clone());
 	let lb_client_opt = build_launchbox_client(lb_http_client, redis_conn.clone(), conn.clone());
+	let er_client_opt = build_emuready_client(er_http_client, redis_conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.mask_unmatched_patterns("UNKNOWN")
@@ -231,6 +235,9 @@ async fn start() -> anyhow::Result<()> {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if let Some(c) = lb_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
+	if let Some(c) = er_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if providers.is_empty() {
@@ -488,6 +495,33 @@ fn build_screenscraper_client(
 		}
 		Err(e) => {
 			warn!("ScreenScraper provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
+/// Returns `None` when EMUREADY_ENABLED is unset or not "true". The EmuReady
+/// API is open and unauthenticated for read endpoints; the flag exists so
+/// existing deployments do not silently start hitting an external service on
+/// next deploy. Matching only — no proxy routes are exposed.
+fn build_emuready_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+) -> Option<Arc<EmuReadyClient>> {
+	let enabled = env::var("EMUREADY_ENABLED")
+		.unwrap_or_default()
+		.eq_ignore_ascii_case("true");
+	if !enabled {
+		warn!("EMUREADY_ENABLED not set to true, EmuReady provider disabled");
+		return None;
+	}
+	match EmuReadyClient::new(http, redis_conn) {
+		Ok(c) => {
+			info!("EmuReady provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("EmuReady provider construction failed, disabled: {e}");
 			None
 		}
 	}
