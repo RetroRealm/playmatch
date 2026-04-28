@@ -89,6 +89,10 @@ use crate::routes::igdb::{
 	__path_get_igdb_website_type_by_id, __path_get_igdb_website_types_by_ids,
 	__path_get_igdb_websites_by_ids, __path_search_igdb_game_by_name,
 };
+use crate::routes::launchbox::{
+	__path_get_lb_game_alternate_names, __path_get_lb_game_by_id, __path_get_lb_game_images,
+	__path_list_lb_platforms, __path_search_lb_games,
+};
 use crate::routes::r#match::{
 	__path_manually_match_company, __path_manually_match_game, __path_manually_match_platform,
 };
@@ -151,6 +155,7 @@ use service::providers::igdb::model::{
 	PopularityType, Region, ReleaseDate, ReleaseDateRegion, ReleaseDateStatus, Report, ReportType,
 	Screenshot, Theme, Website, WebsiteType,
 };
+use service::providers::launchbox::model::{LbGame, LbGameAlternateName, LbGameImage, LbPlatform};
 use service::providers::mobygames::model::{
 	MgAltTitle, MgCover, MgCoverGroup, MgCoversResp, MgGame, MgGamePlatformBrief, MgGenre,
 	MgPlatform, MgSampleCover, MgSampleScreenshot, MgScreenshot, MgScreenshotsResp,
@@ -381,7 +386,12 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		get_mg_game_by_id,
 		search_mg_games,
 		get_mg_game_covers,
-		get_mg_game_screenshots
+		get_mg_game_screenshots,
+		list_lb_platforms,
+		get_lb_game_by_id,
+		search_lb_games,
+		get_lb_game_alternate_names,
+		get_lb_game_images
 	),
 	components(schemas(
 		GameMetadataMatchResult,
@@ -526,7 +536,11 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		MgCoverGroup,
 		MgCoversResp,
 		MgScreenshot,
-		MgScreenshotsResp
+		MgScreenshotsResp,
+		LbGame,
+		LbGameAlternateName,
+		LbGameImage,
+		LbPlatform
 	))
 )]
 pub struct ApiDoc;

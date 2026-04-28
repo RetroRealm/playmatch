@@ -68,6 +68,10 @@ use crate::routes::igdb::{
 	get_igdb_themes_by_ids, get_igdb_website_by_id, get_igdb_website_type_by_id,
 	get_igdb_website_types_by_ids, get_igdb_websites_by_ids, search_igdb_game_by_name,
 };
+use crate::routes::launchbox::{
+	get_lb_game_alternate_names, get_lb_game_by_id, get_lb_game_images, list_lb_platforms,
+	search_lb_games,
+};
 use crate::routes::r#match::{
 	manually_match_company, manually_match_game, manually_match_platform,
 };
@@ -93,7 +97,9 @@ use crate::routes::suggestion::{
 use crate::routes::user::{
 	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
 };
-use crate::util::{wrap_download_and_parse_dats, wrap_match_db_to_all_providers};
+use crate::util::{
+	wrap_download_and_parse_dats, wrap_launchbox_import, wrap_match_db_to_all_providers,
+};
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
@@ -109,6 +115,7 @@ use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::igdb::IgdbClient;
+use service::providers::launchbox::LaunchBoxClient;
 use service::providers::mobygames::MobyGamesClient;
 use service::providers::screenscraper::ScreenScraperClient;
 use service::providers::steamgriddb::SteamGridDbClient;
@@ -178,6 +185,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let mg_http_client = Client::builder().cookie_store(false).build()?;
 
+	let lb_http_client = Client::builder().cookie_store(false).build()?;
+
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
 	let dat_http_client = Client::builder().cookie_store(false).build()?;
@@ -191,6 +200,7 @@ async fn start() -> anyhow::Result<()> {
 	let sgdb_client_opt = build_sgdb_client(sgdb_http_client, redis_conn.clone());
 	let ss_client_opt = build_screenscraper_client(ss_http_client, redis_conn.clone());
 	let mg_client_opt = build_mobygames_client(mg_http_client, redis_conn.clone());
+	let lb_client_opt = build_launchbox_client(lb_http_client, redis_conn.clone(), conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.mask_unmatched_patterns("UNKNOWN")
@@ -220,6 +230,9 @@ async fn start() -> anyhow::Result<()> {
 	if let Some(c) = mg_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
+	if let Some(c) = lb_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
 	if providers.is_empty() {
 		warn!("No metadata providers configured. Background match cron will be a no-op.");
 	}
@@ -237,6 +250,7 @@ async fn start() -> anyhow::Result<()> {
 	let ss_enabled = ss_data.is_some();
 	let mg_data = mg_client_opt.clone().map(Data::from);
 	let mg_enabled = mg_data.is_some();
+	let lb_enabled = lb_client_opt.is_some();
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -286,6 +300,7 @@ async fn start() -> anyhow::Result<()> {
 						sgdb_enabled,
 						ss_enabled,
 						mg_enabled,
+						lb_enabled,
 					)
 				})
 				.service(
@@ -311,13 +326,16 @@ async fn start() -> anyhow::Result<()> {
 	let conn = conn_arc.clone();
 	let dat_client = dat_http_client_arc.clone();
 	let providers_for_cron = providers_arc.clone();
+	let lb_for_cron = lb_client_opt.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
 			let dat_client = dat_client.clone();
 			let providers = providers_for_cron.clone();
+			let lb = lb_for_cron.clone();
 			Box::pin(async move {
 				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
+				wrap_launchbox_import(lb).await;
 				wrap_match_db_to_all_providers(providers, conn.clone()).await;
 			})
 		})?)
@@ -358,6 +376,7 @@ async fn start() -> anyhow::Result<()> {
 	let conn = conn_arc.clone();
 	let http_client = dat_http_client_arc.clone();
 	let providers_for_init = providers_arc.clone();
+	let lb_for_init = lb_client_opt.clone();
 
 	let initial_data_init = env::var("INITIAL_DATA_INIT")
 		.unwrap_or("true".to_string())
@@ -372,6 +391,7 @@ async fn start() -> anyhow::Result<()> {
 	if initial_data_init {
 		tokio::spawn(async move {
 			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
+			wrap_launchbox_import(lb_for_init).await;
 			wrap_match_db_to_all_providers(providers_for_init, conn.clone()).await;
 		});
 	}
@@ -473,6 +493,36 @@ fn build_screenscraper_client(
 	}
 }
 
+/// Returns `None` when LAUNCHBOX_ENABLED is unset or not "true". The
+/// LaunchBox provider downloads ~70 MB of XML once a day and persists ~700k
+/// rows into Postgres, so it is opt-in to keep small deployments lean.
+fn build_launchbox_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+	db_conn: sea_orm::DbConn,
+) -> Option<Arc<LaunchBoxClient>> {
+	let enabled = env::var("LAUNCHBOX_ENABLED")
+		.unwrap_or_default()
+		.eq_ignore_ascii_case("true");
+	if !enabled {
+		warn!("LAUNCHBOX_ENABLED not set to true, LaunchBox provider disabled");
+		return None;
+	}
+	let metadata_url = env::var("LAUNCHBOX_METADATA_URL")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	match LaunchBoxClient::new(http, redis_conn, db_conn, metadata_url) {
+		Ok(c) => {
+			info!("LaunchBox provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("LaunchBox provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
 /// Returns `None` when the API key is absent so self-hosters can run without
 /// the MobyGames integration. The MobyGames API requires a paid subscription;
 /// the cheapest tier permits 1 request every 5 seconds.
@@ -562,6 +612,7 @@ fn configure_public_api_routes(
 	sgdb_enabled: bool,
 	ss_enabled: bool,
 	mg_enabled: bool,
+	lb_enabled: bool,
 ) {
 	cfg.service(health)
 		.service(ready)
@@ -586,6 +637,17 @@ fn configure_public_api_routes(
 	if mg_enabled {
 		configure_mobygames_routes(cfg);
 	}
+	if lb_enabled {
+		configure_launchbox_routes(cfg);
+	}
+}
+
+fn configure_launchbox_routes(cfg: &mut ServiceConfig) {
+	cfg.service(list_lb_platforms)
+		.service(get_lb_game_by_id)
+		.service(search_lb_games)
+		.service(get_lb_game_alternate_names)
+		.service(get_lb_game_images);
 }
 
 fn configure_mobygames_routes(cfg: &mut ServiceConfig) {
