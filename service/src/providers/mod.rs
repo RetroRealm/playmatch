@@ -203,8 +203,18 @@ where
 /// Drive a cross-provider name retry pass for `provider`. Pages through
 /// games that this provider failed to match while at least one sibling
 /// provider has a non-null `matched_name`, then dispatches `match_fn` per
-/// game with the deduped sibling names. Per-entity errors are logged and do
-/// not abort the loop.
+/// game with the deduped sibling names.
+///
+/// After each chunk completes the page's failed mappings get
+/// `cross_match_last_tried_at` stamped via a single bulk UPDATE. That is
+/// the load-bearing piece: without it, the next page-fetch would return
+/// the same games again because non-matching cross-pass attempts leave
+/// the row in `Failed` state. With the stamp + the
+/// [`crate::db::game::CROSS_MATCH_RETRY_INTERVAL_DAYS`] cooldown filter,
+/// each game gets at most one cross-pass attempt per cycle and one
+/// retry per week.
+///
+/// Per-entity errors are logged and do not abort the loop.
 pub async fn drive_cross_match_pipeline<C>(
 	label: &'static str,
 	provider: MetadataProviderEnum,
@@ -245,6 +255,17 @@ where
 				if let Err(e) = handle.await? {
 					error!("Error while cross-matching {label} to provider: {e:?}");
 				}
+			}
+			let chunk_ids: Vec<Uuid> = chunk.iter().map(|g| g.id).collect();
+			if let Err(e) = crate::db::signature_metadata_mapping::bulk_stamp_cross_match_attempt(
+				provider, &chunk_ids, db_conn,
+			)
+			.await
+			{
+				error!(
+					"Failed to stamp cross_match_last_tried_at for {} {label} mappings: {e}",
+					chunk_ids.len()
+				);
 			}
 		}
 	}

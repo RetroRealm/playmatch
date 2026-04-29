@@ -31,6 +31,7 @@ pub struct Model {
 	pub automatic_match_reason: Option<AutomaticMatchReasonEnum>,
 	pub manually_matched_by: Option<Uuid>,
 	pub matched_name: Option<String>,
+	pub cross_match_last_tried_at: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

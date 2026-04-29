@@ -384,62 +384,72 @@ pub fn get_unmatched_games_with_clone_of_with_limit_no_platform_gate<'a>(
 	get_unmatched_games_with_limit(provider, false, false, page_size, conn)
 }
 
+/// Min interval between cross-pass attempts on the same failed mapping.
+/// Cross-pass results only change when sibling `matched_name` values churn,
+/// which is typically a slow-moving signal. Re-running every cycle was the
+/// CPU hot spot we are paying for.
+pub const CROSS_MATCH_RETRY_INTERVAL_DAYS: i64 = 7;
+
 /// Return up to `page_size` games where this `provider` is currently `Failed`
-/// AND at least one other provider has matched the same game with a non-null
-/// `matched_name`. Used by the cross-provider name propagation pass; no age
-/// gate so freshly-failed rows are immediately eligible once any sibling lands
-/// a match. Returns `Ok(None)` when there is nothing left to process.
+/// AND at least one sibling provider has matched the same game with a non-
+/// null `matched_name` AND we have not cross-matched this row in the last
+/// [`CROSS_MATCH_RETRY_INTERVAL_DAYS`]. Uses `EXISTS` (not a self-join) on
+/// the sibling side so a game with multiple matched siblings appears once.
+/// The new partial index `idx_smm_cross_match_pending` covers the outer
+/// filter; `idx_smm_sibling_matched_name` covers the EXISTS subquery.
+/// Returns `Ok(None)` when there is nothing left to process.
 pub fn get_failed_games_for_cross_pass_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
 	Box::pin(async move {
-		let smm_self = Alias::new("smm_self");
-		let smm_sibling = Alias::new("smm_sibling");
+		let cooldown = Utc::now() - Duration::days(CROSS_MATCH_RETRY_INTERVAL_DAYS);
+		let cooldown_naive: NaiveDateTime = cooldown.naive_utc();
 
 		let res = Game::find()
-			.join_as(
+			.join(
 				JoinType::InnerJoin,
 				game::Relation::SignatureMetadataMapping.def(),
-				smm_self.clone(),
-			)
-			.join_as(
-				JoinType::InnerJoin,
-				game::Relation::SignatureMetadataMapping.def(),
-				smm_sibling.clone(),
 			)
 			.filter(
-				Expr::col((
-					smm_self.clone(),
-					signature_metadata_mapping::Column::Provider,
-				))
-				.eq(provider.as_enum())
-				.and(
-					Expr::col((smm_self, signature_metadata_mapping::Column::MatchType))
-						.eq(MatchTypeEnum::Failed.as_enum()),
-				)
-				.and(
-					Expr::col((
-						smm_sibling.clone(),
-						signature_metadata_mapping::Column::Provider,
-					))
-					.ne(provider.as_enum()),
-				)
-				.and(
-					Expr::col((
-						smm_sibling.clone(),
-						signature_metadata_mapping::Column::MatchType,
-					))
-					.is_in([
-						MatchTypeEnum::Automatic.as_enum(),
-						MatchTypeEnum::Manual.as_enum(),
-					]),
-				)
-				.and(
-					Expr::col((smm_sibling, signature_metadata_mapping::Column::MatchedName))
-						.is_not_null(),
-				),
+				signature_metadata_mapping::Column::Provider
+					.eq(provider)
+					.and(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::Failed))
+					.and(
+						signature_metadata_mapping::Column::FailedMatchReason
+							.eq(FailedMatchReasonEnum::NoDirectMatch),
+					)
+					.and(
+						signature_metadata_mapping::Column::CrossMatchLastTriedAt
+							.is_null()
+							.or(signature_metadata_mapping::Column::CrossMatchLastTriedAt
+								.lt(cooldown_naive)),
+					)
+					.and(Expr::exists(
+						sea_orm::sea_query::Query::select()
+							.expr(Expr::val(1))
+							.from(signature_metadata_mapping::Entity)
+							.and_where(
+								Expr::col(signature_metadata_mapping::Column::GameId)
+									.equals((game::Entity, game::Column::Id)),
+							)
+							.and_where(
+								Expr::col(signature_metadata_mapping::Column::Provider)
+									.ne(provider.as_enum()),
+							)
+							.and_where(
+								Expr::col(signature_metadata_mapping::Column::MatchType).is_in([
+									MatchTypeEnum::Automatic.as_enum(),
+									MatchTypeEnum::Manual.as_enum(),
+								]),
+							)
+							.and_where(
+								Expr::col(signature_metadata_mapping::Column::MatchedName)
+									.is_not_null(),
+							)
+							.to_owned(),
+					)),
 			)
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)

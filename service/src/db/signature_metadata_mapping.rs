@@ -9,6 +9,7 @@ use entity::signature_metadata_mapping;
 use entity::signature_metadata_mapping::Model;
 use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
+use sea_orm::sea_query::Expr;
 use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, IntoActiveModel, QueryFilter,
 	TryIntoModel,
@@ -40,6 +41,36 @@ pub struct SignatureMetadataMappingInput {
 	pub manually_matched_by: Option<Uuid>,
 	#[builder(default)]
 	pub matched_name: Option<String>,
+}
+
+/// Stamp `cross_match_last_tried_at = now()` on every Failed-NoDirectMatch
+/// row for `provider` whose `game_id` is in `game_ids`. Called by the
+/// cross-pass orchestrator after each chunk attempt so the same games do
+/// not return on the next page-fetch loop iteration. Bulk update: one
+/// statement per chunk, not one per row.
+pub async fn bulk_stamp_cross_match_attempt(
+	provider: MetadataProviderEnum,
+	game_ids: &[Uuid],
+	conn: &DbConn,
+) -> Result<(), DbErr> {
+	if game_ids.is_empty() {
+		return Ok(());
+	}
+	signature_metadata_mapping::Entity::update_many()
+		.col_expr(
+			signature_metadata_mapping::Column::CrossMatchLastTriedAt,
+			Expr::value(Utc::now().fixed_offset()),
+		)
+		.filter(signature_metadata_mapping::Column::Provider.eq(provider))
+		.filter(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::Failed))
+		.filter(
+			signature_metadata_mapping::Column::FailedMatchReason
+				.eq(FailedMatchReasonEnum::NoDirectMatch),
+		)
+		.filter(signature_metadata_mapping::Column::GameId.is_in(game_ids.iter().copied()))
+		.exec(conn)
+		.await?;
+	Ok(())
 }
 
 /// Look up sibling provider mappings for a game, returning each sibling
