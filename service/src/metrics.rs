@@ -1,4 +1,6 @@
-use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry};
+use prometheus::{
+	HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry,
+};
 use std::sync::OnceLock;
 
 static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -15,6 +17,10 @@ static DAT_INGESTION_FILES: OnceLock<IntCounterVec> = OnceLock::new();
 static CLONE_OF_RESOLUTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_ACTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_AGENTS: OnceLock<IntCounterVec> = OnceLock::new();
+static LAUNCHBOX_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
+static SCREENSCRAPER_QUOTA_EXHAUSTION: OnceLock<IntCounterVec> = OnceLock::new();
+static SCREENSCRAPER_CONCURRENCY: OnceLock<IntGauge> = OnceLock::new();
+static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -191,6 +197,51 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(user_agents)
 		.map_err(|_| anyhow::anyhow!("user agent metrics already initialised"))?;
 
+	let launchbox_import_records = IntCounterVec::new(
+		Opts::new(
+			"api_launchbox_import_records_total",
+			"LaunchBox bulk metadata import records by type and outcome",
+		),
+		&["record_type", "outcome"],
+	)?;
+	registry.register(Box::new(launchbox_import_records.clone()))?;
+	LAUNCHBOX_IMPORT_RECORDS
+		.set(launchbox_import_records)
+		.map_err(|_| anyhow::anyhow!("launchbox import metrics already initialised"))?;
+
+	let screenscraper_quota_exhaustion = IntCounterVec::new(
+		Opts::new(
+			"api_screenscraper_quota_exhaustion_total",
+			"ScreenScraper quota exhaustion events by trigger",
+		),
+		&["trigger"],
+	)?;
+	registry.register(Box::new(screenscraper_quota_exhaustion.clone()))?;
+	SCREENSCRAPER_QUOTA_EXHAUSTION
+		.set(screenscraper_quota_exhaustion)
+		.map_err(|_| anyhow::anyhow!("screenscraper quota metrics already initialised"))?;
+
+	let screenscraper_concurrency = IntGauge::new(
+		"api_screenscraper_concurrency_permits",
+		"Current ScreenScraper adaptive concurrency permit count",
+	)?;
+	registry.register(Box::new(screenscraper_concurrency.clone()))?;
+	SCREENSCRAPER_CONCURRENCY
+		.set(screenscraper_concurrency)
+		.map_err(|_| anyhow::anyhow!("screenscraper concurrency metrics already initialised"))?;
+
+	let cross_match_attempts = IntCounterVec::new(
+		Opts::new(
+			"api_cross_match_attempts_total",
+			"Cross-provider name match pass attempts by provider and outcome",
+		),
+		&["provider", "outcome"],
+	)?;
+	registry.register(Box::new(cross_match_attempts.clone()))?;
+	CROSS_MATCH_ATTEMPTS
+		.set(cross_match_attempts)
+		.map_err(|_| anyhow::anyhow!("cross match metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -294,5 +345,29 @@ pub fn record_user_action(entity_type: &str, action: &str) {
 pub fn record_user_agent(product: &str, version: &str) {
 	if let Some(counter) = USER_AGENTS.get() {
 		counter.with_label_values(&[product, version]).inc();
+	}
+}
+
+pub fn record_launchbox_import_records(record_type: &str, outcome: &str, n: u64) {
+	if let Some(counter) = LAUNCHBOX_IMPORT_RECORDS.get() {
+		counter.with_label_values(&[record_type, outcome]).inc_by(n);
+	}
+}
+
+pub fn record_screenscraper_quota_exhaustion(trigger: &str) {
+	if let Some(counter) = SCREENSCRAPER_QUOTA_EXHAUSTION.get() {
+		counter.with_label_values(&[trigger]).inc();
+	}
+}
+
+pub fn set_screenscraper_concurrency(permits: i64) {
+	if let Some(gauge) = SCREENSCRAPER_CONCURRENCY.get() {
+		gauge.set(permits);
+	}
+}
+
+pub fn record_cross_match_attempt(provider: &str, outcome: &str) {
+	if let Some(counter) = CROSS_MATCH_ATTEMPTS.get() {
+		counter.with_label_values(&[provider, outcome]).inc();
 	}
 }

@@ -86,6 +86,7 @@ impl ScreenScraperClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
+		crate::metrics::set_screenscraper_concurrency(1);
 		Ok(Self {
 			client,
 			service: Mutex::new(service),
@@ -282,13 +283,20 @@ impl ScreenScraperClient {
 		match status {
 			s if s == StatusCode::NOT_FOUND => Ok(None),
 			s if s.as_u16() == 430 => {
-				self.quota_exhausted.store(true, Ordering::Relaxed);
+				if !self.quota_exhausted.swap(true, Ordering::Relaxed) {
+					crate::metrics::record_screenscraper_quota_exhaustion("http_430");
+				}
 				Err(anyhow!(
 					"screenscraper daily quota exhausted (HTTP 430), aborting cycle"
 				))
 			}
 			s if matches!(s.as_u16(), 401 | 426 | 429 | 431) => {
-				self.quota_exhausted.store(true, Ordering::Relaxed);
+				if !self.quota_exhausted.swap(true, Ordering::Relaxed) {
+					crate::metrics::record_screenscraper_quota_exhaustion(&format!(
+						"http_{}",
+						s.as_u16()
+					));
+				}
 				Err(anyhow!(
 					"screenscraper rejected the request with HTTP {s} (server overloaded or thread limit), aborting cycle"
 				))
@@ -367,6 +375,7 @@ impl ScreenScraperClient {
 			warn!(
 				"screenscraper quota near limit ({today}/{max}); short-circuiting remaining match cycle"
 			);
+			crate::metrics::record_screenscraper_quota_exhaustion("ssuser_threshold");
 		}
 	}
 
@@ -383,6 +392,7 @@ impl ScreenScraperClient {
 		if target > current {
 			self.permits.add_permits(target - current);
 			self.concurrency.store(target, Ordering::Relaxed);
+			crate::metrics::set_screenscraper_concurrency(target as i64);
 			info!(
 				"screenscraper concurrency raised to {target} from ssuser.maxthreads (was {current})"
 			);

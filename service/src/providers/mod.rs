@@ -240,6 +240,7 @@ pub async fn drive_cross_match_pipeline<C>(
 where
 	C: Send + Sync + 'static,
 {
+	let provider_label = provider_label_for(provider);
 	while let Some(page) = crate::db::game::get_failed_games_for_cross_pass_with_limit(
 		provider,
 		DEFAULT_PAGE_SIZE,
@@ -259,15 +260,22 @@ where
 						)
 						.await?;
 					if siblings.is_empty() {
-						return Ok(());
+						return Ok::<&'static str, anyhow::Error>("no_siblings");
 					}
 					let names: Vec<String> = siblings.into_iter().map(|(_, n)| n).collect();
-					match_fn(game, names, client, conn).await
+					match_fn(game, names, client, conn).await?;
+					Ok::<&'static str, anyhow::Error>("attempted")
 				}));
 			}
 			for handle in handles {
-				if let Err(e) = handle.await? {
-					error!("Error while cross-matching {label} to provider: {e:?}");
+				match handle.await? {
+					Ok(outcome) => {
+						crate::metrics::record_cross_match_attempt(provider_label, outcome);
+					}
+					Err(e) => {
+						error!("Error while cross-matching {label} to provider: {e:?}");
+						crate::metrics::record_cross_match_attempt(provider_label, "error");
+					}
 				}
 			}
 			let chunk_ids: Vec<Uuid> = chunk.iter().map(|g| g.id).collect();
@@ -284,6 +292,19 @@ where
 		}
 	}
 	Ok(())
+}
+
+/// Stable string label for a provider, used as a metric label value. Must
+/// stay in sync with each `MetadataProvider::provider_label` impl.
+fn provider_label_for(provider: MetadataProviderEnum) -> &'static str {
+	match provider {
+		MetadataProviderEnum::Igdb => "igdb",
+		MetadataProviderEnum::Steamgriddb => "steamgriddb",
+		MetadataProviderEnum::Screenscraper => "screenscraper",
+		MetadataProviderEnum::Mobygames => "mobygames",
+		MetadataProviderEnum::Launchbox => "launchbox",
+		MetadataProviderEnum::EmuReady => "emuready",
+	}
 }
 
 /// Implemented by every metadata provider that participates in the

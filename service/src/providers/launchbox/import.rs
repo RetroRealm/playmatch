@@ -67,6 +67,7 @@ pub async fn ensure_imported(
 		&& prev == md5
 	{
 		info!("LaunchBox import skipped (md5 unchanged: {md5})");
+		crate::metrics::record_launchbox_import_records("zip", "skipped_unchanged", 1);
 		cleanup_tmp(&tmp_dir).await;
 		return Ok(ImportOutcome {
 			imported_md5: md5,
@@ -187,11 +188,13 @@ async fn stream_parse_and_insert(xml_path: &Path, db_conn: &DbConn) -> anyhow::R
 				let n = rows.len();
 				bulk_upsert_lb_platforms(rows, db_conn).await?;
 				counts.platforms += n;
+				crate::metrics::record_launchbox_import_records("platform", "imported", n as u64);
 			}
 			Batch::Games(rows) => {
 				let n = rows.len();
 				bulk_upsert_lb_games(rows, db_conn).await?;
 				counts.games += n;
+				crate::metrics::record_launchbox_import_records("game", "imported", n as u64);
 				if counts.games.is_multiple_of(50_000) {
 					info!("LaunchBox: imported {} games", counts.games);
 				}
@@ -200,11 +203,17 @@ async fn stream_parse_and_insert(xml_path: &Path, db_conn: &DbConn) -> anyhow::R
 				let n = rows.len();
 				bulk_insert_lb_alternate_names(rows, db_conn).await?;
 				counts.alternate_names += n;
+				crate::metrics::record_launchbox_import_records(
+					"alternate_name",
+					"imported",
+					n as u64,
+				);
 			}
 			Batch::Images(rows) => {
 				let n = rows.len();
 				bulk_insert_lb_images(rows, db_conn).await?;
 				counts.images += n;
+				crate::metrics::record_launchbox_import_records("image", "imported", n as u64);
 			}
 		}
 	}
