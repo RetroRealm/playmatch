@@ -19,7 +19,7 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use log::debug;
+use log::{debug, warn};
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -40,6 +40,11 @@ pub async fn match_games_to_screenscraper(
 	.await?;
 	debug!("Finished matching games without clone_of id to ScreenScraper");
 
+	if client.is_quota_exhausted() {
+		warn!("ScreenScraper quota exhausted between game-match passes, ending cycle early");
+		return Ok(());
+	}
+
 	drive_match_pipeline(
 		"game",
 		MetadataProviderEnum::Screenscraper,
@@ -51,6 +56,11 @@ pub async fn match_games_to_screenscraper(
 	)
 	.await?;
 	debug!("Finished matching games with clone_of id to ScreenScraper");
+
+	if client.is_quota_exhausted() {
+		warn!("ScreenScraper quota exhausted between game-match passes, ending cycle early");
+		return Ok(());
+	}
 
 	drive_match_pipeline(
 		"game",

@@ -13,7 +13,7 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use log::{error, info};
+use log::{error, info, warn};
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::sync::Arc;
@@ -169,6 +169,12 @@ fn failed_reason_label(r: FailedMatchReasonEnum) -> &'static str {
 /// runs per entity on its own task with a clone of `client` and `db_conn`.
 /// Per-entity errors are logged with the `label` prefix and do not abort
 /// the loop.
+///
+/// The loop also aborts when two consecutive page fetches return the same
+/// entities. That happens when every task in a page bailed without writing
+/// (e.g. ScreenScraper hit its quota and every game-task early-returns
+/// `Ok(())` without a mapping write); without this guard the page query
+/// would keep returning the same set forever and starve the next provider.
 pub async fn drive_match_pipeline<M, C>(
 	label: &'static str,
 	provider: MetadataProviderEnum,
@@ -179,10 +185,17 @@ pub async fn drive_match_pipeline<M, C>(
 	chunk_size: usize,
 ) -> anyhow::Result<()>
 where
-	M: Clone + Send + 'static,
+	M: Clone + PartialEq + Send + 'static,
 	C: Send + Sync + 'static,
 {
+	let mut last_page: Option<Vec<M>> = None;
 	while let Some(page) = fetch_fn(provider, DEFAULT_PAGE_SIZE, db_conn.clone()).await? {
+		if last_page.as_ref() == Some(&page) {
+			warn!(
+				"Provider returned the same {label} page twice in a row; aborting cycle to avoid infinite loop (likely cause: upstream quota or persistent error)"
+			);
+			break;
+		}
 		for chunk in page.chunks(chunk_size) {
 			let mut handles = Vec::with_capacity(chunk.len());
 			for entity in chunk.iter().cloned() {
@@ -196,6 +209,7 @@ where
 				}
 			}
 		}
+		last_page = Some(page);
 	}
 	Ok(())
 }
