@@ -35,7 +35,6 @@ impl RegionTag {
 	/// ScreenScraper region codes that map to this RegionTag. Used by the
 	/// per-candidate iterator on `SsGame` to prefer regions matching the DAT
 	/// row's `(USA)` / `(Japan)` / etc tags.
-	#[allow(dead_code)]
 	pub fn ss_codes(&self) -> &'static [&'static str] {
 		match self {
 			RegionTag::World => &["wor"],
@@ -59,7 +58,6 @@ impl RegionTag {
 	/// metadata feed (typical values are full English country / region
 	/// names). These are the strings to feed to the LB region-priority
 	/// SQL finders.
-	#[allow(dead_code)]
 	pub fn lb_codes(&self) -> &'static [&'static str] {
 		match self {
 			RegionTag::World => &["World"],

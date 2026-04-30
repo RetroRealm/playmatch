@@ -4,9 +4,9 @@ use crate::db::game::{
 	get_unmatched_games_without_clone_of_with_limit,
 };
 use crate::db::launchbox::{
-	find_lb_game_by_platform_and_alternate_name,
-	find_lb_game_by_platform_and_alternate_normalized_name, find_lb_game_by_platform_and_name,
-	find_lb_game_by_platform_and_normalized_name,
+	find_lb_game_by_platform_and_alternate_name_region_priority,
+	find_lb_game_by_platform_and_alternate_normalized_name_region_priority,
+	find_lb_game_by_platform_and_name, find_lb_game_by_platform_and_normalized_name,
 };
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
@@ -149,6 +149,11 @@ fn match_game_to_launchbox(
 		let parsed_dat = parse_name(&game.name);
 		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
+		let dat_lb_regions: Vec<&'static str> = parsed_dat
+			.regions
+			.iter()
+			.flat_map(|r| r.lb_codes().iter().copied())
+			.collect();
 
 		if let Some(found) =
 			find_lb_game_by_platform_and_name(&platform_name, &cleaned, &db_conn).await?
@@ -171,8 +176,13 @@ fn match_game_to_launchbox(
 			return Ok(());
 		}
 
-		if let Some(found) =
-			find_lb_game_by_platform_and_alternate_name(&platform_name, &cleaned, &db_conn).await?
+		if let Some(found) = find_lb_game_by_platform_and_alternate_name_region_priority(
+			&platform_name,
+			&cleaned,
+			&dat_lb_regions,
+			&db_conn,
+		)
+		.await?
 		{
 			debug!(
 				"Matched Game \"{}\" to LaunchBox Game ID {} (Alternative Name)",
@@ -217,9 +227,10 @@ fn match_game_to_launchbox(
 			return Ok(());
 		}
 
-		if let Some(found) = find_lb_game_by_platform_and_alternate_normalized_name(
+		if let Some(found) = find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
 			&platform_name,
 			&cleaned_normalized,
+			&dat_lb_regions,
 			&db_conn,
 		)
 		.await?
@@ -312,6 +323,11 @@ pub fn match_game_via_sibling_name_launchbox(
 		let platform_name = get_game_platform_launchbox_name(&game, &db_conn).await?;
 		let parsed_dat = parse_name(&game.name);
 		let cleaned_playmatch = parsed_dat.base.to_lowercase();
+		let dat_lb_regions: Vec<&'static str> = parsed_dat
+			.regions
+			.iter()
+			.flat_map(|r| r.lb_codes().iter().copied())
+			.collect();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
@@ -343,8 +359,13 @@ pub fn match_game_via_sibling_name_launchbox(
 				return Ok(());
 			}
 
-			if let Some(found) =
-				find_lb_game_by_platform_and_alternate_name(&platform_name, &q, &db_conn).await?
+			if let Some(found) = find_lb_game_by_platform_and_alternate_name_region_priority(
+				&platform_name,
+				&q,
+				&dat_lb_regions,
+				&db_conn,
+			)
+			.await?
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct alt)",
@@ -386,12 +407,14 @@ pub fn match_game_via_sibling_name_launchbox(
 				return Ok(());
 			}
 
-			if let Some(found) = find_lb_game_by_platform_and_alternate_normalized_name(
-				&platform_name,
-				&q_norm,
-				&db_conn,
-			)
-			.await?
+			if let Some(found) =
+				find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
+					&platform_name,
+					&q_norm,
+					&dat_lb_regions,
+					&db_conn,
+				)
+				.await?
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized alt)",

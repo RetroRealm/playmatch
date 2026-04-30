@@ -188,26 +188,67 @@ impl SsGame {
 	/// `REGION_PRIORITY` order, then any remaining region. Used by the matcher
 	/// so a game returned with only a `jp` name still produces a hit.
 	pub fn iter_candidate_names(&self) -> impl Iterator<Item = &str> {
-		let priority: Vec<&str> = REGION_PRIORITY
-			.iter()
-			.filter_map(|region| {
-				self.noms
-					.iter()
-					.find(|n| n.region.eq_ignore_ascii_case(region))
-					.map(|n| n.text.as_str())
-			})
-			.collect();
-		let extras: Vec<&str> = self
-			.noms
-			.iter()
-			.filter(|n| {
-				!REGION_PRIORITY
-					.iter()
-					.any(|r| n.region.eq_ignore_ascii_case(r))
-			})
-			.map(|n| n.text.as_str())
-			.collect();
-		priority.into_iter().chain(extras)
+		self.iter_candidate_names_with_region_priority(&[])
+	}
+
+	/// Iterate candidate names preferring the regions listed in `prefer`
+	/// first (in `prefer` order), then the default `REGION_PRIORITY` order
+	/// for regions not already emitted, then any remaining regions.
+	/// Duplicate regions inside `prefer` are de-duplicated. Used by the
+	/// matcher to bias selection toward the DAT row's parsed `(USA)` /
+	/// `(Japan)` / etc tags.
+	pub fn iter_candidate_names_with_region_priority(
+		&self,
+		prefer: &[&str],
+	) -> impl Iterator<Item = &str> {
+		let mut emitted_regions: Vec<&str> = Vec::with_capacity(self.noms.len());
+		let mut out: Vec<&str> = Vec::with_capacity(self.noms.len());
+
+		for region in prefer {
+			if emitted_regions
+				.iter()
+				.any(|r| r.eq_ignore_ascii_case(region))
+			{
+				continue;
+			}
+			if let Some(n) = self
+				.noms
+				.iter()
+				.find(|n| n.region.eq_ignore_ascii_case(region))
+			{
+				out.push(n.text.as_str());
+				emitted_regions.push(n.region.as_str());
+			}
+		}
+
+		for region in REGION_PRIORITY {
+			if emitted_regions
+				.iter()
+				.any(|r| r.eq_ignore_ascii_case(region))
+			{
+				continue;
+			}
+			if let Some(n) = self
+				.noms
+				.iter()
+				.find(|n| n.region.eq_ignore_ascii_case(region))
+			{
+				out.push(n.text.as_str());
+				emitted_regions.push(n.region.as_str());
+			}
+		}
+
+		for n in &self.noms {
+			if emitted_regions
+				.iter()
+				.any(|r| r.eq_ignore_ascii_case(&n.region))
+			{
+				continue;
+			}
+			out.push(n.text.as_str());
+		}
+
+		out.into_iter()
 	}
 }
 
@@ -323,6 +364,54 @@ mod tests {
 		assert_eq!(names[1], "American");
 		assert_eq!(names[2], "Korean");
 		assert_eq!(names.last().copied(), Some("Unknown"));
+	}
+
+	#[test]
+	fn iter_candidate_names_with_region_priority_prefers_dat_region_first() {
+		let game = SsGame {
+			id: Some(1),
+			noms: vec![
+				SsLocalizedName {
+					region: "us".into(),
+					text: "American".into(),
+				},
+				SsLocalizedName {
+					region: "jp".into(),
+					text: "Japanese".into(),
+				},
+				SsLocalizedName {
+					region: "wor".into(),
+					text: "World".into(),
+				},
+			],
+			roms: None,
+			editeur: None,
+			developpeur: None,
+		};
+
+		let names: Vec<&str> = game
+			.iter_candidate_names_with_region_priority(&["jp"])
+			.collect();
+		assert_eq!(names, vec!["Japanese", "World", "American"]);
+	}
+
+	#[test]
+	fn iter_candidate_names_with_region_priority_dedups_within_prefer() {
+		let game = SsGame {
+			id: Some(2),
+			noms: vec![SsLocalizedName {
+				region: "us".into(),
+				text: "American".into(),
+			}],
+			roms: None,
+			editeur: None,
+			developpeur: None,
+		};
+
+		let names: Vec<&str> = game
+			.iter_candidate_names_with_region_priority(&["us", "us"])
+			.collect();
+		assert_eq!(names, vec!["American"]);
 	}
 
 	#[test]

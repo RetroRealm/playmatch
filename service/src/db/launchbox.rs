@@ -125,6 +125,81 @@ pub async fn find_lb_game_by_platform_and_alternate_normalized_name(
 		.await
 }
 
+/// Same as [`find_lb_game_by_platform_and_alternate_name`] but ranks the
+/// matched alternate-name row by region: alternates whose `region` is in
+/// `prefer_regions` come first, then NULL regions, then everything else.
+/// Returns the first row by that ordering, so the caller does not have to
+/// re-rank in Rust. Empty `prefer_regions` reduces to "any matching alt".
+pub async fn find_lb_game_by_platform_and_alternate_name_region_priority(
+	platform_name: &str,
+	name: &str,
+	prefer_regions: &[&str],
+	conn: &DbConn,
+) -> Result<Option<launchbox_game::Model>, DbErr> {
+	let lower_platform = platform_name.to_lowercase();
+	let lower_name = name.to_lowercase();
+	let prefer_array: Vec<String> = prefer_regions.iter().map(|s| (*s).to_string()).collect();
+	launchbox_game::Entity::find()
+		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
+			sea_orm::DatabaseBackend::Postgres,
+			r#"SELECT g.* FROM launchbox_game g
+			   INNER JOIN launchbox_game_alternate_name a
+			     ON a.launchbox_game_database_id = g.database_id
+			   WHERE lower(g.platform_name) = $1 AND lower(a.name) = $2
+			   ORDER BY
+			     CASE
+			       WHEN a.region = ANY($3) THEN 0
+			       WHEN a.region IS NULL THEN 1
+			       ELSE 2
+			     END,
+			     a.region ASC NULLS LAST
+			   LIMIT 1"#,
+			[
+				lower_platform.into(),
+				lower_name.into(),
+				prefer_array.into(),
+			],
+		))
+		.one(conn)
+		.await
+}
+
+/// Mirror of [`find_lb_game_by_platform_and_alternate_name_region_priority`]
+/// for the normalised alt-name column.
+pub async fn find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
+	platform_name: &str,
+	normalized_name: &str,
+	prefer_regions: &[&str],
+	conn: &DbConn,
+) -> Result<Option<launchbox_game::Model>, DbErr> {
+	let lower_platform = platform_name.to_lowercase();
+	let lower_norm = normalized_name.to_lowercase();
+	let prefer_array: Vec<String> = prefer_regions.iter().map(|s| (*s).to_string()).collect();
+	launchbox_game::Entity::find()
+		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
+			sea_orm::DatabaseBackend::Postgres,
+			r#"SELECT g.* FROM launchbox_game g
+			   INNER JOIN launchbox_game_alternate_name a
+			     ON a.launchbox_game_database_id = g.database_id
+			   WHERE lower(g.platform_name) = $1 AND lower(a.name_normalized) = $2
+			   ORDER BY
+			     CASE
+			       WHEN a.region = ANY($3) THEN 0
+			       WHEN a.region IS NULL THEN 1
+			       ELSE 2
+			     END,
+			     a.region ASC NULLS LAST
+			   LIMIT 1"#,
+			[
+				lower_platform.into(),
+				lower_norm.into(),
+				prefer_array.into(),
+			],
+		))
+		.one(conn)
+		.await
+}
+
 pub async fn find_lb_game_alternate_names(
 	database_id: i64,
 	conn: &DbConn,

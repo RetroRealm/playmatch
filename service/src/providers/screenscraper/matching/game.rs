@@ -174,6 +174,11 @@ fn match_game_to_screenscraper(
 		let parsed_dat = parse_name(&game.name);
 		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
+		let dat_ss_regions: Vec<&'static str> = parsed_dat
+			.regions
+			.iter()
+			.flat_map(|r| r.ss_codes().iter().copied())
+			.collect();
 
 		let candidates = client.search_games(system_id, &cleaned).await?;
 
@@ -181,7 +186,7 @@ fn match_game_to_screenscraper(
 			let Some(candidate_id) = candidate.id else {
 				continue;
 			};
-			for name in candidate.iter_candidate_names() {
+			for name in candidate.iter_candidate_names_with_region_priority(&dat_ss_regions) {
 				if name.to_lowercase() == cleaned {
 					debug!(
 						"Matched Game \"{}\" to ScreenScraper Game ID {} (Direct Match)",
@@ -193,7 +198,10 @@ fn match_game_to_screenscraper(
 						Target::Game(game.id),
 						candidate_id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
-						candidate.iter_candidate_names().next().map(str::to_string),
+						candidate
+							.iter_candidate_names_with_region_priority(&dat_ss_regions)
+							.next()
+							.map(str::to_string),
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -207,7 +215,7 @@ fn match_game_to_screenscraper(
 			let Some(candidate_id) = candidate.id else {
 				continue;
 			};
-			for name in candidate.iter_candidate_names() {
+			for name in candidate.iter_candidate_names_with_region_priority(&dat_ss_regions) {
 				if normalize_title(&name.to_lowercase()) == cleaned_normalized {
 					debug!(
 						"Matched Game \"{}\" to ScreenScraper Game ID {} (Normalized Match)",
@@ -219,7 +227,10 @@ fn match_game_to_screenscraper(
 						Target::Game(game.id),
 						candidate_id.to_string(),
 						AutomaticMatchReasonEnum::NormalizedName,
-						candidate.iter_candidate_names().next().map(str::to_string),
+						candidate
+							.iter_candidate_names_with_region_priority(&dat_ss_regions)
+							.next()
+							.map(str::to_string),
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -405,6 +416,11 @@ pub fn match_game_via_sibling_name_screenscraper(
 		let system_id = get_game_platform_screenscraper_id(&game, &db_conn).await?;
 		let parsed_dat = parse_name(&game.name);
 		let cleaned_playmatch = parsed_dat.base.to_lowercase();
+		let dat_ss_regions: Vec<&'static str> = parsed_dat
+			.regions
+			.iter()
+			.flat_map(|r| r.ss_codes().iter().copied())
+			.collect();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
@@ -421,7 +437,7 @@ pub fn match_game_via_sibling_name_screenscraper(
 
 			for c in &candidates {
 				let Some(candidate_id) = c.id else { continue };
-				for name in c.iter_candidate_names() {
+				for name in c.iter_candidate_names_with_region_priority(&dat_ss_regions) {
 					if name.to_lowercase() == q {
 						debug!(
 							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Direct)",
@@ -433,7 +449,9 @@ pub fn match_game_via_sibling_name_screenscraper(
 							Target::Game(game.id),
 							candidate_id.to_string(),
 							AutomaticMatchReasonEnum::CrossProviderDirectName,
-							c.iter_candidate_names().next().map(str::to_string),
+							c.iter_candidate_names_with_region_priority(&dat_ss_regions)
+								.next()
+								.map(str::to_string),
 							&db_conn,
 							&mut redis_conn,
 						)
@@ -444,7 +462,7 @@ pub fn match_game_via_sibling_name_screenscraper(
 			}
 			for c in &candidates {
 				let Some(candidate_id) = c.id else { continue };
-				for name in c.iter_candidate_names() {
+				for name in c.iter_candidate_names_with_region_priority(&dat_ss_regions) {
 					if normalize_title(&name.to_lowercase()) == q_norm {
 						debug!(
 							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Normalized)",
@@ -456,7 +474,9 @@ pub fn match_game_via_sibling_name_screenscraper(
 							Target::Game(game.id),
 							candidate_id.to_string(),
 							AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-							c.iter_candidate_names().next().map(str::to_string),
+							c.iter_candidate_names_with_region_priority(&dat_ss_regions)
+								.next()
+								.map(str::to_string),
 							&db_conn,
 							&mut redis_conn,
 						)
