@@ -421,9 +421,11 @@ fn build_game_active_model(
 	let database_id = opt_i64(fields, "DatabaseID")?;
 	let name = opt(fields, "Name")?;
 	let platform_name = opt(fields, "Platform")?;
+	let name_normalized = crate::matching::util::normalize_title(&name.to_lowercase());
 	Some(launchbox_game::ActiveModel {
 		database_id: Set(database_id),
 		name: Set(name),
+		name_normalized: Set(Some(name_normalized)),
 		platform_name: Set(platform_name),
 		release_date: Set(opt(fields, "ReleaseDate")),
 		release_year: Set(opt_i32(fields, "ReleaseYear")),
@@ -449,9 +451,11 @@ fn build_alt_active_model(
 ) -> Option<launchbox_game_alternate_name::ActiveModel> {
 	let database_id = opt_i64(fields, "DatabaseID")?;
 	let name = opt(fields, "AlternateName")?;
+	let name_normalized = crate::matching::util::normalize_title(&name.to_lowercase());
 	Some(launchbox_game_alternate_name::ActiveModel {
 		launchbox_game_database_id: Set(database_id),
 		name: Set(name),
+		name_normalized: Set(Some(name_normalized)),
 		region: Set(opt(fields, "Region")),
 		..Default::default()
 	})

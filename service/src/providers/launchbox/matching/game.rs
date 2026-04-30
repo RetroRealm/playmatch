@@ -4,11 +4,14 @@ use crate::db::game::{
 	get_unmatched_games_without_clone_of_with_limit,
 };
 use crate::db::launchbox::{
-	find_lb_game_by_platform_and_alternate_name, find_lb_game_by_platform_and_name,
+	find_lb_game_by_platform_and_alternate_name,
+	find_lb_game_by_platform_and_alternate_normalized_name, find_lb_game_by_platform_and_name,
+	find_lb_game_by_platform_and_normalized_name,
 };
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
+use crate::matching::name_parse::parse_name;
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::launchbox::LaunchBoxClient;
@@ -143,7 +146,8 @@ fn match_game_to_launchbox(
 		let mut redis_conn = client.redis_conn().clone();
 		let platform_name = get_game_platform_launchbox_name(&game, &db_conn).await?;
 
-		let cleaned = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
 
 		if let Some(found) =
@@ -188,9 +192,12 @@ fn match_game_to_launchbox(
 			return Ok(());
 		}
 
-		if let Some(found) =
-			find_lb_game_by_platform_and_name(&platform_name, &cleaned_normalized, &db_conn).await?
-			&& normalize_title(&found.name.to_lowercase()) == cleaned_normalized
+		if let Some(found) = find_lb_game_by_platform_and_normalized_name(
+			&platform_name,
+			&cleaned_normalized,
+			&db_conn,
+		)
+		.await?
 		{
 			debug!(
 				"Matched Game \"{}\" to LaunchBox Game ID {} (Normalized Match)",
@@ -210,7 +217,7 @@ fn match_game_to_launchbox(
 			return Ok(());
 		}
 
-		if let Some(found) = find_lb_game_by_platform_and_alternate_name(
+		if let Some(found) = find_lb_game_by_platform_and_alternate_normalized_name(
 			&platform_name,
 			&cleaned_normalized,
 			&db_conn,
@@ -303,7 +310,8 @@ pub fn match_game_via_sibling_name_launchbox(
 	Box::pin(async move {
 		let mut redis_conn = client.redis_conn().clone();
 		let platform_name = get_game_platform_launchbox_name(&game, &db_conn).await?;
-		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned_playmatch = parsed_dat.base.to_lowercase();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
@@ -357,8 +365,8 @@ pub fn match_game_via_sibling_name_launchbox(
 			}
 
 			if let Some(found) =
-				find_lb_game_by_platform_and_name(&platform_name, &q_norm, &db_conn).await?
-				&& normalize_title(&found.name.to_lowercase()) == q_norm
+				find_lb_game_by_platform_and_normalized_name(&platform_name, &q_norm, &db_conn)
+					.await?
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized)",
@@ -378,9 +386,12 @@ pub fn match_game_via_sibling_name_launchbox(
 				return Ok(());
 			}
 
-			if let Some(found) =
-				find_lb_game_by_platform_and_alternate_name(&platform_name, &q_norm, &db_conn)
-					.await?
+			if let Some(found) = find_lb_game_by_platform_and_alternate_normalized_name(
+				&platform_name,
+				&q_norm,
+				&db_conn,
+			)
+			.await?
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized alt)",

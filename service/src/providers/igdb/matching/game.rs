@@ -6,12 +6,15 @@ use crate::db::game::{
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
+use crate::matching::name_parse::parse_name;
+use crate::matching::scoring::{CandidateVerdict, score_candidate};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::igdb::IgdbClient;
 use crate::providers::{
 	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
 	write_auto_match_success,
 };
+use chrono::{DateTime, Datelike, Utc};
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
@@ -147,13 +150,35 @@ fn match_game_to_igdb(
 		let mut redis_conn = igdb_client.redis_conn().clone();
 		let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
 
-		let clean_name = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let clean_name = parsed_dat.base.to_lowercase();
 
 		let search_results = igdb_client
 			.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 			.await?;
 
 		for search_result in search_results {
+			let candidate_year = search_result
+				.first_release_date
+				.and_then(year_from_unix_seconds);
+			let candidate_platforms_i64 = search_result
+				.platforms
+				.as_ref()
+				.map(|v| v.iter().map(|p| *p as i64).collect::<Vec<_>>());
+			if score_candidate(
+				&parsed_dat,
+				candidate_year,
+				candidate_platforms_i64.as_deref(),
+				Some(platform_igdb_id as i64),
+			) == CandidateVerdict::Reject
+			{
+				debug!(
+					"Skipping IGDB candidate id={} for Game \"{}\": rejected by year/platform gate",
+					search_result.id, &game.name
+				);
+				continue;
+			}
+
 			let search_result_name = search_result.name.to_lowercase();
 
 			if search_result_name == clean_name {
@@ -334,7 +359,8 @@ pub fn match_game_via_sibling_name_igdb(
 	Box::pin(async move {
 		let mut redis_conn = igdb_client.redis_conn().clone();
 		let platform_igdb_id = get_game_platform_igdb_id(&game, &db_conn).await?;
-		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned_playmatch = parsed_dat.base.to_lowercase();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
@@ -349,6 +375,21 @@ pub fn match_game_via_sibling_name_igdb(
 				.await?;
 
 			for c in &candidates {
+				let candidate_year = c.first_release_date.and_then(year_from_unix_seconds);
+				let candidate_platforms_i64 = c
+					.platforms
+					.as_ref()
+					.map(|v| v.iter().map(|p| *p as i64).collect::<Vec<_>>());
+				if score_candidate(
+					&parsed_dat,
+					candidate_year,
+					candidate_platforms_i64.as_deref(),
+					Some(platform_igdb_id as i64),
+				) == CandidateVerdict::Reject
+				{
+					continue;
+				}
+
 				if c.name.to_lowercase() == q {
 					debug!(
 						"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" (Direct)",
@@ -369,6 +410,21 @@ pub fn match_game_via_sibling_name_igdb(
 				}
 			}
 			for c in &candidates {
+				let candidate_year = c.first_release_date.and_then(year_from_unix_seconds);
+				let candidate_platforms_i64 = c
+					.platforms
+					.as_ref()
+					.map(|v| v.iter().map(|p| *p as i64).collect::<Vec<_>>());
+				if score_candidate(
+					&parsed_dat,
+					candidate_year,
+					candidate_platforms_i64.as_deref(),
+					Some(platform_igdb_id as i64),
+				) == CandidateVerdict::Reject
+				{
+					continue;
+				}
+
 				if normalize_title(&c.name.to_lowercase()) == q_norm {
 					debug!(
 						"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" (Normalized)",
@@ -391,4 +447,8 @@ pub fn match_game_via_sibling_name_igdb(
 		}
 		Ok(())
 	})
+}
+
+fn year_from_unix_seconds(secs: i64) -> Option<u16> {
+	DateTime::<Utc>::from_timestamp(secs, 0).and_then(|dt| u16::try_from(dt.year()).ok())
 }

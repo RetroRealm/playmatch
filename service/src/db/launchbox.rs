@@ -81,6 +81,50 @@ pub async fn find_lb_game_by_platform_and_alternate_name(
 		.await
 }
 
+/// Look up a LaunchBox game by platform and a normalised primary name.
+/// `name_normalized` is populated at LB import time with the same
+/// `normalize_title` the matcher uses on the DAT side, so this is the
+/// only path that hits the normalised rung after stricter normalisation
+/// gained NFKD / symbol / `&`-fold transformations the SQL `lower()`
+/// cannot reproduce.
+pub async fn find_lb_game_by_platform_and_normalized_name(
+	platform_name: &str,
+	normalized_name: &str,
+	conn: &DbConn,
+) -> Result<Option<launchbox_game::Model>, DbErr> {
+	launchbox_game::Entity::find()
+		.filter(
+			launchbox_game::Column::PlatformName
+				.eq_ignore_case(platform_name)
+				.and(launchbox_game::Column::NameNormalized.eq_ignore_case(normalized_name)),
+		)
+		.one(conn)
+		.await
+}
+
+/// Mirror of [`find_lb_game_by_platform_and_normalized_name`] for the
+/// alternate-name table.
+pub async fn find_lb_game_by_platform_and_alternate_normalized_name(
+	platform_name: &str,
+	normalized_name: &str,
+	conn: &DbConn,
+) -> Result<Option<launchbox_game::Model>, DbErr> {
+	let lower_platform = platform_name.to_lowercase();
+	let lower_norm = normalized_name.to_lowercase();
+	launchbox_game::Entity::find()
+		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
+			sea_orm::DatabaseBackend::Postgres,
+			r#"SELECT g.* FROM launchbox_game g
+			   INNER JOIN launchbox_game_alternate_name a
+			     ON a.launchbox_game_database_id = g.database_id
+			   WHERE lower(g.platform_name) = $1 AND lower(a.name_normalized) = $2
+			   LIMIT 1"#,
+			[lower_platform.into(), lower_norm.into()],
+		))
+		.one(conn)
+		.await
+}
+
 pub async fn find_lb_game_alternate_names(
 	database_id: i64,
 	conn: &DbConn,
@@ -206,6 +250,7 @@ pub async fn bulk_upsert_lb_games(
 			OnConflict::column(launchbox_game::Column::DatabaseId)
 				.update_columns([
 					launchbox_game::Column::Name,
+					launchbox_game::Column::NameNormalized,
 					launchbox_game::Column::PlatformName,
 					launchbox_game::Column::ReleaseDate,
 					launchbox_game::Column::ReleaseYear,

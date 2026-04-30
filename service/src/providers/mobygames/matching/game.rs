@@ -6,9 +6,12 @@ use crate::db::game::{
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
+use crate::matching::name_parse::parse_name;
+use crate::matching::scoring::{CandidateVerdict, score_candidate};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::mobygames::MobyGamesClient;
+use crate::providers::mobygames::model::MgGame;
 use crate::providers::{
 	Target, drive_match_pipeline, write_auto_match_failed, write_auto_match_success,
 };
@@ -140,12 +143,27 @@ fn match_game_to_mobygames(
 		let mut redis_conn = client.redis_conn().clone();
 		let platform_id = get_game_platform_mobygames_id(&game, &db_conn).await?;
 
-		let cleaned = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
 
 		let candidates = client.search_games(Some(platform_id), &cleaned).await?;
 
-		for candidate in &candidates {
+		let candidates_filtered: Vec<&MgGame> = candidates
+			.iter()
+			.filter(|c| {
+				let candidate_year = mg_year_for_platform(c, platform_id);
+				let candidate_platforms_i64 = mg_platforms_i64(c);
+				score_candidate(
+					&parsed_dat,
+					candidate_year,
+					candidate_platforms_i64.as_deref(),
+					Some(platform_id),
+				) != CandidateVerdict::Reject
+			})
+			.collect();
+
+		for candidate in &candidates_filtered {
 			for name in candidate.iter_candidate_titles() {
 				if name.to_lowercase() == cleaned {
 					debug!(
@@ -168,7 +186,7 @@ fn match_game_to_mobygames(
 			}
 		}
 
-		for candidate in &candidates {
+		for candidate in &candidates_filtered {
 			for name in candidate.iter_candidate_titles() {
 				if normalize_title(&name.to_lowercase()) == cleaned_normalized {
 					debug!(
@@ -262,7 +280,8 @@ pub fn match_game_via_sibling_name_mobygames(
 	Box::pin(async move {
 		let mut redis_conn = client.redis_conn().clone();
 		let platform_id = get_game_platform_mobygames_id(&game, &db_conn).await?;
-		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned_playmatch = parsed_dat.base.to_lowercase();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
@@ -274,7 +293,21 @@ pub fn match_game_via_sibling_name_mobygames(
 			let q_norm = normalize_title(&q);
 			let candidates = client.search_games(Some(platform_id), &q).await?;
 
-			for c in &candidates {
+			let candidates_filtered: Vec<&MgGame> = candidates
+				.iter()
+				.filter(|c| {
+					let candidate_year = mg_year_for_platform(c, platform_id);
+					let candidate_platforms_i64 = mg_platforms_i64(c);
+					score_candidate(
+						&parsed_dat,
+						candidate_year,
+						candidate_platforms_i64.as_deref(),
+						Some(platform_id),
+					) != CandidateVerdict::Reject
+				})
+				.collect();
+
+			for c in &candidates_filtered {
 				for name in c.iter_candidate_titles() {
 					if name.to_lowercase() == q {
 						debug!(
@@ -296,7 +329,7 @@ pub fn match_game_via_sibling_name_mobygames(
 					}
 				}
 			}
-			for c in &candidates {
+			for c in &candidates_filtered {
 				for name in c.iter_candidate_titles() {
 					if normalize_title(&name.to_lowercase()) == q_norm {
 						debug!(
@@ -321,4 +354,20 @@ pub fn match_game_via_sibling_name_mobygames(
 		}
 		Ok(())
 	})
+}
+
+fn mg_year_for_platform(c: &MgGame, our_platform_id: i64) -> Option<u16> {
+	c.platforms
+		.as_ref()?
+		.iter()
+		.find(|p| p.platform_id == our_platform_id)
+		.and_then(|p| p.first_release_date.as_ref())
+		.and_then(|s| s.get(..4))
+		.and_then(|y| y.parse::<u16>().ok())
+}
+
+fn mg_platforms_i64(c: &MgGame) -> Option<Vec<i64>> {
+	c.platforms
+		.as_ref()
+		.map(|v| v.iter().map(|p| p.platform_id).collect())
 }

@@ -1,6 +1,5 @@
 use crate::matching::name_parse::ParsedName;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateVerdict {
 	/// Year and platform pass; year exact-match preferred.
@@ -21,7 +20,6 @@ pub enum CandidateVerdict {
 /// Returns `AcceptPreferred` when both years are present and equal.
 /// Returns `Accept` otherwise (includes the case where either side has
 /// no year, or the candidate has no platform list).
-#[allow(dead_code)]
 pub fn score_candidate(
 	parsed_dat: &ParsedName,
 	candidate_year: Option<u16>,

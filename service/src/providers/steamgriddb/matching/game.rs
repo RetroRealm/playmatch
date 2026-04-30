@@ -4,6 +4,11 @@ use crate::db::game::{
 	get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 };
 use crate::db::signature_metadata_mapping::find_signature_metadata_mapping_by_platform_game_company_and_provider;
+// SteamGridDB does not expose platform or release-year info in any of its
+// API responses, so the year/platform candidate gate is intentionally not
+// applied here. SGDB precision tightening (cross-provider Steam appid
+// handoff, scored ladder) is tracked for Tier 2.
+use crate::matching::name_parse::parse_name;
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::steamgriddb::SteamGridDbClient;
 use crate::providers::{
@@ -150,7 +155,8 @@ fn match_game_to_steamgriddb(
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
 		let mut redis_conn = client.redis_conn().clone();
-		let cleaned = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
 
 		let candidates = client.search_games(&cleaned).await?;
@@ -222,7 +228,8 @@ pub fn match_game_via_sibling_name_steamgriddb(
 ) -> BoxFuture<'static, anyhow::Result<()>> {
 	Box::pin(async move {
 		let mut redis_conn = client.redis_conn().clone();
-		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned_playmatch = parsed_dat.base.to_lowercase();
 		let mut tried: HashSet<String> = HashSet::new();
 		tried.insert(cleaned_playmatch);
 

@@ -6,6 +6,7 @@ use crate::db::game::{
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
+use crate::matching::name_parse::parse_name;
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::emuready::EmuReadyClient;
@@ -140,7 +141,8 @@ fn match_game_to_emuready(
 		let mut redis_conn = client.redis_conn().clone();
 		let system_id = get_game_platform_emuready_id(&game, &db_conn).await?;
 
-		let cleaned = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
 
 		let candidates = client.search_games(&system_id, &cleaned).await?;
@@ -167,10 +169,10 @@ fn match_game_to_emuready(
 		}
 
 		for candidate in &candidates {
-			let normalised = candidate
-				.normalized_title
-				.clone()
-				.unwrap_or_else(|| normalize_title(&candidate.title.to_lowercase()));
+			// EmuReady's pre-baked `normalized_title` uses their normalisation
+			// rules, not ours; recompute locally so the comparison stays
+			// consistent under our `normalize_title`.
+			let normalised = normalize_title(&candidate.title.to_lowercase());
 			if normalised == cleaned_normalized {
 				debug!(
 					"Matched Game \"{}\" to EmuReady Game ID {} (Normalized Match)",
@@ -256,7 +258,8 @@ pub fn match_game_via_sibling_name_emuready(
 	Box::pin(async move {
 		let mut redis_conn = client.redis_conn().clone();
 		let system_id = get_game_platform_emuready_id(&game, &db_conn).await?;
-		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned_playmatch = parsed_dat.base.to_lowercase();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
@@ -289,10 +292,7 @@ pub fn match_game_via_sibling_name_emuready(
 				}
 			}
 			for c in &candidates {
-				let normalised = c
-					.normalized_title
-					.clone()
-					.unwrap_or_else(|| normalize_title(&c.title.to_lowercase()));
+				let normalised = normalize_title(&c.title.to_lowercase());
 				if normalised == q_norm {
 					debug!(
 						"Cross-matched Game \"{}\" to EmuReady Game ID {} via sibling \"{}\" (Normalized)",

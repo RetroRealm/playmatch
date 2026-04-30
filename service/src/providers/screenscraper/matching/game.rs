@@ -7,6 +7,7 @@ use crate::db::game_file::get_game_files_from_game_id;
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
+use crate::matching::name_parse::parse_name;
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::screenscraper::ScreenScraperClient;
@@ -170,7 +171,8 @@ fn match_game_to_screenscraper(
 			return Ok(());
 		}
 
-		let cleaned = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
 
 		let candidates = client.search_games(system_id, &cleaned).await?;
@@ -401,7 +403,8 @@ pub fn match_game_via_sibling_name_screenscraper(
 		}
 		let mut redis_conn = client.redis_conn().clone();
 		let system_id = get_game_platform_screenscraper_id(&game, &db_conn).await?;
-		let cleaned_playmatch = clean_name(&game.name).to_lowercase();
+		let parsed_dat = parse_name(&game.name);
+		let cleaned_playmatch = parsed_dat.base.to_lowercase();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
 
