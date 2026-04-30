@@ -19,6 +19,7 @@ chrono = { workspace = true }
 rand = "^0.10"
 regex = "^1"
 lazy_static = "^1"
+unicode-normalization = "^0.1"
 futures-util = "^0.3"
 zip = "^8"
 async-recursion = "^1.1"

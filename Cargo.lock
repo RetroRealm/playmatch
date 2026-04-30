@@ -3887,6 +3887,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tower",
+ "unicode-normalization",
  "utoipa",
  "zip 8.5.1",
 ]

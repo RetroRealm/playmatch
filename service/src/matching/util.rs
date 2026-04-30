@@ -1,35 +1,55 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-
-lazy_static! {
-	static ref BRACKET_REGEX: Regex = Regex::new(r"\s*\(.*?\)").unwrap();
-}
+use unicode_normalization::UnicodeNormalization;
+use unicode_normalization::char::is_combining_mark;
 
 pub(crate) fn clean_name(input: &str) -> String {
-	BRACKET_REGEX.replace_all(input, "").to_string()
+	crate::matching::name_parse::parse_name(input).base
 }
 
+/// Normalise a title for comparison. Both DAT side and candidate side
+/// should pass through this before equality checks.
+///
+/// Pipeline:
+/// 1. NFKD decompose, then strip combining marks (folds diacritics:
+///    `Pokémon` → `Pokemon`).
+/// 2. Strip trademark / copyright glyphs (`™ ® ©`).
+/// 3. Unify apostrophe variants (curly + backtick → `'`).
+/// 4. Replace `&` with `and` (word-boundary tolerant). `Sonic & Knuckles`
+///    and `Sonic and Knuckles` collapse into the same key. `D&D` becomes
+///    `D and D` — both sides see the same output so equality holds.
+/// 5. Collapse `" - "` and `": "` to a single space.
+/// 6. Strip a leading article (`The /A /An `).
+/// 7. Strip suffix-form articles (`, The` / `, A` / `, An`).
+/// 8. Replace roman numerals up to 3999 with their integer form.
+/// 9. Collapse internal whitespace.
 pub fn normalize_title(input: &str) -> String {
 	lazy_static! {
+		static ref RE_AMPERSAND: Regex = Regex::new(r"\s*&\s*").unwrap();
 		static ref RE_STRIP: Regex = Regex::new(r" - |: ").unwrap();
 		static ref RE_LEADING: Regex = Regex::new(r"^(?i)(the |a |an )").unwrap();
-		// Remove ", The", ", A", ", An" anywhere in the string (case-insensitive)
 		static ref RE_ARTICLE: Regex = Regex::new(r"(?i),\s*(the|a|an)\b").unwrap();
-		static ref RE_ROMAN: Regex = Regex::new(
-			r"\b(?i:M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\b"
-		).unwrap();
+		static ref RE_ROMAN: Regex =
+			Regex::new(r"\b(?i:M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\b").unwrap();
 	}
 
-	// 1. Strip " - " and ": "
-	let mut s = RE_STRIP.replace_all(input, " ").to_string();
+	// Strip ™/®/© before NFKD: ™ NFKD-decomposes to "TM" which would
+	// then leak into the output (and would be impossible to distinguish
+	// from a literal "TM" inside a title like "TMNT").
+	let pre = input.replace(['\u{2122}', '\u{00ae}', '\u{00a9}'], "");
 
-	// 2. Strip leading article
+	let mut s: String = pre.nfkd().filter(|c| !is_combining_mark(*c)).collect();
+
+	s = s.replace(['\u{2018}', '\u{2019}', '\u{0060}'], "'");
+
+	s = RE_AMPERSAND.replace_all(&s, " and ").to_string();
+
+	s = RE_STRIP.replace_all(&s, " ").to_string();
+
 	s = RE_LEADING.replace(&s, "").to_string();
 
-	// 3. Remove all article suffixes (anywhere in string)
 	s = RE_ARTICLE.replace_all(&s, "").to_string();
 
-	// 4. Replace all roman numerals
 	s = RE_ROMAN
 		.replace_all(&s, |caps: &regex::Captures| {
 			let roman = &caps[0];
@@ -103,5 +123,63 @@ mod tests {
 			normalize_title("The Legend of Zelda: Twilight Princess"),
 			"Legend of Zelda Twilight Princess"
 		)
+	}
+
+	#[test]
+	fn diacritic_fold() {
+		assert_eq!(normalize_title("Pokémon Red"), "Pokemon Red");
+		assert_eq!(normalize_title("Café del Mar"), "Cafe del Mar");
+		assert_eq!(normalize_title("Pokémon"), normalize_title("Pokemon"));
+	}
+
+	#[test]
+	fn trademark_strip() {
+		assert_eq!(normalize_title("Madden NFL™"), "Madden NFL");
+		assert_eq!(normalize_title("Tetris®"), "Tetris");
+		assert_eq!(normalize_title("Pong© 2"), "Pong 2");
+	}
+
+	#[test]
+	fn apostrophe_variants_collapse() {
+		let curly = normalize_title("Majora\u{2019}s Mask");
+		let backtick = normalize_title("Majora\u{0060}s Mask");
+		let straight = normalize_title("Majora's Mask");
+		assert_eq!(curly, straight);
+		assert_eq!(backtick, straight);
+	}
+
+	#[test]
+	fn ampersand_to_and() {
+		assert_eq!(
+			normalize_title("Sonic & Knuckles"),
+			normalize_title("Sonic and Knuckles")
+		);
+		assert_eq!(normalize_title("Sonic & Knuckles"), "Sonic and Knuckles");
+	}
+
+	#[test]
+	fn ampersand_no_space() {
+		// `D` happens to be a Roman numeral (500); both sides see the same
+		// transform so equality holds. Use a non-Roman example here.
+		assert_eq!(normalize_title("Tom&Jerry"), "Tom and Jerry");
+	}
+
+	#[test]
+	fn combined_diacritic_apostrophe_trademark() {
+		let a = normalize_title("Pokémon™ Red’s Adventure");
+		let b = normalize_title("Pokemon Red's Adventure");
+		assert_eq!(a, b);
+	}
+
+	#[test]
+	fn clean_name_strips_parens() {
+		assert_eq!(clean_name("Mario (USA)"), "Mario");
+		assert_eq!(clean_name("Mario (USA) (Rev A)"), "Mario");
+		assert_eq!(clean_name("Plain Title"), "Plain Title");
+	}
+
+	#[test]
+	fn clean_name_handles_nested_parens() {
+		assert_eq!(clean_name("Game (Foo (Bar))"), "Game");
 	}
 }
