@@ -8,6 +8,7 @@ pub struct Model {
 	pub id: Uuid,
 	pub launchbox_game_database_id: i64,
 	pub name: String,
+	pub name_normalized: Option<String>,
 	pub region: Option<String>,
 	pub created_at: DateTimeWithTimeZone,
 }

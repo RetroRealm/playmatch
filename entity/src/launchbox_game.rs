@@ -9,6 +9,7 @@ pub struct Model {
 	#[sea_orm(unique)]
 	pub database_id: i64,
 	pub name: String,
+	pub name_normalized: Option<String>,
 	pub platform_name: String,
 	pub release_date: Option<String>,
 	pub release_year: Option<i32>,
