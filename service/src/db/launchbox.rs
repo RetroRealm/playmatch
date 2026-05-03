@@ -4,9 +4,10 @@ use entity::{
 	launchbox_platform,
 };
 use sea_orm::ActiveValue::Set;
-use sea_orm::sea_query::{Expr, Func, OnConflict};
+use sea_orm::sea_query::{CaseStatement, Expr, Func, OnConflict, SimpleExpr};
 use sea_orm::{
-	ColumnTrait, DbConn, DbErr, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect,
+	ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, Order, QueryFilter, QueryOrder, QuerySelect,
+	RelationTrait,
 };
 
 const LB_SEARCH_LIMIT: u64 = 50;
@@ -65,18 +66,13 @@ pub async fn find_lb_game_by_platform_and_alternate_name(
 	name: &str,
 	conn: &DbConn,
 ) -> Result<Option<launchbox_game::Model>, DbErr> {
-	let lower_platform = platform_name.to_lowercase();
-	let lower_name = name.to_lowercase();
 	launchbox_game::Entity::find()
-		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
-			sea_orm::DatabaseBackend::Postgres,
-			r#"SELECT g.* FROM launchbox_game g
-			   INNER JOIN launchbox_game_alternate_name a
-			     ON a.launchbox_game_database_id = g.database_id
-			   WHERE lower(g.platform_name) = $1 AND lower(a.name) = $2
-			   LIMIT 1"#,
-			[lower_platform.into(), lower_name.into()],
-		))
+		.join(
+			JoinType::InnerJoin,
+			launchbox_game::Relation::AlternateName.def(),
+		)
+		.filter(launchbox_game::Column::PlatformName.eq_ignore_case(platform_name))
+		.filter(launchbox_game_alternate_name::Column::Name.eq_ignore_case(name))
 		.one(conn)
 		.await
 }
@@ -104,18 +100,15 @@ pub async fn find_lb_game_by_platform_and_alternate_normalized_name(
 	normalized_name: &str,
 	conn: &DbConn,
 ) -> Result<Option<launchbox_game::Model>, DbErr> {
-	let lower_platform = platform_name.to_lowercase();
-	let lower_norm = normalized_name.to_lowercase();
 	launchbox_game::Entity::find()
-		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
-			sea_orm::DatabaseBackend::Postgres,
-			r#"SELECT g.* FROM launchbox_game g
-			   INNER JOIN launchbox_game_alternate_name a
-			     ON a.launchbox_game_database_id = g.database_id
-			   WHERE lower(g.platform_name) = $1 AND lower(a.name_normalized) = $2
-			   LIMIT 1"#,
-			[lower_platform.into(), lower_norm.into()],
-		))
+		.join(
+			JoinType::InnerJoin,
+			launchbox_game::Relation::AlternateName.def(),
+		)
+		.filter(launchbox_game::Column::PlatformName.eq_ignore_case(platform_name))
+		.filter(
+			launchbox_game_alternate_name::Column::NameNormalized.eq_ignore_case(normalized_name),
+		)
 		.one(conn)
 		.await
 }
@@ -128,30 +121,15 @@ pub async fn find_lb_game_by_platform_and_alternate_name_region_priority(
 	prefer_regions: &[&str],
 	conn: &DbConn,
 ) -> Result<Option<launchbox_game::Model>, DbErr> {
-	let lower_platform = platform_name.to_lowercase();
-	let lower_name = name.to_lowercase();
-	let prefer_array: Vec<String> = prefer_regions.iter().map(|s| (*s).to_string()).collect();
 	launchbox_game::Entity::find()
-		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
-			sea_orm::DatabaseBackend::Postgres,
-			r#"SELECT g.* FROM launchbox_game g
-			   INNER JOIN launchbox_game_alternate_name a
-			     ON a.launchbox_game_database_id = g.database_id
-			   WHERE lower(g.platform_name) = $1 AND lower(a.name) = $2
-			   ORDER BY
-			     CASE
-			       WHEN a.region = ANY($3) THEN 0
-			       WHEN a.region IS NULL THEN 1
-			       ELSE 2
-			     END,
-			     a.region ASC NULLS LAST
-			   LIMIT 1"#,
-			[
-				lower_platform.into(),
-				lower_name.into(),
-				prefer_array.into(),
-			],
-		))
+		.join(
+			JoinType::InnerJoin,
+			launchbox_game::Relation::AlternateName.def(),
+		)
+		.filter(launchbox_game::Column::PlatformName.eq_ignore_case(platform_name))
+		.filter(launchbox_game_alternate_name::Column::Name.eq_ignore_case(name))
+		.order_by(region_priority_case(prefer_regions), Order::Asc)
+		.order_by_asc(launchbox_game_alternate_name::Column::Region)
 		.one(conn)
 		.await
 }
@@ -162,32 +140,33 @@ pub async fn find_lb_game_by_platform_and_alternate_normalized_name_region_prior
 	prefer_regions: &[&str],
 	conn: &DbConn,
 ) -> Result<Option<launchbox_game::Model>, DbErr> {
-	let lower_platform = platform_name.to_lowercase();
-	let lower_norm = normalized_name.to_lowercase();
-	let prefer_array: Vec<String> = prefer_regions.iter().map(|s| (*s).to_string()).collect();
 	launchbox_game::Entity::find()
-		.from_raw_sql(sea_orm::Statement::from_sql_and_values(
-			sea_orm::DatabaseBackend::Postgres,
-			r#"SELECT g.* FROM launchbox_game g
-			   INNER JOIN launchbox_game_alternate_name a
-			     ON a.launchbox_game_database_id = g.database_id
-			   WHERE lower(g.platform_name) = $1 AND lower(a.name_normalized) = $2
-			   ORDER BY
-			     CASE
-			       WHEN a.region = ANY($3) THEN 0
-			       WHEN a.region IS NULL THEN 1
-			       ELSE 2
-			     END,
-			     a.region ASC NULLS LAST
-			   LIMIT 1"#,
-			[
-				lower_platform.into(),
-				lower_norm.into(),
-				prefer_array.into(),
-			],
-		))
+		.join(
+			JoinType::InnerJoin,
+			launchbox_game::Relation::AlternateName.def(),
+		)
+		.filter(launchbox_game::Column::PlatformName.eq_ignore_case(platform_name))
+		.filter(
+			launchbox_game_alternate_name::Column::NameNormalized.eq_ignore_case(normalized_name),
+		)
+		.order_by(region_priority_case(prefer_regions), Order::Asc)
+		.order_by_asc(launchbox_game_alternate_name::Column::Region)
 		.one(conn)
 		.await
+}
+
+fn region_priority_case(prefer_regions: &[&str]) -> SimpleExpr {
+	let region_col = Expr::col((
+		launchbox_game_alternate_name::Entity,
+		launchbox_game_alternate_name::Column::Region,
+	));
+	let prefer_owned: Vec<String> = prefer_regions.iter().map(|s| (*s).to_string()).collect();
+
+	let mut case = CaseStatement::new();
+	if !prefer_owned.is_empty() {
+		case = case.case(region_col.clone().is_in(prefer_owned), 0_i32);
+	}
+	case.case(region_col.is_null(), 1_i32).finally(2_i32).into()
 }
 
 pub async fn find_lb_game_alternate_names(
@@ -264,8 +243,11 @@ pub async fn record_lb_import(
 }
 
 pub async fn truncate_lb_alternate_names_and_images(conn: &DbConn) -> Result<(), DbErr> {
-	use sea_orm::ConnectionTrait;
-	conn.execute_unprepared("TRUNCATE TABLE launchbox_game_alternate_name, launchbox_game_image;")
+	launchbox_game_alternate_name::Entity::delete_many()
+		.exec(conn)
+		.await?;
+	launchbox_game_image::Entity::delete_many()
+		.exec(conn)
 		.await?;
 	Ok(())
 }

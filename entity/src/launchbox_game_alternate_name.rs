@@ -14,6 +14,19 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+	#[sea_orm(
+		belongs_to = "super::launchbox_game::Entity",
+		from = "Column::LaunchboxGameDatabaseId",
+		to = "super::launchbox_game::Column::DatabaseId"
+	)]
+	LaunchboxGame,
+}
+
+impl Related<super::launchbox_game::Entity> for Entity {
+	fn to() -> RelationDef {
+		Relation::LaunchboxGame.def()
+	}
+}
 
 impl ActiveModelBehavior for ActiveModel {}
