@@ -7,22 +7,6 @@ pub(crate) fn clean_name(input: &str) -> String {
 	crate::matching::name_parse::parse_name(input).base
 }
 
-/// Normalise a title for comparison. Both DAT side and candidate side
-/// should pass through this before equality checks.
-///
-/// Pipeline:
-/// 1. NFKD decompose, then strip combining marks (folds diacritics:
-///    `Pokémon` → `Pokemon`).
-/// 2. Strip trademark / copyright glyphs (`™ ® ©`).
-/// 3. Unify apostrophe variants (curly + backtick → `'`).
-/// 4. Replace `&` with `and` (word-boundary tolerant). `Sonic & Knuckles`
-///    and `Sonic and Knuckles` collapse into the same key. `D&D` becomes
-///    `D and D` — both sides see the same output so equality holds.
-/// 5. Collapse `" - "` and `": "` to a single space.
-/// 6. Strip a leading article (`The /A /An `).
-/// 7. Strip suffix-form articles (`, The` / `, A` / `, An`).
-/// 8. Replace roman numerals up to 3999 with their integer form.
-/// 9. Collapse internal whitespace.
 pub fn normalize_title(input: &str) -> String {
 	lazy_static! {
 		static ref RE_AMPERSAND: Regex = Regex::new(r"\s*&\s*").unwrap();
@@ -33,9 +17,8 @@ pub fn normalize_title(input: &str) -> String {
 			Regex::new(r"\b(?i:M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\b").unwrap();
 	}
 
-	// Strip ™/®/© before NFKD: ™ NFKD-decomposes to "TM" which would
-	// then leak into the output (and would be impossible to distinguish
-	// from a literal "TM" inside a title like "TMNT").
+	// ™ NFKD-decomposes to "TM" which would later collide with titles
+	// like "TMNT", so strip the glyphs before NFKD.
 	let pre = input.replace(['\u{2122}', '\u{00ae}', '\u{00a9}'], "");
 
 	let mut s: String = pre.nfkd().filter(|c| !is_combining_mark(*c)).collect();
@@ -159,8 +142,6 @@ mod tests {
 
 	#[test]
 	fn ampersand_no_space() {
-		// `D` happens to be a Roman numeral (500); both sides see the same
-		// transform so equality holds. Use a non-Roman example here.
 		assert_eq!(normalize_title("Tom&Jerry"), "Tom and Jerry");
 	}
 

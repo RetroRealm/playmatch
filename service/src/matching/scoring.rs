@@ -2,24 +2,15 @@ use crate::matching::name_parse::ParsedName;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateVerdict {
-	/// Year and platform pass; year exact-match preferred.
 	AcceptPreferred,
-	/// Year and platform pass; no special preference.
 	Accept,
-	/// Hard reject: year delta >= 2 OR platform list excludes our platform.
 	Reject,
 }
 
-/// Year and platform constraints for a candidate.
-///
-/// Returns `Reject` when:
-/// - DAT and candidate both expose a year and they differ by >= 2, OR
-/// - candidate exposes a non-empty platform list and our DAT-side
-///   platform id is set but not present in that list.
-///
-/// Returns `AcceptPreferred` when both years are present and equal.
-/// Returns `Accept` otherwise (includes the case where either side has
-/// no year, or the candidate has no platform list).
+/// Rejects candidates whose year is >=2 off from the DAT year, or whose
+/// platform list does not include the DAT's platform id. Returns
+/// `AcceptPreferred` on an exact year match. When either side lacks the
+/// data, the corresponding check is skipped.
 pub fn score_candidate(
 	parsed_dat: &ParsedName,
 	candidate_year: Option<u16>,

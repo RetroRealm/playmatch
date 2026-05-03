@@ -169,9 +169,7 @@ fn match_game_to_emuready(
 		}
 
 		for candidate in &candidates {
-			// EmuReady's pre-baked `normalized_title` uses their normalisation
-			// rules, not ours; recompute locally so the comparison stays
-			// consistent under our `normalize_title`.
+			// EmuReady's `normalized_title` uses different rules to ours.
 			let normalised = normalize_title(&candidate.title.to_lowercase());
 			if normalised == cleaned_normalized {
 				debug!(

@@ -32,9 +32,6 @@ pub enum RegionTag {
 }
 
 impl RegionTag {
-	/// ScreenScraper region codes that map to this RegionTag. Used by the
-	/// per-candidate iterator on `SsGame` to prefer regions matching the DAT
-	/// row's `(USA)` / `(Japan)` / etc tags.
 	pub fn ss_codes(&self) -> &'static [&'static str] {
 		match self {
 			RegionTag::World => &["wor"],
@@ -54,10 +51,6 @@ impl RegionTag {
 		}
 	}
 
-	/// LaunchBox stores `region` on alternate names verbatim from its XML
-	/// metadata feed (typical values are full English country / region
-	/// names). These are the strings to feed to the LB region-priority
-	/// SQL finders.
 	pub fn lb_codes(&self) -> &'static [&'static str] {
 		match self {
 			RegionTag::World => &["World"],
@@ -111,14 +104,6 @@ pub enum Lang {
 	Tr,
 }
 
-/// Walk the input, lift `(...)` and `[...]` groups out, classify each, and
-/// return the leftover text as `base` along with the structured fields.
-///
-/// Classification priority (per group):
-/// variant > revision > disc > year > regions > languages > residual.
-///
-/// Square-bracket groups always go to residual; full TOSEC handling is
-/// out of scope here.
 pub fn parse_name(input: &str) -> ParsedName {
 	let mut parsed = ParsedName::default();
 	let mut base = String::with_capacity(input.len());
@@ -425,8 +410,6 @@ mod tests {
 
 	#[test]
 	fn nested_parens() {
-		// Outer paren content is "Foo (Bar)" — currently classifies as residual.
-		// Important: depth-counted walker must NOT leave a stray ')'.
 		let p = parse_name("Game (Foo (Bar))");
 		assert_eq!(p.base, "Game");
 		assert_eq!(p.residual, vec!["Foo (Bar)"]);

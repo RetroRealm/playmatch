@@ -191,12 +191,8 @@ impl SsGame {
 		self.iter_candidate_names_with_region_priority(&[])
 	}
 
-	/// Iterate candidate names preferring the regions listed in `prefer`
-	/// first (in `prefer` order), then the default `REGION_PRIORITY` order
-	/// for regions not already emitted, then any remaining regions.
-	/// Duplicate regions inside `prefer` are de-duplicated. Used by the
-	/// matcher to bias selection toward the DAT row's parsed `(USA)` /
-	/// `(Japan)` / etc tags.
+	/// Emits names in `prefer` order first, then the `REGION_PRIORITY`
+	/// defaults, then any remaining regions.
 	pub fn iter_candidate_names_with_region_priority(
 		&self,
 		prefer: &[&str],

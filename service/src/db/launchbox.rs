@@ -81,12 +81,9 @@ pub async fn find_lb_game_by_platform_and_alternate_name(
 		.await
 }
 
-/// Look up a LaunchBox game by platform and a normalised primary name.
-/// `name_normalized` is populated at LB import time with the same
-/// `normalize_title` the matcher uses on the DAT side, so this is the
-/// only path that hits the normalised rung after stricter normalisation
-/// gained NFKD / symbol / `&`-fold transformations the SQL `lower()`
-/// cannot reproduce.
+/// `name_normalized` is populated at import time with `normalize_title`,
+/// which Postgres `lower()` cannot reproduce (NFKD, symbol stripping,
+/// `&` folding).
 pub async fn find_lb_game_by_platform_and_normalized_name(
 	platform_name: &str,
 	normalized_name: &str,
@@ -102,8 +99,6 @@ pub async fn find_lb_game_by_platform_and_normalized_name(
 		.await
 }
 
-/// Mirror of [`find_lb_game_by_platform_and_normalized_name`] for the
-/// alternate-name table.
 pub async fn find_lb_game_by_platform_and_alternate_normalized_name(
 	platform_name: &str,
 	normalized_name: &str,
@@ -125,11 +120,8 @@ pub async fn find_lb_game_by_platform_and_alternate_normalized_name(
 		.await
 }
 
-/// Same as [`find_lb_game_by_platform_and_alternate_name`] but ranks the
-/// matched alternate-name row by region: alternates whose `region` is in
-/// `prefer_regions` come first, then NULL regions, then everything else.
-/// Returns the first row by that ordering, so the caller does not have to
-/// re-rank in Rust. Empty `prefer_regions` reduces to "any matching alt".
+/// Order: rows whose `region` is in `prefer_regions` first, then NULL
+/// regions, then everything else.
 pub async fn find_lb_game_by_platform_and_alternate_name_region_priority(
 	platform_name: &str,
 	name: &str,
@@ -164,8 +156,6 @@ pub async fn find_lb_game_by_platform_and_alternate_name_region_priority(
 		.await
 }
 
-/// Mirror of [`find_lb_game_by_platform_and_alternate_name_region_priority`]
-/// for the normalised alt-name column.
 pub async fn find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
 	platform_name: &str,
 	normalized_name: &str,

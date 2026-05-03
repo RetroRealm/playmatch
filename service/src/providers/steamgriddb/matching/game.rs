@@ -4,10 +4,8 @@ use crate::db::game::{
 	get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 };
 use crate::db::signature_metadata_mapping::find_signature_metadata_mapping_by_platform_game_company_and_provider;
-// SteamGridDB does not expose platform or release-year info in any of its
-// API responses, so the year/platform candidate gate is intentionally not
-// applied here. SGDB precision tightening (cross-provider Steam appid
-// handoff, scored ladder) is tracked for Tier 2.
+// SteamGridDB returns neither platform nor release year, so there is no
+// year / platform gate to apply on the candidate side here.
 use crate::matching::name_parse::parse_name;
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::steamgriddb::SteamGridDbClient;
