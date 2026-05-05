@@ -27,7 +27,7 @@ where
 	Value: for<'a> From<&'a str>,
 {
 	fn eq_ignore_case(self, value: &str) -> SimpleExpr {
-		// LOWER(value) = LOWER($1)
-		Expr::expr(Func::lower(Expr::col(self))).eq(Expr::value(value.to_lowercase()))
+		Expr::expr(Func::lower(Expr::col(self.as_column_ref())))
+			.eq(Expr::value(value.to_lowercase()))
 	}
 }
