@@ -495,6 +495,33 @@ mod tests {
 	}
 
 	#[test]
+	fn hack_no_intro_shape() {
+		let p = parse_name("Super Mario Bros. (USA) (Hack)");
+		assert_eq!(p.base, "Super Mario Bros.");
+		assert_eq!(p.regions, vec![RegionTag::Usa]);
+		assert_eq!(p.variant, Some(Variant::Hack));
+	}
+
+	#[test]
+	fn pirate_no_intro_shape() {
+		let p = parse_name("Some Game (Pirate)");
+		assert_eq!(p.base, "Some Game");
+		assert_eq!(p.variant, Some(Variant::Pirate));
+	}
+
+	#[test]
+	fn unl_short_form() {
+		let p = parse_name("Tetris (Unl)");
+		assert_eq!(p.variant, Some(Variant::Unlicensed));
+	}
+
+	#[test]
+	fn unlicensed_long_form() {
+		let p = parse_name("Tetris (Unlicensed)");
+		assert_eq!(p.variant, Some(Variant::Unlicensed));
+	}
+
+	#[test]
 	fn ss_codes_japan() {
 		assert_eq!(RegionTag::Japan.ss_codes(), &["jp"]);
 	}

@@ -163,4 +163,11 @@ mod tests {
 	fn clean_name_handles_nested_parens() {
 		assert_eq!(clean_name("Game (Foo (Bar))"), "Game");
 	}
+
+	#[test]
+	fn clean_name_strips_hack_pirate_unl_tags() {
+		assert_eq!(clean_name("Mario (USA) (Hack)"), "Mario");
+		assert_eq!(clean_name("Tetris (Unl)"), "Tetris");
+		assert_eq!(clean_name("Sonic (Pirate)"), "Sonic");
+	}
 }
