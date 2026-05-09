@@ -124,6 +124,12 @@ impl ScreenScraperClient {
 	}
 
 	pub async fn search_games(&self, system_id: i32, term: &str) -> anyhow::Result<Vec<SsGame>> {
+		// ScreenScraper's jeuRecherche.php rejects searches shorter than 3
+		// characters with HTTP 400, so skip the round-trip entirely.
+		if term.trim().chars().count() < 3 {
+			debug!("screenscraper search_games skipped: term too short ({term:?})");
+			return Ok(vec![]);
+		}
 		let url = self.url(
 			"jeuRecherche.php",
 			&[
@@ -301,7 +307,10 @@ impl ScreenScraperClient {
 					"screenscraper rejected the request with HTTP {s} (server overloaded or thread limit), aborting cycle"
 				))
 			}
-			s if !s.is_success() => Err(anyhow!("screenscraper returned non-success status: {s}")),
+			s if !s.is_success() => Err(anyhow!(
+				"screenscraper returned non-success status: {s} (body preview: {:?})",
+				body_preview(&body)
+			)),
 			_ if body.is_empty() => Ok(None),
 			_ => {
 				parse_or_incident(&body, content_type.as_deref())?;
@@ -455,6 +464,15 @@ fn url_for_log(url: &Url) -> String {
 	sanitised.to_string()
 }
 
+/// Trims the body for inclusion in error messages on non-success statuses.
+/// Error responses do not contain the `ssuser` block (that only rides on
+/// success envelopes), so they are safe to log unredacted within a short cap.
+fn body_preview(body: &str) -> String {
+	const LIMIT: usize = 256;
+	let collapsed: String = body.split_whitespace().collect::<Vec<_>>().join(" ");
+	collapsed.chars().take(LIMIT).collect()
+}
+
 /// Returns `Err` when the body looks like a French incident message or the
 /// content type is not JSON, so the caller does not try to parse the body and
 /// the per-game match logs an error instead of aborting the whole cycle.
@@ -543,6 +561,14 @@ mod tests {
 	fn parse_or_incident_rejects_non_json_content_type() {
 		let body = "{\"jeu\": {\"id\": \"1\"}}";
 		assert!(parse_or_incident(body, Some("text/html; charset=utf-8")).is_err());
+	}
+
+	#[test]
+	fn body_preview_collapses_whitespace_and_caps_length() {
+		let body = "Recherche\n\ntrop\tcourte";
+		assert_eq!(body_preview(body), "Recherche trop courte");
+		let long: String = "a".repeat(1024);
+		assert_eq!(body_preview(&long).chars().count(), 256);
 	}
 
 	#[test]
