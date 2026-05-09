@@ -7,9 +7,12 @@ use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
 use crate::matching::name_parse::parse_name;
-use crate::matching::scoring::{CandidateVerdict, score_candidate};
+use crate::matching::scoring::{
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::igdb::IgdbClient;
+use crate::providers::igdb::model::Game as IgdbGame;
 use crate::providers::{
 	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
 	write_auto_match_success,
@@ -72,10 +75,6 @@ fn match_clone_of_game_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
-	// Basic idea, first check if the parent game is matched to IGDB,
-	// if yes, then we match to the same igdb id,
-	// otherwise we try to match the game to igdb, if it succeeds, we apply the same igdb to the parent game
-
 	Box::pin(async move {
 		let mut redis_conn = igdb_client.redis_conn().clone();
 		let parent_game = find_game_parent(&game, &db_conn).await?;
@@ -101,7 +100,7 @@ fn match_clone_of_game_to_igdb(
 					parent_game_igdb_mapping.provider_id.clone().unwrap(),
 					AutomaticMatchReasonEnum::ViaParent,
 					parent_game_igdb_mapping.matched_name.clone(),
-					None,
+					parent_game_igdb_mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -129,7 +128,7 @@ fn match_clone_of_game_to_igdb(
 					mapping.provider_id.unwrap(),
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -143,6 +142,12 @@ fn match_clone_of_game_to_igdb(
 	})
 }
 
+struct ScoredCand<'a> {
+	cand: &'a IgdbGame,
+	score: CandidateScore,
+	year: Option<i16>,
+}
+
 fn match_game_to_igdb(
 	game: Model,
 	igdb_client: Arc<IgdbClient>,
@@ -154,138 +159,161 @@ fn match_game_to_igdb(
 
 		let parsed_dat = parse_name(&game.name);
 		let clean_name = parsed_dat.base.to_lowercase();
+		let clean_name_normalized = normalize_title(&clean_name);
 
 		let search_results = igdb_client
 			.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 			.await?;
 
-		for search_result in search_results {
-			let candidate_year = search_result
-				.first_release_date
-				.and_then(year_from_unix_seconds);
-			let candidate_platforms_i64 = search_result
+		let mut direct: Vec<ScoredCand<'_>> = vec![];
+		let mut normalized: Vec<ScoredCand<'_>> = vec![];
+		let mut needs_alt: Vec<(&IgdbGame, CandidateScore, Option<i16>)> = vec![];
+
+		for c in &search_results {
+			let candidate_year = c.first_release_date.and_then(year_from_unix_seconds);
+			let candidate_platforms_i64 = c
 				.platforms
 				.as_ref()
 				.map(|v| v.iter().map(|p| *p as i64).collect::<Vec<_>>());
-			if score_candidate(
+			let parsed_cand = parse_name(&c.name);
+			let gate = gate_and_score(
 				&parsed_dat,
+				Some(&parsed_cand),
 				candidate_year,
+				&[],
+				&[],
 				candidate_platforms_i64.as_deref(),
 				Some(platform_igdb_id as i64),
-			) == CandidateVerdict::Reject
-			{
-				debug!(
-					"Skipping IGDB candidate id={} for Game \"{}\": rejected by year/platform gate",
-					search_result.id, &game.name
-				);
+				&[],
+			);
+			let score = match gate {
+				CandidateGate::Reject => continue,
+				CandidateGate::Pass(s) => s,
+			};
+			let year_i16 = candidate_year.and_then(|y| i16::try_from(y).ok());
+
+			let cand_lower = c.name.to_lowercase();
+			if cand_lower == clean_name {
+				direct.push(ScoredCand {
+					cand: c,
+					score,
+					year: year_i16,
+				});
 				continue;
 			}
+			if normalize_title(&cand_lower) == clean_name_normalized {
+				normalized.push(ScoredCand {
+					cand: c,
+					score,
+					year: year_i16,
+				});
+				continue;
+			}
+			if c.alternative_names.is_some() {
+				needs_alt.push((c, score, year_i16));
+			}
+		}
 
-			let search_result_name = search_result.name.to_lowercase();
-
-			if search_result_name == clean_name {
-				debug!(
-					"Matched Game \"{}\" to IGDB Game ID {} (Direct Match)",
-					&clean_name, search_result.id
-				);
-				write_auto_match_success(
-					"igdb",
-					MetadataProviderEnum::Igdb,
-					Target::Game(game.id),
-					search_result.id.to_string(),
+		match pick_best(direct.iter().map(|s| (s, s.score))) {
+			Selection::Best(s) => {
+				return write_match(
+					&db_conn,
+					&mut redis_conn,
+					&game,
+					s.cand,
+					s.year,
 					AutomaticMatchReasonEnum::DirectName,
-					Some(search_result.name.clone()),
-					None,
+					"Direct Match",
+				)
+				.await;
+			}
+			Selection::Ambiguous => {
+				return write_ambiguous(&db_conn, &mut redis_conn, &game).await;
+			}
+			Selection::None => {}
+		}
+
+		match pick_best(normalized.iter().map(|s| (s, s.score))) {
+			Selection::Best(s) => {
+				return write_match(
 					&db_conn,
 					&mut redis_conn,
-				)
-				.await?;
-
-				return Ok(());
-			}
-
-			let search_result_name_normalized = normalize_title(&search_result_name);
-			let clean_name_normalized = normalize_title(&clean_name);
-
-			if search_result_name_normalized == clean_name_normalized {
-				debug!(
-					"Matched Game \"{}\" to IGDB Game ID {} (Normalized Name Match)",
-					&clean_name, search_result.id
-				);
-				write_auto_match_success(
-					"igdb",
-					MetadataProviderEnum::Igdb,
-					Target::Game(game.id),
-					search_result.id.to_string(),
+					&game,
+					s.cand,
+					s.year,
 					AutomaticMatchReasonEnum::NormalizedName,
-					Some(search_result.name.clone()),
-					None,
-					&db_conn,
-					&mut redis_conn,
+					"Normalized Name Match",
 				)
-				.await?;
-
-				return Ok(());
+				.await;
 			}
+			Selection::Ambiguous => {
+				return write_ambiguous(&db_conn, &mut redis_conn, &game).await;
+			}
+			Selection::None => {}
+		}
 
-			if let Some(alternative_names) = search_result.alternative_names {
-				debug!(
-					"Game {} has no direct match but has alternative names, checking alternative names...",
-					&clean_name
-				);
-
-				let alternative_names_resolved = igdb_client
-					.get_alternative_names_by_id(alternative_names)
-					.await?;
-
-				for alternative_name in alternative_names_resolved {
-					let alternative_name_lower = alternative_name.name.to_lowercase();
-
-					if alternative_name_lower == clean_name {
-						debug!(
-							"Matched Game \"{}\" to IGDB Game ID {} (Alternative Name Match)",
-							&clean_name, search_result.id
-						);
-						write_auto_match_success(
-							"igdb",
-							MetadataProviderEnum::Igdb,
-							Target::Game(game.id),
-							search_result.id.to_string(),
-							AutomaticMatchReasonEnum::AlternativeName,
-							Some(search_result.name.clone()),
-							None,
-							&db_conn,
-							&mut redis_conn,
-						)
-						.await?;
-
-						return Ok(());
-					}
-
-					let alternative_name_normalized = normalize_title(&alternative_name_lower);
-
-					if alternative_name_normalized == clean_name_normalized {
-						debug!(
-							"Matched Game \"{}\" to IGDB Game ID {} (Normalized Alternative Name Match)",
-							&clean_name, search_result.id
-						);
-						write_auto_match_success(
-							"igdb",
-							MetadataProviderEnum::Igdb,
-							Target::Game(game.id),
-							search_result.id.to_string(),
-							AutomaticMatchReasonEnum::NormalizedAlternativeName,
-							Some(search_result.name.clone()),
-							None,
-							&db_conn,
-							&mut redis_conn,
-						)
-						.await?;
-
-						return Ok(());
-					}
+		let mut alt_direct: Vec<ScoredCand<'_>> = vec![];
+		let mut alt_normalized: Vec<ScoredCand<'_>> = vec![];
+		for (c, score, year_i16) in &needs_alt {
+			let alt_ids = c.alternative_names.clone().expect("filtered above");
+			let alt_resolved = igdb_client.get_alternative_names_by_id(alt_ids).await?;
+			for alt in alt_resolved {
+				let alt_lower = alt.name.to_lowercase();
+				if alt_lower == clean_name {
+					alt_direct.push(ScoredCand {
+						cand: c,
+						score: *score,
+						year: *year_i16,
+					});
+					break;
+				}
+				if normalize_title(&alt_lower) == clean_name_normalized {
+					alt_normalized.push(ScoredCand {
+						cand: c,
+						score: *score,
+						year: *year_i16,
+					});
+					break;
 				}
 			}
+		}
+
+		match pick_best(alt_direct.iter().map(|s| (s, s.score))) {
+			Selection::Best(s) => {
+				return write_match(
+					&db_conn,
+					&mut redis_conn,
+					&game,
+					s.cand,
+					s.year,
+					AutomaticMatchReasonEnum::AlternativeName,
+					"Alternative Name Match",
+				)
+				.await;
+			}
+			Selection::Ambiguous => {
+				return write_ambiguous(&db_conn, &mut redis_conn, &game).await;
+			}
+			Selection::None => {}
+		}
+
+		match pick_best(alt_normalized.iter().map(|s| (s, s.score))) {
+			Selection::Best(s) => {
+				return write_match(
+					&db_conn,
+					&mut redis_conn,
+					&game,
+					s.cand,
+					s.year,
+					AutomaticMatchReasonEnum::NormalizedAlternativeName,
+					"Normalized Alternative Name Match",
+				)
+				.await;
+			}
+			Selection::Ambiguous => {
+				return write_ambiguous(&db_conn, &mut redis_conn, &game).await;
+			}
+			Selection::None => {}
 		}
 
 		debug!("No match found for Game \"{}\"", &clean_name);
@@ -301,6 +329,53 @@ fn match_game_to_igdb(
 
 		Ok(())
 	})
+}
+
+async fn write_match(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	cand: &IgdbGame,
+	year: Option<i16>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<()> {
+	debug!(
+		"Matched Game \"{}\" to IGDB Game ID {} ({label})",
+		&game.name, cand.id
+	);
+	write_auto_match_success(
+		"igdb",
+		MetadataProviderEnum::Igdb,
+		Target::Game(game.id),
+		cand.id.to_string(),
+		reason,
+		Some(cand.name.clone()),
+		year,
+		db_conn,
+		redis_conn,
+	)
+	.await
+}
+
+async fn write_ambiguous(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+) -> anyhow::Result<()> {
+	debug!(
+		"Refusing to match Game \"{}\" on IGDB: candidates tied at the top of the score",
+		&game.name
+	);
+	write_auto_match_failed(
+		"igdb",
+		MetadataProviderEnum::Igdb,
+		Target::Game(game.id),
+		FailedMatchReasonEnum::Ambiguous,
+		db_conn,
+		redis_conn,
+	)
+	.await
 }
 
 async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Result<i32> {
@@ -339,21 +414,19 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 		));
 	}
 
-	let platform_id_parsed = platform_igdb_metadata_mapping
-		.provider_id
-		.map(|id| id.parse::<i32>().unwrap());
+	let raw = platform_igdb_metadata_mapping.provider_id.ok_or_else(|| {
+		anyhow::anyhow!(
+			"Platform {} is missing its igdb id on its metadata mapping, this shouldn't happen...",
+			&platform.name
+		)
+	})?;
 
-	let platform_igdb_id = match platform_id_parsed {
-		None => {
-			return Err(anyhow::anyhow!(
-				"Platform {} is missing its igdb id on its metadata mapping, this shouldn't happen...",
-				&platform.name
-			));
-		}
-		Some(platform_igdb_id) => platform_igdb_id,
-	};
-
-	Ok(platform_igdb_id)
+	raw.parse::<i32>().map_err(|e| {
+		anyhow::anyhow!(
+			"Platform {} has a non-numeric igdb provider_id ({raw}): {e}",
+			&platform.name
+		)
+	})
 }
 
 pub fn match_game_via_sibling_name_igdb(
@@ -380,81 +453,176 @@ pub fn match_game_via_sibling_name_igdb(
 				.search_game_by_name_and_platform(&q, platform_igdb_id)
 				.await?;
 
+			let mut direct: Vec<ScoredCand<'_>> = vec![];
+			let mut normalized: Vec<ScoredCand<'_>> = vec![];
+			let mut needs_alt: Vec<(&IgdbGame, CandidateScore, Option<i16>)> = vec![];
+
 			for c in &candidates {
 				let candidate_year = c.first_release_date.and_then(year_from_unix_seconds);
 				let candidate_platforms_i64 = c
 					.platforms
 					.as_ref()
 					.map(|v| v.iter().map(|p| *p as i64).collect::<Vec<_>>());
-				if score_candidate(
+				let parsed_cand = parse_name(&c.name);
+				let gate = gate_and_score(
 					&parsed_dat,
+					Some(&parsed_cand),
 					candidate_year,
+					&[],
+					&[],
 					candidate_platforms_i64.as_deref(),
 					Some(platform_igdb_id as i64),
-				) == CandidateVerdict::Reject
-				{
+					&[],
+				);
+				let score = match gate {
+					CandidateGate::Reject => continue,
+					CandidateGate::Pass(s) => s,
+				};
+				let year_i16 = candidate_year.and_then(|y| i16::try_from(y).ok());
+
+				let cand_lower = c.name.to_lowercase();
+				if cand_lower == q {
+					direct.push(ScoredCand {
+						cand: c,
+						score,
+						year: year_i16,
+					});
 					continue;
 				}
-
-				if c.name.to_lowercase() == q {
-					debug!(
-						"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" (Direct)",
-						&game.name, c.id, &sibling
-					);
-					write_auto_match_success(
-						"igdb",
-						MetadataProviderEnum::Igdb,
-						Target::Game(game.id),
-						c.id.to_string(),
-						AutomaticMatchReasonEnum::CrossProviderDirectName,
-						Some(c.name.clone()),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
+				if normalize_title(&cand_lower) == q_norm {
+					normalized.push(ScoredCand {
+						cand: c,
+						score,
+						year: year_i16,
+					});
+					continue;
+				}
+				if c.alternative_names.is_some() {
+					needs_alt.push((c, score, year_i16));
 				}
 			}
-			for c in &candidates {
-				let candidate_year = c.first_release_date.and_then(year_from_unix_seconds);
-				let candidate_platforms_i64 = c
-					.platforms
-					.as_ref()
-					.map(|v| v.iter().map(|p| *p as i64).collect::<Vec<_>>());
-				if score_candidate(
-					&parsed_dat,
-					candidate_year,
-					candidate_platforms_i64.as_deref(),
-					Some(platform_igdb_id as i64),
-				) == CandidateVerdict::Reject
-				{
-					continue;
-				}
 
-				if normalize_title(&c.name.to_lowercase()) == q_norm {
-					debug!(
-						"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" (Normalized)",
-						&game.name, c.id, &sibling
-					);
-					write_auto_match_success(
-						"igdb",
-						MetadataProviderEnum::Igdb,
-						Target::Game(game.id),
-						c.id.to_string(),
-						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-						Some(c.name.clone()),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(direct.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Direct",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+
+			let mut alt_direct: Vec<ScoredCand<'_>> = vec![];
+			let mut alt_normalized: Vec<ScoredCand<'_>> = vec![];
+			for (c, score, year_i16) in &needs_alt {
+				let alt_ids = c.alternative_names.clone().expect("filtered above");
+				let alt_resolved = igdb_client.get_alternative_names_by_id(alt_ids).await?;
+				for alt in alt_resolved {
+					let alt_lower = alt.name.to_lowercase();
+					if alt_lower == q {
+						alt_direct.push(ScoredCand {
+							cand: c,
+							score: *score,
+							year: *year_i16,
+						});
+						break;
+					}
+					if normalize_title(&alt_lower) == q_norm {
+						alt_normalized.push(ScoredCand {
+							cand: c,
+							score: *score,
+							year: *year_i16,
+						});
+						break;
+					}
 				}
+			}
+
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(alt_direct.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Alternative",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized Alternative",
+			)
+			.await?
+			{
+				return Ok(());
 			}
 		}
 		Ok(())
 	})
+}
+
+async fn try_write_cross(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	sibling: &str,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<bool> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Cross-matched Game \"{}\" to IGDB Game ID {} via sibling \"{}\" ({label})",
+				&game.name, s.cand.id, sibling
+			);
+			write_auto_match_success(
+				"igdb",
+				MetadataProviderEnum::Igdb,
+				Target::Game(game.id),
+				s.cand.id.to_string(),
+				reason,
+				Some(s.cand.name.clone()),
+				s.year,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::Ambiguous => {
+			write_ambiguous(db_conn, redis_conn, game).await?;
+			Ok(true)
+		}
+		Selection::None => Ok(false),
+	}
 }
 
 fn year_from_unix_seconds(secs: i64) -> Option<u16> {

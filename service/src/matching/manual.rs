@@ -84,7 +84,7 @@ async fn apply_manual_entity_match(
 	};
 
 	if let Some(mapping) = existing_mapping {
-		if mapping.match_type != MatchTypeEnum::Failed || mapping.match_type != MatchTypeEnum::None
+		if mapping.match_type != MatchTypeEnum::Failed && mapping.match_type != MatchTypeEnum::None
 		{
 			debug!(
 				"Overwriting existing mapping for {}: {entity_id}",
@@ -227,7 +227,7 @@ pub async fn apply_manual_game_match_by_game(
 
 		if let Some(mapping) = mapping {
 			if mapping.match_type != MatchTypeEnum::Failed
-				|| mapping.match_type != MatchTypeEnum::None
+				&& mapping.match_type != MatchTypeEnum::None
 			{
 				debug!("Overwriting existing mapping for game: {}", game.id);
 				// TODO: decide how to notify the user that this entry is already matched

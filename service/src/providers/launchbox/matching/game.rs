@@ -11,7 +11,8 @@ use crate::db::launchbox::{
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
-use crate::matching::name_parse::parse_name;
+use crate::matching::name_parse::{ParsedName, parse_name};
+use crate::matching::scoring::{CandidateGate, gate_and_score};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::launchbox::LaunchBoxClient;
@@ -19,6 +20,7 @@ use crate::providers::{
 	Target, drive_match_pipeline, write_auto_match_failed, write_auto_match_success,
 };
 use entity::game::Model;
+use entity::launchbox_game;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
@@ -101,7 +103,7 @@ fn match_clone_of_game_to_launchbox(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -127,7 +129,7 @@ fn match_clone_of_game_to_launchbox(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -137,6 +139,28 @@ fn match_clone_of_game_to_launchbox(
 
 		Ok(())
 	})
+}
+
+fn lb_year(found: &launchbox_game::Model) -> Option<i16> {
+	found.release_year.and_then(|y| i16::try_from(y).ok())
+}
+
+fn lb_passes_gate(parsed_dat: &ParsedName, found: &launchbox_game::Model) -> bool {
+	let parsed_cand = parse_name(&found.name);
+	let candidate_year = found.release_year.and_then(|y| u16::try_from(y).ok());
+	matches!(
+		gate_and_score(
+			parsed_dat,
+			Some(&parsed_cand),
+			candidate_year,
+			&[],
+			&[],
+			None,
+			None,
+			&[]
+		),
+		CandidateGate::Pass(_)
+	)
 }
 
 fn match_game_to_launchbox(
@@ -159,6 +183,7 @@ fn match_game_to_launchbox(
 
 		if let Some(found) =
 			find_lb_game_by_platform_and_name(&platform_name, &cleaned, &db_conn).await?
+			&& lb_passes_gate(&parsed_dat, &found)
 		{
 			debug!(
 				"Matched Game \"{}\" to LaunchBox Game ID {} (Direct Match)",
@@ -171,7 +196,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::DirectName,
 				Some(found.name.clone()),
-				None,
+				lb_year(&found),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -185,7 +210,7 @@ fn match_game_to_launchbox(
 			&dat_lb_regions,
 			&db_conn,
 		)
-		.await?
+		.await? && lb_passes_gate(&parsed_dat, &found)
 		{
 			debug!(
 				"Matched Game \"{}\" to LaunchBox Game ID {} (Alternative Name)",
@@ -198,7 +223,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::AlternativeName,
 				Some(found.name.clone()),
-				None,
+				lb_year(&found),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -211,7 +236,7 @@ fn match_game_to_launchbox(
 			&cleaned_normalized,
 			&db_conn,
 		)
-		.await?
+		.await? && lb_passes_gate(&parsed_dat, &found)
 		{
 			debug!(
 				"Matched Game \"{}\" to LaunchBox Game ID {} (Normalized Match)",
@@ -224,7 +249,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::NormalizedName,
 				Some(found.name.clone()),
-				None,
+				lb_year(&found),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -238,7 +263,7 @@ fn match_game_to_launchbox(
 			&dat_lb_regions,
 			&db_conn,
 		)
-		.await?
+		.await? && lb_passes_gate(&parsed_dat, &found)
 		{
 			debug!(
 				"Matched Game \"{}\" to LaunchBox Game ID {} (Normalized Alternative Name)",
@@ -251,7 +276,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::NormalizedAlternativeName,
 				Some(found.name.clone()),
-				None,
+				lb_year(&found),
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -346,6 +371,7 @@ pub fn match_game_via_sibling_name_launchbox(
 
 			if let Some(found) =
 				find_lb_game_by_platform_and_name(&platform_name, &q, &db_conn).await?
+				&& lb_passes_gate(&parsed_dat, &found)
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct)",
@@ -357,8 +383,8 @@ pub fn match_game_via_sibling_name_launchbox(
 					Target::Game(game.id),
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderDirectName,
-					Some(found.name),
-					None,
+					Some(found.name.clone()),
+					lb_year(&found),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -372,7 +398,7 @@ pub fn match_game_via_sibling_name_launchbox(
 				&dat_lb_regions,
 				&db_conn,
 			)
-			.await?
+			.await? && lb_passes_gate(&parsed_dat, &found)
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct alt)",
@@ -384,8 +410,8 @@ pub fn match_game_via_sibling_name_launchbox(
 					Target::Game(game.id),
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderDirectName,
-					Some(found.name),
-					None,
+					Some(found.name.clone()),
+					lb_year(&found),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -395,7 +421,7 @@ pub fn match_game_via_sibling_name_launchbox(
 
 			if let Some(found) =
 				find_lb_game_by_platform_and_normalized_name(&platform_name, &q_norm, &db_conn)
-					.await?
+					.await? && lb_passes_gate(&parsed_dat, &found)
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized)",
@@ -407,8 +433,8 @@ pub fn match_game_via_sibling_name_launchbox(
 					Target::Game(game.id),
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-					Some(found.name),
-					None,
+					Some(found.name.clone()),
+					lb_year(&found),
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -423,7 +449,7 @@ pub fn match_game_via_sibling_name_launchbox(
 					&dat_lb_regions,
 					&db_conn,
 				)
-				.await?
+				.await? && lb_passes_gate(&parsed_dat, &found)
 			{
 				debug!(
 					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized alt)",
@@ -435,8 +461,8 @@ pub fn match_game_via_sibling_name_launchbox(
 					Target::Game(game.id),
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-					Some(found.name),
-					None,
+					Some(found.name.clone()),
+					lb_year(&found),
 					&db_conn,
 					&mut redis_conn,
 				)

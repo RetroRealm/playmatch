@@ -4,11 +4,13 @@ use crate::db::game::{
 	get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 };
 use crate::db::signature_metadata_mapping::find_signature_metadata_mapping_by_platform_game_company_and_provider;
-// SteamGridDB returns neither platform nor release year, so there is no
-// year / platform gate to apply on the candidate side here.
 use crate::matching::name_parse::parse_name;
+use crate::matching::scoring::{
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::steamgriddb::SteamGridDbClient;
+use crate::providers::steamgriddb::model::SgdbGame;
 use crate::providers::{
 	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,
 	write_auto_match_success,
@@ -103,7 +105,7 @@ fn match_clone_of_game_to_steamgriddb(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -136,7 +138,7 @@ fn match_clone_of_game_to_steamgriddb(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -146,6 +148,11 @@ fn match_clone_of_game_to_steamgriddb(
 
 		Ok(())
 	})
+}
+
+struct ScoredCand<'a> {
+	cand: &'a SgdbGame,
+	score: CandidateScore,
 }
 
 fn match_game_to_steamgriddb(
@@ -161,50 +168,59 @@ fn match_game_to_steamgriddb(
 
 		let candidates = client.search_games(&cleaned).await?;
 
-		for candidate in &candidates {
-			let candidate_lower = candidate.name.to_lowercase();
-			if candidate_lower == cleaned {
-				debug!(
-					"Matched Game \"{}\" to SteamGridDB Game ID {} (Direct Match)",
-					&cleaned, candidate.id
-				);
-				write_auto_match_success(
-					"steamgriddb",
-					MetadataProviderEnum::Steamgriddb,
-					Target::Game(game.id),
-					candidate.id.to_string(),
-					AutomaticMatchReasonEnum::DirectName,
-					Some(candidate.name.clone()),
-					None,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-				return Ok(());
+		let mut direct: Vec<ScoredCand<'_>> = vec![];
+		let mut normalized: Vec<ScoredCand<'_>> = vec![];
+
+		for c in &candidates {
+			let parsed_cand = parse_name(&c.name);
+			let gate = gate_and_score(
+				&parsed_dat,
+				Some(&parsed_cand),
+				None,
+				&[],
+				&[],
+				None,
+				None,
+				&[],
+			);
+			let score = match gate {
+				CandidateGate::Reject => continue,
+				CandidateGate::Pass(s) => s,
+			};
+
+			let lower = c.name.to_lowercase();
+			if lower == cleaned {
+				direct.push(ScoredCand { cand: c, score });
+				continue;
+			}
+			if normalize_title(&lower) == cleaned_normalized {
+				normalized.push(ScoredCand { cand: c, score });
 			}
 		}
 
-		for candidate in &candidates {
-			let candidate_lower = candidate.name.to_lowercase();
-			if normalize_title(&candidate_lower) == cleaned_normalized {
-				debug!(
-					"Matched Game \"{}\" to SteamGridDB Game ID {} (Normalized Name Match)",
-					&cleaned, candidate.id
-				);
-				write_auto_match_success(
-					"steamgriddb",
-					MetadataProviderEnum::Steamgriddb,
-					Target::Game(game.id),
-					candidate.id.to_string(),
-					AutomaticMatchReasonEnum::NormalizedName,
-					Some(candidate.name.clone()),
-					None,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-				return Ok(());
-			}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(direct.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::DirectName,
+			"Direct Match",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(normalized.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedName,
+			"Normalized Match",
+		)
+		.await?
+		{
+			return Ok(());
 		}
 
 		debug!("No SteamGridDB match found for Game \"{}\"", &cleaned);
@@ -220,6 +236,50 @@ fn match_game_to_steamgriddb(
 
 		Ok(())
 	})
+}
+
+async fn run_rung(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<Option<()>> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Matched Game \"{}\" to SteamGridDB Game ID {} ({label})",
+				&game.name, s.cand.id
+			);
+			write_auto_match_success(
+				"steamgriddb",
+				MetadataProviderEnum::Steamgriddb,
+				Target::Game(game.id),
+				s.cand.id.to_string(),
+				reason,
+				Some(s.cand.name.clone()),
+				None,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::Ambiguous => {
+			write_auto_match_failed(
+				"steamgriddb",
+				MetadataProviderEnum::Steamgriddb,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::None => Ok(None),
+	}
 }
 
 pub fn match_game_via_sibling_name_steamgriddb(
@@ -243,49 +303,108 @@ pub fn match_game_via_sibling_name_steamgriddb(
 			let q_norm = normalize_title(&q);
 			let candidates = client.search_games(&q).await?;
 
+			let mut direct: Vec<ScoredCand<'_>> = vec![];
+			let mut normalized: Vec<ScoredCand<'_>> = vec![];
+
 			for c in &candidates {
-				if c.name.to_lowercase() == q {
-					debug!(
-						"Cross-matched Game \"{}\" to SteamGridDB Game ID {} via sibling \"{}\" (Direct)",
-						&game.name, c.id, &sibling
-					);
-					write_auto_match_success(
-						"steamgriddb",
-						MetadataProviderEnum::Steamgriddb,
-						Target::Game(game.id),
-						c.id.to_string(),
-						AutomaticMatchReasonEnum::CrossProviderDirectName,
-						Some(c.name.clone()),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
+				let parsed_cand = parse_name(&c.name);
+				let gate = gate_and_score(
+					&parsed_dat,
+					Some(&parsed_cand),
+					None,
+					&[],
+					&[],
+					None,
+					None,
+					&[],
+				);
+				let score = match gate {
+					CandidateGate::Reject => continue,
+					CandidateGate::Pass(s) => s,
+				};
+
+				let lower = c.name.to_lowercase();
+				if lower == q {
+					direct.push(ScoredCand { cand: c, score });
+					continue;
+				}
+				if normalize_title(&lower) == q_norm {
+					normalized.push(ScoredCand { cand: c, score });
 				}
 			}
-			for c in &candidates {
-				if normalize_title(&c.name.to_lowercase()) == q_norm {
-					debug!(
-						"Cross-matched Game \"{}\" to SteamGridDB Game ID {} via sibling \"{}\" (Normalized)",
-						&game.name, c.id, &sibling
-					);
-					write_auto_match_success(
-						"steamgriddb",
-						MetadataProviderEnum::Steamgriddb,
-						Target::Game(game.id),
-						c.id.to_string(),
-						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-						Some(c.name.clone()),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
-				}
+
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(direct.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Direct",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized",
+			)
+			.await?
+			{
+				return Ok(());
 			}
 		}
 		Ok(())
 	})
+}
+
+async fn try_write_cross(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	sibling: &str,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<bool> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Cross-matched Game \"{}\" to SteamGridDB Game ID {} via sibling \"{}\" ({label})",
+				&game.name, s.cand.id, sibling
+			);
+			write_auto_match_success(
+				"steamgriddb",
+				MetadataProviderEnum::Steamgriddb,
+				Target::Game(game.id),
+				s.cand.id.to_string(),
+				reason,
+				Some(s.cand.name.clone()),
+				None,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::Ambiguous => {
+			write_auto_match_failed(
+				"steamgriddb",
+				MetadataProviderEnum::Steamgriddb,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::None => Ok(false),
+	}
 }

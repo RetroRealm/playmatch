@@ -8,10 +8,13 @@ use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
 use crate::matching::name_parse::parse_name;
+use crate::matching::scoring::{
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::screenscraper::ScreenScraperClient;
-use crate::providers::screenscraper::model::SsGame;
+use crate::providers::screenscraper::model::{REGION_PRIORITY, SsGame};
 use crate::providers::{
 	Target, drive_match_pipeline, write_auto_match_failed, write_auto_match_success,
 };
@@ -112,7 +115,7 @@ fn match_clone_of_game_to_screenscraper(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -138,7 +141,7 @@ fn match_clone_of_game_to_screenscraper(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -148,6 +151,13 @@ fn match_clone_of_game_to_screenscraper(
 
 		Ok(())
 	})
+}
+
+#[derive(Clone)]
+struct ScoredCand {
+	candidate_id: i64,
+	matched_name: String,
+	score: CandidateScore,
 }
 
 fn match_game_to_screenscraper(
@@ -184,64 +194,37 @@ fn match_game_to_screenscraper(
 
 		let candidates = client.search_games(system_id, &cleaned).await?;
 
-		for candidate in &candidates {
-			let Some(candidate_id) = candidate.id else {
-				continue;
-			};
-			for name in candidate.iter_candidate_names_with_region_priority(&dat_ss_regions) {
-				if name.to_lowercase() == cleaned {
-					debug!(
-						"Matched Game \"{}\" to ScreenScraper Game ID {} (Direct Match)",
-						&cleaned, candidate_id
-					);
-					write_auto_match_success(
-						"screenscraper",
-						MetadataProviderEnum::Screenscraper,
-						Target::Game(game.id),
-						candidate_id.to_string(),
-						AutomaticMatchReasonEnum::DirectName,
-						candidate
-							.iter_candidate_names_with_region_priority(&dat_ss_regions)
-							.next()
-							.map(str::to_string),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
-				}
-			}
-		}
+		let (direct, normalized) = collect_ss_rungs(
+			&candidates,
+			&parsed_dat,
+			&cleaned,
+			&cleaned_normalized,
+			&dat_ss_regions,
+		);
 
-		for candidate in &candidates {
-			let Some(candidate_id) = candidate.id else {
-				continue;
-			};
-			for name in candidate.iter_candidate_names_with_region_priority(&dat_ss_regions) {
-				if normalize_title(&name.to_lowercase()) == cleaned_normalized {
-					debug!(
-						"Matched Game \"{}\" to ScreenScraper Game ID {} (Normalized Match)",
-						&cleaned, candidate_id
-					);
-					write_auto_match_success(
-						"screenscraper",
-						MetadataProviderEnum::Screenscraper,
-						Target::Game(game.id),
-						candidate_id.to_string(),
-						AutomaticMatchReasonEnum::NormalizedName,
-						candidate
-							.iter_candidate_names_with_region_priority(&dat_ss_regions)
-							.next()
-							.map(str::to_string),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
-				}
-			}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(direct.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::DirectName,
+			"Direct Match",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(normalized.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedName,
+			"Normalized Match",
+		)
+		.await?
+		{
+			return Ok(());
 		}
 
 		debug!("No ScreenScraper match found for Game \"{}\"", &cleaned);
@@ -259,9 +242,108 @@ fn match_game_to_screenscraper(
 	})
 }
 
+fn collect_ss_rungs(
+	candidates: &[SsGame],
+	parsed_dat: &crate::matching::name_parse::ParsedName,
+	cleaned: &str,
+	cleaned_normalized: &str,
+	dat_ss_regions: &[&str],
+) -> (Vec<ScoredCand>, Vec<ScoredCand>) {
+	let mut direct: Vec<ScoredCand> = vec![];
+	let mut normalized: Vec<ScoredCand> = vec![];
+
+	for c in candidates {
+		let Some(candidate_id) = c.id else { continue };
+		for nom in &c.noms {
+			let parsed_cand = parse_name(&nom.text);
+			let region_codes: [&str; 1] = [nom.region.as_str()];
+			let gate = gate_and_score(
+				parsed_dat,
+				Some(&parsed_cand),
+				None,
+				&region_codes,
+				REGION_PRIORITY,
+				None,
+				None,
+				dat_ss_regions,
+			);
+			let score = match gate {
+				CandidateGate::Reject => continue,
+				CandidateGate::Pass(s) => s,
+			};
+
+			let lower = nom.text.to_lowercase();
+			if lower == cleaned {
+				direct.push(ScoredCand {
+					candidate_id,
+					matched_name: nom.text.clone(),
+					score,
+				});
+				continue;
+			}
+			if normalize_title(&lower) == cleaned_normalized {
+				normalized.push(ScoredCand {
+					candidate_id,
+					matched_name: nom.text.clone(),
+					score,
+				});
+			}
+		}
+	}
+
+	(direct, normalized)
+}
+
+async fn run_rung(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	selection: Selection<'_, ScoredCand>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<Option<()>> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Matched Game \"{}\" to ScreenScraper Game ID {} ({label})",
+				&game.name, s.candidate_id
+			);
+			write_auto_match_success(
+				"screenscraper",
+				MetadataProviderEnum::Screenscraper,
+				Target::Game(game.id),
+				s.candidate_id.to_string(),
+				reason,
+				Some(s.matched_name.clone()),
+				None,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::Ambiguous => {
+			debug!(
+				"Refusing to match Game \"{}\" on ScreenScraper: tied at top of score",
+				&game.name
+			);
+			write_auto_match_failed(
+				"screenscraper",
+				MetadataProviderEnum::Screenscraper,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::None => Ok(None),
+	}
+}
+
 /// Walk every game file's md5/sha1/crc against `jeuInfos.php` until a hit
-/// lands or all hashes are exhausted. Returns `Some(())` when a match was
-/// recorded so the caller skips the name ladder.
+/// lands or all hashes are exhausted.
 async fn try_match_by_hashes(
 	game: &Model,
 	system_id: i32,
@@ -274,6 +356,13 @@ async fn try_match_by_hashes(
 		return Ok(None);
 	}
 
+	let parsed_dat = parse_name(&game.name);
+	let dat_ss_regions: Vec<&'static str> = parsed_dat
+		.regions
+		.iter()
+		.flat_map(|r| r.ss_codes().iter().copied())
+		.collect();
+
 	for file in &files {
 		if client.is_quota_exhausted() {
 			return Ok(None);
@@ -285,6 +374,7 @@ async fn try_match_by_hashes(
 				game,
 				&found,
 				AutomaticMatchReasonEnum::Md5Hash,
+				&dat_ss_regions,
 				db_conn,
 				redis_conn,
 			)
@@ -301,6 +391,7 @@ async fn try_match_by_hashes(
 				game,
 				&found,
 				AutomaticMatchReasonEnum::Sha1Hash,
+				&dat_ss_regions,
 				db_conn,
 				redis_conn,
 			)
@@ -317,6 +408,7 @@ async fn try_match_by_hashes(
 				game,
 				&found,
 				AutomaticMatchReasonEnum::CrcHash,
+				&dat_ss_regions,
 				db_conn,
 				redis_conn,
 			)
@@ -332,6 +424,7 @@ async fn record_hash_match(
 	game: &Model,
 	found: &SsGame,
 	reason: AutomaticMatchReasonEnum,
+	dat_ss_regions: &[&str],
 	db_conn: &DbConn,
 	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
@@ -346,13 +439,17 @@ async fn record_hash_match(
 		"Matched Game \"{}\" to ScreenScraper Game ID {} ({:?})",
 		game.name, found_id, reason
 	);
+	let matched_name = found
+		.iter_candidate_names_with_region_priority(dat_ss_regions)
+		.next()
+		.map(str::to_string);
 	write_auto_match_success(
 		"screenscraper",
 		MetadataProviderEnum::Screenscraper,
 		Target::Game(game.id),
 		found_id.to_string(),
 		reason,
-		found.iter_candidate_names().next().map(str::to_string),
+		matched_name,
 		None,
 		db_conn,
 		redis_conn,
@@ -440,59 +537,81 @@ pub fn match_game_via_sibling_name_screenscraper(
 			let q_norm = normalize_title(&q);
 			let candidates = client.search_games(system_id, &q).await?;
 
-			for c in &candidates {
-				let Some(candidate_id) = c.id else { continue };
-				for name in c.iter_candidate_names_with_region_priority(&dat_ss_regions) {
-					if name.to_lowercase() == q {
-						debug!(
-							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Direct)",
-							&game.name, candidate_id, &sibling
-						);
-						write_auto_match_success(
-							"screenscraper",
-							MetadataProviderEnum::Screenscraper,
-							Target::Game(game.id),
-							candidate_id.to_string(),
-							AutomaticMatchReasonEnum::CrossProviderDirectName,
-							c.iter_candidate_names_with_region_priority(&dat_ss_regions)
-								.next()
-								.map(str::to_string),
-							None,
-							&db_conn,
-							&mut redis_conn,
-						)
-						.await?;
-						return Ok(());
-					}
-				}
+			let (direct, normalized) =
+				collect_ss_rungs(&candidates, &parsed_dat, &q, &q_norm, &dat_ss_regions);
+
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(direct.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Direct",
+			)
+			.await?
+			{
+				return Ok(());
 			}
-			for c in &candidates {
-				let Some(candidate_id) = c.id else { continue };
-				for name in c.iter_candidate_names_with_region_priority(&dat_ss_regions) {
-					if normalize_title(&name.to_lowercase()) == q_norm {
-						debug!(
-							"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" (Normalized)",
-							&game.name, candidate_id, &sibling
-						);
-						write_auto_match_success(
-							"screenscraper",
-							MetadataProviderEnum::Screenscraper,
-							Target::Game(game.id),
-							candidate_id.to_string(),
-							AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-							c.iter_candidate_names_with_region_priority(&dat_ss_regions)
-								.next()
-								.map(str::to_string),
-							None,
-							&db_conn,
-							&mut redis_conn,
-						)
-						.await?;
-						return Ok(());
-					}
-				}
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized",
+			)
+			.await?
+			{
+				return Ok(());
 			}
 		}
 		Ok(())
 	})
+}
+
+async fn try_write_cross(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	sibling: &str,
+	selection: Selection<'_, ScoredCand>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<bool> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Cross-matched Game \"{}\" to ScreenScraper Game ID {} via sibling \"{}\" ({label})",
+				&game.name, s.candidate_id, sibling
+			);
+			write_auto_match_success(
+				"screenscraper",
+				MetadataProviderEnum::Screenscraper,
+				Target::Game(game.id),
+				s.candidate_id.to_string(),
+				reason,
+				Some(s.matched_name.clone()),
+				None,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::Ambiguous => {
+			write_auto_match_failed(
+				"screenscraper",
+				MetadataProviderEnum::Screenscraper,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::None => Ok(false),
+	}
 }

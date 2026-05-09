@@ -7,7 +7,9 @@ use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
 use crate::matching::name_parse::parse_name;
-use crate::matching::scoring::{CandidateVerdict, score_candidate};
+use crate::matching::scoring::{
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::mobygames::MobyGamesClient;
@@ -98,7 +100,7 @@ fn match_clone_of_game_to_mobygames(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -124,7 +126,7 @@ fn match_clone_of_game_to_mobygames(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
-					None,
+					mapping.matched_year,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -134,6 +136,12 @@ fn match_clone_of_game_to_mobygames(
 
 		Ok(())
 	})
+}
+
+struct ScoredCand<'a> {
+	cand: &'a MgGame,
+	score: CandidateScore,
+	year: Option<i16>,
 }
 
 fn match_game_to_mobygames(
@@ -151,66 +159,127 @@ fn match_game_to_mobygames(
 
 		let candidates = client.search_games(Some(platform_id), &cleaned).await?;
 
-		let candidates_filtered: Vec<&MgGame> = candidates
-			.iter()
-			.filter(|c| {
-				let candidate_year = mg_year_for_platform(c, platform_id);
-				let candidate_platforms_i64 = mg_platforms_i64(c);
-				score_candidate(
-					&parsed_dat,
-					candidate_year,
-					candidate_platforms_i64.as_deref(),
-					Some(platform_id),
-				) != CandidateVerdict::Reject
-			})
-			.collect();
+		let mut direct: Vec<ScoredCand<'_>> = vec![];
+		let mut normalized: Vec<ScoredCand<'_>> = vec![];
+		let mut alt_direct: Vec<ScoredCand<'_>> = vec![];
+		let mut alt_normalized: Vec<ScoredCand<'_>> = vec![];
 
-		for candidate in &candidates_filtered {
-			for name in candidate.iter_candidate_titles() {
-				if name.to_lowercase() == cleaned {
-					debug!(
-						"Matched Game \"{}\" to MobyGames Game ID {} (Direct Match)",
-						&cleaned, candidate.game_id
-					);
-					write_auto_match_success(
-						"mobygames",
-						MetadataProviderEnum::Mobygames,
-						Target::Game(game.id),
-						candidate.game_id.to_string(),
-						AutomaticMatchReasonEnum::DirectName,
-						Some(candidate.title.clone()),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
+		for c in &candidates {
+			let candidate_year = mg_year_for_platform(c, platform_id);
+			let candidate_platforms_i64 = mg_platforms_i64(c);
+			let parsed_cand = parse_name(&c.title);
+			let gate = gate_and_score(
+				&parsed_dat,
+				Some(&parsed_cand),
+				candidate_year,
+				&[],
+				&[],
+				candidate_platforms_i64.as_deref(),
+				Some(platform_id),
+				&[],
+			);
+			let score = match gate {
+				CandidateGate::Reject => continue,
+				CandidateGate::Pass(s) => s,
+			};
+			let year_i16 = candidate_year.and_then(|y| i16::try_from(y).ok());
+
+			let main_lower = c.title.to_lowercase();
+			if main_lower == cleaned {
+				direct.push(ScoredCand {
+					cand: c,
+					score,
+					year: year_i16,
+				});
+				continue;
+			}
+			if normalize_title(&main_lower) == cleaned_normalized {
+				normalized.push(ScoredCand {
+					cand: c,
+					score,
+					year: year_i16,
+				});
+				continue;
+			}
+
+			if let Some(alts) = c.alternate_titles.as_ref() {
+				let mut placed = false;
+				for alt in alts {
+					let alt_lower = alt.title.to_lowercase();
+					if alt_lower == cleaned {
+						alt_direct.push(ScoredCand {
+							cand: c,
+							score,
+							year: year_i16,
+						});
+						placed = true;
+						break;
+					}
+				}
+				if placed {
+					continue;
+				}
+				for alt in alts {
+					let alt_lower = alt.title.to_lowercase();
+					if normalize_title(&alt_lower) == cleaned_normalized {
+						alt_normalized.push(ScoredCand {
+							cand: c,
+							score,
+							year: year_i16,
+						});
+						break;
+					}
 				}
 			}
 		}
 
-		for candidate in &candidates_filtered {
-			for name in candidate.iter_candidate_titles() {
-				if normalize_title(&name.to_lowercase()) == cleaned_normalized {
-					debug!(
-						"Matched Game \"{}\" to MobyGames Game ID {} (Normalized Match)",
-						&cleaned, candidate.game_id
-					);
-					write_auto_match_success(
-						"mobygames",
-						MetadataProviderEnum::Mobygames,
-						Target::Game(game.id),
-						candidate.game_id.to_string(),
-						AutomaticMatchReasonEnum::NormalizedName,
-						Some(candidate.title.clone()),
-						None,
-						&db_conn,
-						&mut redis_conn,
-					)
-					.await?;
-					return Ok(());
-				}
-			}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(direct.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::DirectName,
+			"Direct Match",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(normalized.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedName,
+			"Normalized Match",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(alt_direct.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::AlternativeName,
+			"Alternative Name Match",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+		if let Some(()) = run_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedAlternativeName,
+			"Normalized Alternative Match",
+		)
+		.await?
+		{
+			return Ok(());
 		}
 
 		debug!("No MobyGames match found for Game \"{}\"", &cleaned);
@@ -226,6 +295,54 @@ fn match_game_to_mobygames(
 
 		Ok(())
 	})
+}
+
+async fn run_rung(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<Option<()>> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Matched Game \"{}\" to MobyGames Game ID {} ({label})",
+				&game.name, s.cand.game_id
+			);
+			write_auto_match_success(
+				"mobygames",
+				MetadataProviderEnum::Mobygames,
+				Target::Game(game.id),
+				s.cand.game_id.to_string(),
+				reason,
+				Some(s.cand.title.clone()),
+				s.year,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::Ambiguous => {
+			debug!(
+				"Refusing to match Game \"{}\" on MobyGames: tied at top of score",
+				&game.name
+			);
+			write_auto_match_failed(
+				"mobygames",
+				MetadataProviderEnum::Mobygames,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::None => Ok(None),
+	}
 }
 
 async fn get_game_platform_mobygames_id(game: &Model, db_conn: &DbConn) -> anyhow::Result<i64> {
@@ -297,69 +414,184 @@ pub fn match_game_via_sibling_name_mobygames(
 			let q_norm = normalize_title(&q);
 			let candidates = client.search_games(Some(platform_id), &q).await?;
 
-			let candidates_filtered: Vec<&MgGame> = candidates
-				.iter()
-				.filter(|c| {
-					let candidate_year = mg_year_for_platform(c, platform_id);
-					let candidate_platforms_i64 = mg_platforms_i64(c);
-					score_candidate(
-						&parsed_dat,
-						candidate_year,
-						candidate_platforms_i64.as_deref(),
-						Some(platform_id),
-					) != CandidateVerdict::Reject
-				})
-				.collect();
+			let mut direct: Vec<ScoredCand<'_>> = vec![];
+			let mut normalized: Vec<ScoredCand<'_>> = vec![];
+			let mut alt_direct: Vec<ScoredCand<'_>> = vec![];
+			let mut alt_normalized: Vec<ScoredCand<'_>> = vec![];
 
-			for c in &candidates_filtered {
-				for name in c.iter_candidate_titles() {
-					if name.to_lowercase() == q {
-						debug!(
-							"Cross-matched Game \"{}\" to MobyGames Game ID {} via sibling \"{}\" (Direct)",
-							&game.name, c.game_id, &sibling
-						);
-						write_auto_match_success(
-							"mobygames",
-							MetadataProviderEnum::Mobygames,
-							Target::Game(game.id),
-							c.game_id.to_string(),
-							AutomaticMatchReasonEnum::CrossProviderDirectName,
-							Some(c.title.clone()),
-							None,
-							&db_conn,
-							&mut redis_conn,
-						)
-						.await?;
-						return Ok(());
+			for c in &candidates {
+				let candidate_year = mg_year_for_platform(c, platform_id);
+				let candidate_platforms_i64 = mg_platforms_i64(c);
+				let parsed_cand = parse_name(&c.title);
+				let gate = gate_and_score(
+					&parsed_dat,
+					Some(&parsed_cand),
+					candidate_year,
+					&[],
+					&[],
+					candidate_platforms_i64.as_deref(),
+					Some(platform_id),
+					&[],
+				);
+				let score = match gate {
+					CandidateGate::Reject => continue,
+					CandidateGate::Pass(s) => s,
+				};
+				let year_i16 = candidate_year.and_then(|y| i16::try_from(y).ok());
+
+				let main_lower = c.title.to_lowercase();
+				if main_lower == q {
+					direct.push(ScoredCand {
+						cand: c,
+						score,
+						year: year_i16,
+					});
+					continue;
+				}
+				if normalize_title(&main_lower) == q_norm {
+					normalized.push(ScoredCand {
+						cand: c,
+						score,
+						year: year_i16,
+					});
+					continue;
+				}
+
+				if let Some(alts) = c.alternate_titles.as_ref() {
+					let mut placed = false;
+					for alt in alts {
+						let alt_lower = alt.title.to_lowercase();
+						if alt_lower == q {
+							alt_direct.push(ScoredCand {
+								cand: c,
+								score,
+								year: year_i16,
+							});
+							placed = true;
+							break;
+						}
+					}
+					if placed {
+						continue;
+					}
+					for alt in alts {
+						let alt_lower = alt.title.to_lowercase();
+						if normalize_title(&alt_lower) == q_norm {
+							alt_normalized.push(ScoredCand {
+								cand: c,
+								score,
+								year: year_i16,
+							});
+							break;
+						}
 					}
 				}
 			}
-			for c in &candidates_filtered {
-				for name in c.iter_candidate_titles() {
-					if normalize_title(&name.to_lowercase()) == q_norm {
-						debug!(
-							"Cross-matched Game \"{}\" to MobyGames Game ID {} via sibling \"{}\" (Normalized)",
-							&game.name, c.game_id, &sibling
-						);
-						write_auto_match_success(
-							"mobygames",
-							MetadataProviderEnum::Mobygames,
-							Target::Game(game.id),
-							c.game_id.to_string(),
-							AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-							Some(c.title.clone()),
-							None,
-							&db_conn,
-							&mut redis_conn,
-						)
-						.await?;
-						return Ok(());
-					}
-				}
+
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(direct.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Direct",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(alt_direct.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Alternative",
+			)
+			.await?
+			{
+				return Ok(());
+			}
+			if try_write_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized Alternative",
+			)
+			.await?
+			{
+				return Ok(());
 			}
 		}
 		Ok(())
 	})
+}
+
+async fn try_write_cross(
+	db_conn: &DbConn,
+	redis_conn: &mut redis::aio::MultiplexedConnection,
+	game: &Model,
+	sibling: &str,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<bool> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Cross-matched Game \"{}\" to MobyGames Game ID {} via sibling \"{}\" ({label})",
+				&game.name, s.cand.game_id, sibling
+			);
+			write_auto_match_success(
+				"mobygames",
+				MetadataProviderEnum::Mobygames,
+				Target::Game(game.id),
+				s.cand.game_id.to_string(),
+				reason,
+				Some(s.cand.title.clone()),
+				s.year,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::Ambiguous => {
+			debug!(
+				"Refusing to cross-match Game \"{}\" on MobyGames: tied at top of score",
+				&game.name
+			);
+			write_auto_match_failed(
+				"mobygames",
+				MetadataProviderEnum::Mobygames,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::None => Ok(false),
+	}
 }
 
 fn mg_year_for_platform(c: &MgGame, our_platform_id: i64) -> Option<u16> {

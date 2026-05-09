@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::matching::name_parse::{ParsedName, Variant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -36,44 +34,6 @@ pub struct CandidateScore {
 pub enum CandidateGate {
 	Reject,
 	Pass(CandidateScore),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CandidateVerdict {
-	AcceptPreferred,
-	Accept,
-	Reject,
-}
-
-/// Legacy gate kept for matchers that have not migrated to the scored ladder
-/// (companies, platforms). Rejects on year delta >=2 or platform mismatch.
-pub fn score_candidate(
-	parsed_dat: &ParsedName,
-	candidate_year: Option<u16>,
-	candidate_platforms: Option<&[i64]>,
-	dat_platform_id: Option<i64>,
-) -> CandidateVerdict {
-	if let Some(platforms) = candidate_platforms
-		&& !platforms.is_empty()
-		&& let Some(dat_pid) = dat_platform_id
-		&& !platforms.contains(&dat_pid)
-	{
-		return CandidateVerdict::Reject;
-	}
-
-	match (parsed_dat.year, candidate_year) {
-		(Some(dat_year), Some(cand_year)) => {
-			let delta = dat_year.abs_diff(cand_year);
-			if delta >= 2 {
-				CandidateVerdict::Reject
-			} else if delta == 0 {
-				CandidateVerdict::AcceptPreferred
-			} else {
-				CandidateVerdict::Accept
-			}
-		}
-		_ => CandidateVerdict::Accept,
-	}
 }
 
 /// Combined gate + scorer used by the scored ladder. Returns `Reject` for
@@ -181,7 +141,7 @@ fn score_variant(dat: Option<Variant>, cand: Option<Variant>) -> VariantMatch {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Selection<'a, T> {
-	Best(&'a T, CandidateScore),
+	Best(&'a T),
 	Ambiguous,
 	None,
 }
@@ -212,7 +172,7 @@ pub fn pick_best<'a, T>(
 	match best {
 		None => Selection::None,
 		Some(_) if tied => Selection::Ambiguous,
-		Some((c, s)) => Selection::Best(c, s),
+		Some((c, _)) => Selection::Best(c),
 	}
 }
 
@@ -247,30 +207,6 @@ mod tests {
 			regions: vec![r],
 			..ParsedName::default()
 		}
-	}
-
-	#[test]
-	fn legacy_no_year_no_platform_accepts() {
-		assert_eq!(
-			score_candidate(&dat(None), None, None, None),
-			CandidateVerdict::Accept
-		);
-	}
-
-	#[test]
-	fn legacy_off_by_two_rejects() {
-		assert_eq!(
-			score_candidate(&dat(Some(2000)), Some(2002), None, None),
-			CandidateVerdict::Reject
-		);
-	}
-
-	#[test]
-	fn legacy_exact_year_preferred() {
-		assert_eq!(
-			score_candidate(&dat(Some(2000)), Some(2000), None, None),
-			CandidateVerdict::AcceptPreferred
-		);
 	}
 
 	#[test]
@@ -512,16 +448,16 @@ mod tests {
 		};
 		let sel = pick_best([(&a, lo), (&b, hi)]);
 		match sel {
-			Selection::Best(c, _) => assert_eq!(c.0, 2),
+			Selection::Best(c) => assert_eq!(c.0, 2),
 			_ => panic!(),
 		}
 	}
 
 	#[test]
 	fn pick_best_ambiguous_on_tie() {
-		struct C(u32);
-		let a = C(1);
-		let b = C(2);
+		struct C;
+		let a = C;
+		let b = C;
 		let s = CandidateScore {
 			year_match: YearMatch::Exact,
 			region_match: RegionMatch::Unknown,
@@ -555,7 +491,7 @@ mod tests {
 			variant_match: VariantMatch::BothNone,
 		};
 		match pick_best([(&a, lo), (&b, hi)]) {
-			Selection::Best(c, _) => assert_eq!(c.0, 2),
+			Selection::Best(c) => assert_eq!(c.0, 2),
 			_ => panic!(),
 		}
 	}
