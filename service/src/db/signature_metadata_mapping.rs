@@ -41,6 +41,8 @@ pub struct SignatureMetadataMappingInput {
 	pub manually_matched_by: Option<Uuid>,
 	#[builder(default)]
 	pub matched_name: Option<String>,
+	#[builder(default)]
+	pub matched_year: Option<i16>,
 }
 
 /// Stamp `cross_match_last_tried_at = now()` on every Failed-NoDirectMatch
@@ -154,6 +156,9 @@ pub async fn create_or_update_signature_metadata_mapping(
 	active_model.manually_matched_by = Set(input.manually_matched_by);
 	if input.matched_name.is_some() {
 		active_model.matched_name = Set(input.matched_name);
+	}
+	if input.matched_year.is_some() {
+		active_model.matched_year = Set(input.matched_year);
 	}
 	active_model.updated_at = Set(Utc::now().fixed_offset());
 

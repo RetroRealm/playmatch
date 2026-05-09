@@ -50,6 +50,7 @@ pub fn match_platform_to_igdb(
 					search_result.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					Some(search_result.name.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)

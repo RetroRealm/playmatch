@@ -96,6 +96,7 @@ fn match_clone_of_game_to_emuready(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -121,6 +122,7 @@ fn match_clone_of_game_to_emuready(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -160,6 +162,7 @@ fn match_game_to_emuready(
 					candidate.id.clone(),
 					AutomaticMatchReasonEnum::DirectName,
 					Some(candidate.title.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -183,6 +186,7 @@ fn match_game_to_emuready(
 					candidate.id.clone(),
 					AutomaticMatchReasonEnum::NormalizedName,
 					Some(candidate.title.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -282,6 +286,7 @@ pub fn match_game_via_sibling_name_emuready(
 						c.id.clone(),
 						AutomaticMatchReasonEnum::CrossProviderDirectName,
 						Some(c.title.clone()),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -303,6 +308,7 @@ pub fn match_game_via_sibling_name_emuready(
 						c.id.clone(),
 						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 						Some(c.title.clone()),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)

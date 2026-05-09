@@ -45,9 +45,9 @@ impl RegionTag {
 			RegionTag::China => &["cn"],
 			RegionTag::Germany => &["de"],
 			RegionTag::France => &["fr"],
-			RegionTag::Italy => &[],
-			RegionTag::Spain => &[],
-			RegionTag::Netherlands => &[],
+			RegionTag::Italy => &["it"],
+			RegionTag::Spain => &["sp"],
+			RegionTag::Netherlands => &["nl"],
 		}
 	}
 
@@ -261,46 +261,48 @@ fn classify_year(content: &str) -> Option<u16> {
 }
 
 fn classify_region(token: &str) -> Option<RegionTag> {
-	match token {
-		"USA" | "U" | "United States" => Some(RegionTag::Usa),
-		"Europe" | "E" | "EU" => Some(RegionTag::Europe),
-		"Japan" | "J" => Some(RegionTag::Japan),
-		"World" | "W" => Some(RegionTag::World),
-		"Asia" => Some(RegionTag::Asia),
-		"Australia" => Some(RegionTag::Australia),
-		"Brazil" => Some(RegionTag::Brazil),
-		"Korea" => Some(RegionTag::Korea),
-		"China" => Some(RegionTag::China),
-		"Germany" => Some(RegionTag::Germany),
-		"France" => Some(RegionTag::France),
-		"Italy" => Some(RegionTag::Italy),
-		"Spain" => Some(RegionTag::Spain),
-		"Netherlands" => Some(RegionTag::Netherlands),
+	let lower = token.to_ascii_lowercase();
+	match lower.as_str() {
+		"usa" | "u" | "united states" => Some(RegionTag::Usa),
+		"europe" | "e" | "eu" => Some(RegionTag::Europe),
+		"japan" | "j" => Some(RegionTag::Japan),
+		"world" | "w" => Some(RegionTag::World),
+		"asia" => Some(RegionTag::Asia),
+		"australia" => Some(RegionTag::Australia),
+		"brazil" => Some(RegionTag::Brazil),
+		"korea" => Some(RegionTag::Korea),
+		"china" => Some(RegionTag::China),
+		"germany" => Some(RegionTag::Germany),
+		"france" => Some(RegionTag::France),
+		"italy" => Some(RegionTag::Italy),
+		"spain" => Some(RegionTag::Spain),
+		"netherlands" => Some(RegionTag::Netherlands),
 		_ => None,
 	}
 }
 
 fn classify_lang(token: &str) -> Option<Lang> {
 	let base = token.split('-').next().unwrap_or(token).trim();
-	match base {
-		"En" => Some(Lang::En),
-		"Fr" => Some(Lang::Fr),
-		"De" => Some(Lang::De),
-		"Es" => Some(Lang::Es),
-		"It" => Some(Lang::It),
-		"Ja" => Some(Lang::Ja),
-		"Pt" => Some(Lang::Pt),
-		"Nl" => Some(Lang::Nl),
-		"Sv" => Some(Lang::Sv),
-		"Da" => Some(Lang::Da),
-		"No" => Some(Lang::No),
-		"Fi" => Some(Lang::Fi),
-		"Ko" => Some(Lang::Ko),
-		"Zh" => Some(Lang::Zh),
-		"Ru" => Some(Lang::Ru),
-		"Pl" => Some(Lang::Pl),
-		"Cs" => Some(Lang::Cs),
-		"Tr" => Some(Lang::Tr),
+	let lower = base.to_ascii_lowercase();
+	match lower.as_str() {
+		"en" => Some(Lang::En),
+		"fr" => Some(Lang::Fr),
+		"de" => Some(Lang::De),
+		"es" => Some(Lang::Es),
+		"it" => Some(Lang::It),
+		"ja" => Some(Lang::Ja),
+		"pt" => Some(Lang::Pt),
+		"nl" => Some(Lang::Nl),
+		"sv" => Some(Lang::Sv),
+		"da" => Some(Lang::Da),
+		"no" => Some(Lang::No),
+		"fi" => Some(Lang::Fi),
+		"ko" => Some(Lang::Ko),
+		"zh" => Some(Lang::Zh),
+		"ru" => Some(Lang::Ru),
+		"pl" => Some(Lang::Pl),
+		"cs" => Some(Lang::Cs),
+		"tr" => Some(Lang::Tr),
 		_ => None,
 	}
 }
@@ -461,10 +463,28 @@ mod tests {
 	}
 
 	#[test]
-	fn lowercase_region_falls_through_to_residual() {
+	fn lowercase_region_recognised() {
 		let p = parse_name("Game (usa)");
-		assert!(p.regions.is_empty());
-		assert_eq!(p.residual, vec!["usa"]);
+		assert_eq!(p.regions, vec![RegionTag::Usa]);
+	}
+
+	#[test]
+	fn mixed_case_region_recognised() {
+		let p = parse_name("Game (Usa)");
+		assert_eq!(p.regions, vec![RegionTag::Usa]);
+	}
+
+	#[test]
+	fn lowercase_lang_recognised() {
+		let p = parse_name("Game (en,fr)");
+		assert_eq!(p.languages, vec![Lang::En, Lang::Fr]);
+	}
+
+	#[test]
+	fn ss_codes_italy_spain_netherlands() {
+		assert_eq!(RegionTag::Italy.ss_codes(), &["it"]);
+		assert_eq!(RegionTag::Spain.ss_codes(), &["sp"]);
+		assert_eq!(RegionTag::Netherlands.ss_codes(), &["nl"]);
 	}
 
 	#[test]

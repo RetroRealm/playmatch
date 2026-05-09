@@ -52,6 +52,7 @@ pub fn match_platform_to_mobygames(
 					candidate.platform_id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					Some(candidate.platform_name.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)

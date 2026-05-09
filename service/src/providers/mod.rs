@@ -82,6 +82,7 @@ pub async fn write_auto_match_success(
 	provider_id: String,
 	reason: AutomaticMatchReasonEnum,
 	matched_name: Option<String>,
+	matched_year: Option<i16>,
 	db_conn: &DbConn,
 	redis_conn: &mut redis::aio::MultiplexedConnection,
 ) -> anyhow::Result<()> {
@@ -93,6 +94,7 @@ pub async fn write_auto_match_success(
 		.match_type(MatchTypeEnum::Automatic)
 		.automatic_match_reason(Some(reason))
 		.matched_name(matched_name)
+		.matched_year(matched_year)
 		.build()?;
 	create_or_update_signature_metadata_mapping(input, db_conn).await?;
 	if let Target::Game(game_id) = target {

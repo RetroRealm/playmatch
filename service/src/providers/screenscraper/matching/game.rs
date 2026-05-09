@@ -112,6 +112,7 @@ fn match_clone_of_game_to_screenscraper(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -137,6 +138,7 @@ fn match_clone_of_game_to_screenscraper(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -202,6 +204,7 @@ fn match_game_to_screenscraper(
 							.iter_candidate_names_with_region_priority(&dat_ss_regions)
 							.next()
 							.map(str::to_string),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -231,6 +234,7 @@ fn match_game_to_screenscraper(
 							.iter_candidate_names_with_region_priority(&dat_ss_regions)
 							.next()
 							.map(str::to_string),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -349,6 +353,7 @@ async fn record_hash_match(
 		found_id.to_string(),
 		reason,
 		found.iter_candidate_names().next().map(str::to_string),
+		None,
 		db_conn,
 		redis_conn,
 	)
@@ -452,6 +457,7 @@ pub fn match_game_via_sibling_name_screenscraper(
 							c.iter_candidate_names_with_region_priority(&dat_ss_regions)
 								.next()
 								.map(str::to_string),
+							None,
 							&db_conn,
 							&mut redis_conn,
 						)
@@ -477,6 +483,7 @@ pub fn match_game_via_sibling_name_screenscraper(
 							c.iter_candidate_names_with_region_priority(&dat_ss_regions)
 								.next()
 								.map(str::to_string),
+							None,
 							&db_conn,
 							&mut redis_conn,
 						)

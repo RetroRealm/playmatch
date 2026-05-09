@@ -52,6 +52,7 @@ pub fn match_platform_to_emuready(
 					system.id.clone(),
 					AutomaticMatchReasonEnum::DirectName,
 					Some(system.name.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)

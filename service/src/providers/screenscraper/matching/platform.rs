@@ -57,6 +57,7 @@ pub fn match_platform_to_screenscraper(
 						system.id.to_string(),
 						AutomaticMatchReasonEnum::DirectName,
 						system.iter_names().next().map(str::to_string),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)

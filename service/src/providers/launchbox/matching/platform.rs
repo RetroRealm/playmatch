@@ -49,6 +49,7 @@ pub fn match_platform_to_launchbox(
 				found.name.clone(),
 				AutomaticMatchReasonEnum::DirectName,
 				Some(found.name),
+				None,
 				&db_conn,
 				&mut redis_conn,
 			)

@@ -103,6 +103,7 @@ fn match_clone_of_game_to_steamgriddb(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -135,6 +136,7 @@ fn match_clone_of_game_to_steamgriddb(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -173,6 +175,7 @@ fn match_game_to_steamgriddb(
 					candidate.id.to_string(),
 					AutomaticMatchReasonEnum::DirectName,
 					Some(candidate.name.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -195,6 +198,7 @@ fn match_game_to_steamgriddb(
 					candidate.id.to_string(),
 					AutomaticMatchReasonEnum::NormalizedName,
 					Some(candidate.name.clone()),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -252,6 +256,7 @@ pub fn match_game_via_sibling_name_steamgriddb(
 						c.id.to_string(),
 						AutomaticMatchReasonEnum::CrossProviderDirectName,
 						Some(c.name.clone()),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)
@@ -272,6 +277,7 @@ pub fn match_game_via_sibling_name_steamgriddb(
 						c.id.to_string(),
 						AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 						Some(c.name.clone()),
+						None,
 						&db_conn,
 						&mut redis_conn,
 					)

@@ -101,6 +101,7 @@ fn match_clone_of_game_to_launchbox(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaParent,
 					mapping.matched_name.clone(),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -126,6 +127,7 @@ fn match_clone_of_game_to_launchbox(
 					provider_id,
 					AutomaticMatchReasonEnum::ViaChild,
 					mapping.matched_name,
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -169,6 +171,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::DirectName,
 				Some(found.name.clone()),
+				None,
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -195,6 +198,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::AlternativeName,
 				Some(found.name.clone()),
+				None,
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -220,6 +224,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::NormalizedName,
 				Some(found.name.clone()),
+				None,
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -246,6 +251,7 @@ fn match_game_to_launchbox(
 				found.database_id.to_string(),
 				AutomaticMatchReasonEnum::NormalizedAlternativeName,
 				Some(found.name.clone()),
+				None,
 				&db_conn,
 				&mut redis_conn,
 			)
@@ -352,6 +358,7 @@ pub fn match_game_via_sibling_name_launchbox(
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderDirectName,
 					Some(found.name),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -378,6 +385,7 @@ pub fn match_game_via_sibling_name_launchbox(
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderDirectName,
 					Some(found.name),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -400,6 +408,7 @@ pub fn match_game_via_sibling_name_launchbox(
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 					Some(found.name),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
@@ -427,6 +436,7 @@ pub fn match_game_via_sibling_name_launchbox(
 					found.database_id.to_string(),
 					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 					Some(found.name),
+					None,
 					&db_conn,
 					&mut redis_conn,
 				)
