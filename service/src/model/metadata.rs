@@ -130,6 +130,9 @@ pub enum FailedMatchReason {
 
 	/// Too many direct matches were found.
 	TooManyMatches,
+
+	/// Multiple candidates tied at the top of the score; matcher refused to pick.
+	Ambiguous,
 }
 
 /// Reason why a game was automatically matched.
@@ -256,6 +259,7 @@ impl From<FailedMatchReasonEnum> for FailedMatchReason {
 		match failed_match_reason {
 			FailedMatchReasonEnum::NoDirectMatch => FailedMatchReason::NoDirectMatch,
 			FailedMatchReasonEnum::TooManyMatches => FailedMatchReason::TooManyMatches,
+			FailedMatchReasonEnum::Ambiguous => FailedMatchReason::Ambiguous,
 		}
 	}
 }
