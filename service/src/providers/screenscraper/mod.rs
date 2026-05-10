@@ -10,8 +10,8 @@ use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, OnceCell, Semaphore};
 use tokio::time::sleep;
 use tower::retry::Retry;
@@ -46,6 +46,11 @@ const MAX_CONCURRENCY: usize = 16;
 const QUOTA_SOFT_LIMIT_NUMERATOR: u64 = 95;
 const QUOTA_SOFT_LIMIT_DENOMINATOR: u64 = 100;
 
+/// How long an exhaustion mark blocks further requests. ScreenScraper's
+/// daily request budget resets every 24 hours, so any block (quota,
+/// thread limit, transient overload) is safe to retry past this window.
+const QUOTA_BLOCK_TTL_SECS: i64 = 24 * 60 * 60;
+
 /// French phrases ScreenScraper returns as plain text (or embedded in HTML)
 /// when the API is overloaded or rejecting traffic. Sniffed before we try to
 /// parse a body as JSON because incident pages come back with HTTP 200.
@@ -65,7 +70,7 @@ pub struct ScreenScraperClient {
 	dev_id: String,
 	dev_password: String,
 	user: Option<(String, String)>,
-	quota_exhausted: AtomicBool,
+	quota_exhausted_at: AtomicI64,
 	systems_cache: OnceCell<Arc<Vec<SsSystem>>>,
 	redis_conn: redis::aio::MultiplexedConnection,
 	concurrency: AtomicUsize,
@@ -93,7 +98,7 @@ impl ScreenScraperClient {
 			dev_id,
 			dev_password,
 			user,
-			quota_exhausted: AtomicBool::new(false),
+			quota_exhausted_at: AtomicI64::new(0),
 			systems_cache: OnceCell::new(),
 			redis_conn,
 			concurrency: AtomicUsize::new(1),
@@ -102,7 +107,33 @@ impl ScreenScraperClient {
 	}
 
 	pub fn is_quota_exhausted(&self) -> bool {
-		self.quota_exhausted.load(Ordering::Relaxed)
+		let stamp = self.quota_exhausted_at.load(Ordering::Relaxed);
+		if !is_within_quota_block(stamp, now_unix_secs()) {
+			if stamp != 0 {
+				let _ = self.quota_exhausted_at.compare_exchange(
+					stamp,
+					0,
+					Ordering::Relaxed,
+					Ordering::Relaxed,
+				);
+			}
+			return false;
+		}
+		true
+	}
+
+	/// Records a fresh exhaustion timestamp and returns whether this is a
+	/// new transition (the previous mark was unset or already past its
+	/// 24h TTL). Callers that emit metrics or warn-level logs gate on the
+	/// returned bool so we don't spam on every repeat 430.
+	fn mark_quota_exhausted(&self, reason: &str) -> bool {
+		let now = now_unix_secs();
+		let prev = self.quota_exhausted_at.swap(now, Ordering::Relaxed);
+		let was_fresh = !is_within_quota_block(prev, now);
+		if was_fresh {
+			crate::metrics::record_screenscraper_quota_exhaustion(reason);
+		}
+		was_fresh
 	}
 
 	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
@@ -344,20 +375,13 @@ impl ScreenScraperClient {
 		match status {
 			s if s == StatusCode::NOT_FOUND => Ok(None),
 			s if s.as_u16() == 430 => {
-				if !self.quota_exhausted.swap(true, Ordering::Relaxed) {
-					crate::metrics::record_screenscraper_quota_exhaustion("http_430");
-				}
+				self.mark_quota_exhausted("http_430");
 				Err(anyhow!(
 					"screenscraper daily quota exhausted (HTTP 430), aborting cycle"
 				))
 			}
 			s if matches!(s.as_u16(), 401 | 426 | 429 | 431) => {
-				if !self.quota_exhausted.swap(true, Ordering::Relaxed) {
-					crate::metrics::record_screenscraper_quota_exhaustion(&format!(
-						"http_{}",
-						s.as_u16()
-					));
-				}
+				self.mark_quota_exhausted(&format!("http_{}", s.as_u16()));
 				Err(anyhow!(
 					"screenscraper rejected the request with HTTP {s} (server overloaded or thread limit), aborting cycle"
 				))
@@ -433,13 +457,11 @@ impl ScreenScraperClient {
 
 	fn update_quota_from(&self, user: &Option<SsUser>) {
 		let Some(user) = user else { return };
-		if quota_should_mark_exhausted(user) && !self.quota_exhausted.swap(true, Ordering::Relaxed)
-		{
+		if quota_should_mark_exhausted(user) && self.mark_quota_exhausted("ssuser_threshold") {
 			let (today, max) = parsed_quota(user).unwrap_or((0, 0));
 			warn!(
 				"screenscraper quota near limit ({today}/{max}); short-circuiting remaining match cycle"
 			);
-			crate::metrics::record_screenscraper_quota_exhaustion("ssuser_threshold");
 		}
 	}
 
@@ -517,6 +539,20 @@ fn url_for_log(url: &Url) -> String {
 			.extend_pairs(pairs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
 	}
 	sanitised.to_string()
+}
+
+fn now_unix_secs() -> i64 {
+	SystemTime::now()
+		.duration_since(UNIX_EPOCH)
+		.map(|d| d.as_secs() as i64)
+		.unwrap_or(0)
+}
+
+/// True when `stamp` is a non-zero exhaustion mark whose age relative to
+/// `now` is still inside [`QUOTA_BLOCK_TTL_SECS`]. Once the window has
+/// elapsed the mark is treated as cleared so the next match cycle retries.
+fn is_within_quota_block(stamp: i64, now: i64) -> bool {
+	stamp != 0 && now.saturating_sub(stamp) < QUOTA_BLOCK_TTL_SECS
 }
 
 /// ScreenScraper's PHP backend reports `systemeid=0` as missing because
@@ -623,6 +659,38 @@ mod tests {
 	fn parse_or_incident_rejects_non_json_content_type() {
 		let body = "{\"jeu\": {\"id\": \"1\"}}";
 		assert!(parse_or_incident(body, Some("text/html; charset=utf-8")).is_err());
+	}
+
+	#[test]
+	fn quota_block_is_active_during_first_24h_and_clears_after() {
+		let set_at = 1_000_000;
+		assert!(is_within_quota_block(set_at, set_at));
+		assert!(is_within_quota_block(set_at, set_at + 1));
+		assert!(is_within_quota_block(
+			set_at,
+			set_at + QUOTA_BLOCK_TTL_SECS - 1
+		));
+		assert!(!is_within_quota_block(
+			set_at,
+			set_at + QUOTA_BLOCK_TTL_SECS
+		));
+		assert!(!is_within_quota_block(
+			set_at,
+			set_at + QUOTA_BLOCK_TTL_SECS + 60
+		));
+	}
+
+	#[test]
+	fn quota_block_unset_stamp_is_never_active() {
+		assert!(!is_within_quota_block(0, 0));
+		assert!(!is_within_quota_block(0, 1_000_000));
+	}
+
+	#[test]
+	fn quota_block_tolerates_clock_skew() {
+		let set_at = 2_000_000;
+		assert!(is_within_quota_block(set_at, set_at - 5));
+		assert!(is_within_quota_block(set_at, 0));
 	}
 
 	#[test]
