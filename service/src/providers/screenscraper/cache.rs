@@ -151,6 +151,8 @@ pub async fn get_ss_game_by_md5_cached(
 	client: &ScreenScraperClient,
 	redis_conn: &mut MultiplexedConnection,
 	system_id: i32,
+	rom_name: String,
+	rom_size: Option<i64>,
 	md5: String,
 ) -> anyhow::Result<Option<SsGame>> {
 	let lower = md5.to_lowercase();
@@ -160,7 +162,11 @@ pub async fn get_ss_game_by_md5_cached(
 		cache_key,
 		SS_CACHE_LIFETIME_GAME,
 		"Game by MD5",
-		|| async { client.get_game_by_md5(system_id, &lower).await },
+		|| async {
+			client
+				.get_game_by_md5(system_id, &rom_name, rom_size, &lower)
+				.await
+		},
 	)
 	.await
 }
@@ -169,6 +175,8 @@ pub async fn get_ss_game_by_sha1_cached(
 	client: &ScreenScraperClient,
 	redis_conn: &mut MultiplexedConnection,
 	system_id: i32,
+	rom_name: String,
+	rom_size: Option<i64>,
 	sha1: String,
 ) -> anyhow::Result<Option<SsGame>> {
 	let lower = sha1.to_lowercase();
@@ -179,7 +187,11 @@ pub async fn get_ss_game_by_sha1_cached(
 		cache_key,
 		SS_CACHE_LIFETIME_GAME,
 		"Game by SHA1",
-		|| async { client.get_game_by_sha1(system_id, &lower).await },
+		|| async {
+			client
+				.get_game_by_sha1(system_id, &rom_name, rom_size, &lower)
+				.await
+		},
 	)
 	.await
 }
@@ -188,6 +200,8 @@ pub async fn get_ss_game_by_crc_cached(
 	client: &ScreenScraperClient,
 	redis_conn: &mut MultiplexedConnection,
 	system_id: i32,
+	rom_name: String,
+	rom_size: Option<i64>,
 	crc: String,
 ) -> anyhow::Result<Option<SsGame>> {
 	let lower = crc.to_lowercase();
@@ -197,7 +211,11 @@ pub async fn get_ss_game_by_crc_cached(
 		cache_key,
 		SS_CACHE_LIFETIME_GAME,
 		"Game by CRC",
-		|| async { client.get_game_by_crc(system_id, &lower).await },
+		|| async {
+			client
+				.get_game_by_crc(system_id, &rom_name, rom_size, &lower)
+				.await
+		},
 	)
 	.await
 }

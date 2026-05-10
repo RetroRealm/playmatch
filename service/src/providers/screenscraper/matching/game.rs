@@ -367,8 +367,12 @@ async fn try_match_by_hashes(
 		if client.is_quota_exhausted() {
 			return Ok(None);
 		}
+		let rom_name = file.file_name.as_str();
+		let rom_size = file.file_size_in_bytes;
 		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty())
-			&& let Some(found) = client.get_game_by_md5(system_id, md5).await?
+			&& let Some(found) = client
+				.get_game_by_md5(system_id, rom_name, rom_size, md5)
+				.await?
 		{
 			record_hash_match(
 				game,
@@ -385,7 +389,9 @@ async fn try_match_by_hashes(
 			return Ok(None);
 		}
 		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty())
-			&& let Some(found) = client.get_game_by_sha1(system_id, sha1).await?
+			&& let Some(found) = client
+				.get_game_by_sha1(system_id, rom_name, rom_size, sha1)
+				.await?
 		{
 			record_hash_match(
 				game,
@@ -402,7 +408,9 @@ async fn try_match_by_hashes(
 			return Ok(None);
 		}
 		if let Some(crc) = file.crc.as_deref().filter(|s| !s.is_empty())
-			&& let Some(found) = client.get_game_by_crc(system_id, crc).await?
+			&& let Some(found) = client
+				.get_game_by_crc(system_id, rom_name, rom_size, crc)
+				.await?
 		{
 			record_hash_match(
 				game,

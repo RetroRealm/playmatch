@@ -185,73 +185,81 @@ impl ScreenScraperClient {
 	pub async fn get_game_by_md5(
 		&self,
 		system_id: i32,
+		rom_name: &str,
+		rom_size: Option<i64>,
 		md5: &str,
 	) -> anyhow::Result<Option<SsGame>> {
-		if !valid_system_id(system_id) {
-			debug!("screenscraper get_game_by_md5 skipped: invalid system_id ({system_id})");
-			return Ok(None);
-		}
-		let trimmed = md5.trim();
-		if trimmed.is_empty() {
-			debug!("screenscraper get_game_by_md5 skipped: empty md5");
-			return Ok(None);
-		}
-		let url = self.url(
-			"jeuInfos.php",
-			&[
-				("systemeid", system_id.to_string()),
-				("md5", trimmed.to_string()),
-			],
-		)?;
-		self.fetch_optional_game("game_by_md5", url).await
+		self.get_game_by_hash("game_by_md5", system_id, rom_name, rom_size, "md5", md5)
+			.await
 	}
 
 	pub async fn get_game_by_sha1(
 		&self,
 		system_id: i32,
+		rom_name: &str,
+		rom_size: Option<i64>,
 		sha1: &str,
 	) -> anyhow::Result<Option<SsGame>> {
-		if !valid_system_id(system_id) {
-			debug!("screenscraper get_game_by_sha1 skipped: invalid system_id ({system_id})");
-			return Ok(None);
-		}
-		let trimmed = sha1.trim();
-		if trimmed.is_empty() {
-			debug!("screenscraper get_game_by_sha1 skipped: empty sha1");
-			return Ok(None);
-		}
-		let url = self.url(
-			"jeuInfos.php",
-			&[
-				("systemeid", system_id.to_string()),
-				("sha1", trimmed.to_string()),
-			],
-		)?;
-		self.fetch_optional_game("game_by_sha1", url).await
+		self.get_game_by_hash(
+			"game_by_sha1",
+			system_id,
+			rom_name,
+			rom_size,
+			"sha1",
+			sha1,
+		)
+		.await
 	}
 
 	pub async fn get_game_by_crc(
 		&self,
 		system_id: i32,
+		rom_name: &str,
+		rom_size: Option<i64>,
 		crc: &str,
 	) -> anyhow::Result<Option<SsGame>> {
+		self.get_game_by_hash("game_by_crc", system_id, rom_name, rom_size, "crc", crc)
+			.await
+	}
+
+	/// `jeuInfos.php` hash lookups require `systemeid`, `romnom` and a hash;
+	/// `romtaille` is optional but improves the hit rate. Calls without
+	/// `romnom` come back as HTTP 400 "Il manque des champs obligatoires
+	/// dans l'url", so guard for it here.
+	async fn get_game_by_hash(
+		&self,
+		endpoint_label: &'static str,
+		system_id: i32,
+		rom_name: &str,
+		rom_size: Option<i64>,
+		hash_param: &'static str,
+		hash_value: &str,
+	) -> anyhow::Result<Option<SsGame>> {
 		if !valid_system_id(system_id) {
-			debug!("screenscraper get_game_by_crc skipped: invalid system_id ({system_id})");
+			debug!("screenscraper {endpoint_label} skipped: invalid system_id ({system_id})");
 			return Ok(None);
 		}
-		let trimmed = crc.trim();
-		if trimmed.is_empty() {
-			debug!("screenscraper get_game_by_crc skipped: empty crc");
+		let trimmed_hash = hash_value.trim();
+		if trimmed_hash.is_empty() {
+			debug!("screenscraper {endpoint_label} skipped: empty {hash_param}");
 			return Ok(None);
 		}
-		let url = self.url(
-			"jeuInfos.php",
-			&[
-				("systemeid", system_id.to_string()),
-				("crc", trimmed.to_string()),
-			],
-		)?;
-		self.fetch_optional_game("game_by_crc", url).await
+		let trimmed_name = rom_name.trim();
+		if trimmed_name.is_empty() {
+			debug!("screenscraper {endpoint_label} skipped: empty rom_name");
+			return Ok(None);
+		}
+		let mut params: Vec<(&'static str, String)> = vec![
+			("systemeid", system_id.to_string()),
+			("romtype", "rom".to_string()),
+			("romnom", trimmed_name.to_string()),
+			(hash_param, trimmed_hash.to_string()),
+		];
+		if let Some(size) = rom_size.filter(|s| *s > 0) {
+			params.push(("romtaille", size.to_string()));
+		}
+		let url = self.url("jeuInfos.php", &params)?;
+		self.fetch_optional_game(endpoint_label, url).await
 	}
 
 	async fn fetch_optional_game(
