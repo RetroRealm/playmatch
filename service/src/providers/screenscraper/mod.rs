@@ -124,9 +124,15 @@ impl ScreenScraperClient {
 	}
 
 	pub async fn search_games(&self, system_id: i32, term: &str) -> anyhow::Result<Vec<SsGame>> {
-		// ScreenScraper's jeuRecherche.php rejects searches shorter than 3
-		// characters with HTTP 400, so skip the round-trip entirely.
-		if term.trim().chars().count() < 3 {
+		if !valid_system_id(system_id) {
+			debug!("screenscraper search_games skipped: invalid system_id ({system_id})");
+			return Ok(vec![]);
+		}
+		// ScreenScraper's jeuRecherche.php rejects searches with fewer than
+		// three meaningful characters with HTTP 400 ("Il manque des champs
+		// obligatoires dans l'url"), so skip the round-trip entirely.
+		let trimmed = term.trim();
+		if trimmed.chars().filter(|c| c.is_alphanumeric()).count() < 3 {
 			debug!("screenscraper search_games skipped: term too short ({term:?})");
 			return Ok(vec![]);
 		}
@@ -134,7 +140,7 @@ impl ScreenScraperClient {
 			"jeuRecherche.php",
 			&[
 				("systemeid", system_id.to_string()),
-				("recherche", term.to_string()),
+				("recherche", trimmed.to_string()),
 			],
 		)?;
 		let env = self
@@ -144,6 +150,10 @@ impl ScreenScraperClient {
 	}
 
 	pub async fn get_game_by_id(&self, game_id: i64) -> anyhow::Result<Option<SsGame>> {
+		if game_id <= 0 {
+			debug!("screenscraper get_game_by_id skipped: invalid game_id ({game_id})");
+			return Ok(None);
+		}
 		let url = self.url("jeuInfos.php", &[("gameid", game_id.to_string())])?;
 		self.fetch_optional_game("game_by_id", url).await
 	}
@@ -153,11 +163,20 @@ impl ScreenScraperClient {
 		system_id: i32,
 		rom_name: &str,
 	) -> anyhow::Result<Option<SsGame>> {
+		if !valid_system_id(system_id) {
+			debug!("screenscraper get_game_by_rom_name skipped: invalid system_id ({system_id})");
+			return Ok(None);
+		}
+		let trimmed = rom_name.trim();
+		if trimmed.is_empty() {
+			debug!("screenscraper get_game_by_rom_name skipped: empty rom_name");
+			return Ok(None);
+		}
 		let url = self.url(
 			"jeuInfos.php",
 			&[
 				("systemeid", system_id.to_string()),
-				("romnom", rom_name.to_string()),
+				("romnom", trimmed.to_string()),
 			],
 		)?;
 		self.fetch_optional_game("game_by_rom", url).await
@@ -168,11 +187,20 @@ impl ScreenScraperClient {
 		system_id: i32,
 		md5: &str,
 	) -> anyhow::Result<Option<SsGame>> {
+		if !valid_system_id(system_id) {
+			debug!("screenscraper get_game_by_md5 skipped: invalid system_id ({system_id})");
+			return Ok(None);
+		}
+		let trimmed = md5.trim();
+		if trimmed.is_empty() {
+			debug!("screenscraper get_game_by_md5 skipped: empty md5");
+			return Ok(None);
+		}
 		let url = self.url(
 			"jeuInfos.php",
 			&[
 				("systemeid", system_id.to_string()),
-				("md5", md5.to_string()),
+				("md5", trimmed.to_string()),
 			],
 		)?;
 		self.fetch_optional_game("game_by_md5", url).await
@@ -183,11 +211,20 @@ impl ScreenScraperClient {
 		system_id: i32,
 		sha1: &str,
 	) -> anyhow::Result<Option<SsGame>> {
+		if !valid_system_id(system_id) {
+			debug!("screenscraper get_game_by_sha1 skipped: invalid system_id ({system_id})");
+			return Ok(None);
+		}
+		let trimmed = sha1.trim();
+		if trimmed.is_empty() {
+			debug!("screenscraper get_game_by_sha1 skipped: empty sha1");
+			return Ok(None);
+		}
 		let url = self.url(
 			"jeuInfos.php",
 			&[
 				("systemeid", system_id.to_string()),
-				("sha1", sha1.to_string()),
+				("sha1", trimmed.to_string()),
 			],
 		)?;
 		self.fetch_optional_game("game_by_sha1", url).await
@@ -198,11 +235,20 @@ impl ScreenScraperClient {
 		system_id: i32,
 		crc: &str,
 	) -> anyhow::Result<Option<SsGame>> {
+		if !valid_system_id(system_id) {
+			debug!("screenscraper get_game_by_crc skipped: invalid system_id ({system_id})");
+			return Ok(None);
+		}
+		let trimmed = crc.trim();
+		if trimmed.is_empty() {
+			debug!("screenscraper get_game_by_crc skipped: empty crc");
+			return Ok(None);
+		}
 		let url = self.url(
 			"jeuInfos.php",
 			&[
 				("systemeid", system_id.to_string()),
-				("crc", crc.to_string()),
+				("crc", trimmed.to_string()),
 			],
 		)?;
 		self.fetch_optional_game("game_by_crc", url).await
@@ -270,6 +316,7 @@ impl ScreenScraperClient {
 		url: Url,
 	) -> anyhow::Result<Option<SsEnvelope<T>>> {
 		let started = std::time::Instant::now();
+		let sanitised_url = url_for_log(&url);
 		let result = self.execute_get(url).await;
 		let outcome = match &result {
 			Ok((status, _, _)) if status.is_success() => "success",
@@ -308,7 +355,7 @@ impl ScreenScraperClient {
 				))
 			}
 			s if !s.is_success() => Err(anyhow!(
-				"screenscraper returned non-success status: {s} (body preview: {:?})",
+				"screenscraper {endpoint_label} returned non-success status: {s} for {sanitised_url} (body preview: {:?})",
 				body_preview(&body)
 			)),
 			_ if body.is_empty() => Ok(None),
@@ -464,6 +511,13 @@ fn url_for_log(url: &Url) -> String {
 	sanitised.to_string()
 }
 
+/// ScreenScraper's PHP backend reports `systemeid=0` as missing because
+/// PHP's `empty("0")` is true. Treat any non-positive value the same way
+/// so we never spend a request on a guaranteed 400.
+fn valid_system_id(system_id: i32) -> bool {
+	system_id > 0
+}
+
 /// Trims the body for inclusion in error messages on non-success statuses.
 /// Error responses do not contain the `ssuser` block (that only rides on
 /// success envelopes), so they are safe to log unredacted within a short cap.
@@ -561,6 +615,14 @@ mod tests {
 	fn parse_or_incident_rejects_non_json_content_type() {
 		let body = "{\"jeu\": {\"id\": \"1\"}}";
 		assert!(parse_or_incident(body, Some("text/html; charset=utf-8")).is_err());
+	}
+
+	#[test]
+	fn valid_system_id_rejects_zero_and_negative() {
+		assert!(!valid_system_id(0));
+		assert!(!valid_system_id(-1));
+		assert!(valid_system_id(1));
+		assert!(valid_system_id(57));
 	}
 
 	#[test]
