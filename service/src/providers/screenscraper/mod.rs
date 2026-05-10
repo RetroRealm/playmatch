@@ -231,15 +231,8 @@ impl ScreenScraperClient {
 		rom_size: Option<i64>,
 		sha1: &str,
 	) -> anyhow::Result<Option<SsGame>> {
-		self.get_game_by_hash(
-			"game_by_sha1",
-			system_id,
-			rom_name,
-			rom_size,
-			"sha1",
-			sha1,
-		)
-		.await
+		self.get_game_by_hash("game_by_sha1", system_id, rom_name, rom_size, "sha1", sha1)
+			.await
 	}
 
 	pub async fn get_game_by_crc(
