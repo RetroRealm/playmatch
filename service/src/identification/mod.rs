@@ -1,13 +1,15 @@
 pub mod cache;
+mod protocol;
 
 use crate::cache::CacheStatus;
 use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::db::game::{find_all_relations_of_game, get_game_by_id};
 use crate::error::{ServiceError, ServiceResult};
 use crate::identification::cache::{
-	IdentifyCacheType, IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
+	IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
 	find_game_and_metadata_ids_by_hash_cached,
 };
+use crate::identification::protocol::IdentifyAggregator;
 use crate::matching::manual::build_result;
 use crate::model::{
 	GameAndRelationMatchResult, GameAndRelationMatchResultBuilder, GameAndRelationsResult,
@@ -18,6 +20,7 @@ use log::debug;
 use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
+use std::ops::ControlFlow;
 use strum::IntoEnumIterator;
 
 pub async fn get_game_by_id_from_db(game_id: Uuid, conn: &DbConn) -> ServiceResult<PlaymatchGame> {
@@ -95,6 +98,10 @@ pub async fn identify_game_and_metadata_mappings(
 /// Walk the supported match types in order (sha256, sha1, md5, name+size) and return the first
 /// hit, together with whether the hit was served from cache. If every hash that could have been
 /// checked produced a cached-but-empty result, surface a `Cached(None)`; otherwise `NonCached(None)`.
+///
+/// Cache-coherence bookkeeping lives in [`IdentifyAggregator`]; this fn is
+/// the impure dispatch shell that runs the cache lookups and records the
+/// per-attempt metric.
 async fn identify_game(
 	search: &GameFileMatchSearch,
 	redis_conn: &mut MultiplexedConnection,
@@ -109,94 +116,72 @@ async fn identify_game(
 	.filter(|hash| hash.is_some())
 	.count();
 
-	let mut cached_but_empty = 0;
+	let mut agg = IdentifyAggregator::new(expected_count);
 
 	for match_type in GameMatchType::iter().filter(|t| *t != GameMatchType::NoMatch) {
-		let (attempted, type_result) = match match_type {
+		let outcome = match match_type {
 			GameMatchType::SHA256 => match &search.sha256 {
-				Some(hash) => (
-					true,
+				Some(hash) => {
 					find_game_and_metadata_ids_by_hash_cached(
 						hash,
-						IdentifyCacheType::IdentifySha256,
+						GameMatchType::SHA256,
 						redis_conn,
 						db_conn,
 					)
-					.await?,
-				),
-				None => (false, NonCached(None)),
+					.await?
+				}
+				None => continue,
 			},
 			GameMatchType::SHA1 => match &search.sha1 {
-				Some(hash) => (
-					true,
+				Some(hash) => {
 					find_game_and_metadata_ids_by_hash_cached(
 						hash,
-						IdentifyCacheType::IdentifySha1,
+						GameMatchType::SHA1,
 						redis_conn,
 						db_conn,
 					)
-					.await?,
-				),
-				None => (false, NonCached(None)),
+					.await?
+				}
+				None => continue,
 			},
 			GameMatchType::MD5 => match &search.md5 {
-				Some(hash) => (
-					true,
+				Some(hash) => {
 					find_game_and_metadata_ids_by_hash_cached(
 						hash,
-						IdentifyCacheType::IdentifyMd5,
+						GameMatchType::MD5,
 						redis_conn,
 						db_conn,
 					)
-					.await?,
-				),
-				None => (false, NonCached(None)),
+					.await?
+				}
+				None => continue,
 			},
-			GameMatchType::FileNameAndSize => (
-				true,
+			GameMatchType::FileNameAndSize => {
 				find_game_and_metadata_ids_by_filename_size_cached(
 					&search.file_name,
 					search.file_size,
 					redis_conn,
 					db_conn,
 				)
-				.await?,
-			),
+				.await?
+			}
 			GameMatchType::NoMatch => unreachable!(),
 		};
 
-		match type_result {
-			Cached(Some(entry)) => {
-				debug!("Cache hit for game match ({match_type:?}): {entry:?}");
-				crate::metrics::record_identify_attempt(match_type.metric_label(), true);
-				return Ok(Cached(Some((match_type, entry))));
-			}
-			NonCached(Some(entry)) => {
-				debug!("Cache miss for game match ({match_type:?}): {entry:?}");
-				crate::metrics::record_identify_attempt(match_type.metric_label(), true);
-				return Ok(NonCached(Some((match_type, entry))));
-			}
-			Cached(None) => {
-				if attempted {
-					crate::metrics::record_identify_attempt(match_type.metric_label(), false);
-				}
-				cached_but_empty += 1;
-			}
-			NonCached(None) => {
-				if attempted {
-					crate::metrics::record_identify_attempt(match_type.metric_label(), false);
-				}
-				continue;
-			}
+		let hit = matches!(&outcome, Cached(Some(_)) | NonCached(Some(_)));
+		crate::metrics::record_identify_attempt(match_type.metric_label(), hit);
+
+		if let ControlFlow::Break(result) = agg.observe(match_type, outcome) {
+			debug!("Identify resolved on match type {match_type:?}");
+			return Ok(result);
 		}
 	}
 
-	if cached_but_empty == expected_count && cached_but_empty != 0 {
+	let result = agg.finalize();
+	if matches!(result, Cached(None)) {
 		debug!("All possible game matches were cached as empty, returning cached no-match");
-		Ok(Cached(None))
-	} else {
-		Ok(NonCached(None))
 	}
+	Ok(result)
 }
 
 async fn build_relation_match_result(

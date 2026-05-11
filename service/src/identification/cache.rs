@@ -1,6 +1,6 @@
 use crate::cache::CacheStatus::{Cached, NonCached};
 use crate::cache::{
-	CACHE_KEY_VERSION, CACHE_PREFIX, CacheKey, CacheStatus, deserialize_option_redis_value,
+	CACHE_KEY_VERSION, CACHE_PREFIX, CacheStatus, deserialize_option_redis_value,
 	serialize_option_redis_value, spawn_cache_write,
 };
 use crate::db::game::{
@@ -9,6 +9,7 @@ use crate::db::game::{
 };
 use crate::db::game_file::get_game_files_from_game_id;
 use crate::error::ServiceResult;
+use crate::model::GameMatchType;
 use entity::{game, game_file, signature_metadata_mapping};
 use hex::encode as hex_encode;
 use log::{debug, warn};
@@ -28,44 +29,15 @@ pub struct IdentifyEntry {
 	pub metadata_mappings: Vec<signature_metadata_mapping::Model>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum IdentifyCacheType {
-	IdentifySha256,
-	IdentifySha1,
-	IdentifyMd5,
-	IdentifyFilenameSize,
-}
-
-impl CacheKey for IdentifyCacheType {
-	fn get_cache_key(&self, identifier: &str) -> String {
-		match &self {
-			IdentifyCacheType::IdentifySha256 => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:sha256:{identifier}")
-			}
-			IdentifyCacheType::IdentifySha1 => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:sha1:{identifier}")
-			}
-			IdentifyCacheType::IdentifyMd5 => {
-				format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:md5:{identifier}")
-			}
-			IdentifyCacheType::IdentifyFilenameSize => {
-				format!(
-					"{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:filename_size:{identifier}"
-				)
-			}
-		}
-	}
-}
-
-impl IdentifyCacheType {
-	fn metric_label(&self) -> &'static str {
-		match self {
-			IdentifyCacheType::IdentifySha256 => "sha256",
-			IdentifyCacheType::IdentifySha1 => "sha1",
-			IdentifyCacheType::IdentifyMd5 => "md5",
-			IdentifyCacheType::IdentifyFilenameSize => "filename_size",
-		}
-	}
+/// Render the redis key for an identify cache entry. Panics on
+/// [`GameMatchType::NoMatch`] (not a cacheable match type); callers
+/// should only pass match types whose
+/// [`GameMatchType::cache_segment`] returns `Some`.
+fn identify_cache_key(match_type: GameMatchType, identifier: &str) -> String {
+	let segment = match_type
+		.cache_segment()
+		.expect("identify_cache_key called with non-cacheable match type");
+	format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:identify:{segment}:{identifier}")
 }
 
 /// Produce the opaque identifier segment used in the filename+size identify
@@ -80,35 +52,22 @@ pub fn filename_size_key(file_name: &str, file_size: i64) -> String {
 	hex_encode(hasher.finalize())
 }
 
-pub async fn delete_identify_cache(
-	hash: &str,
-	r#type: IdentifyCacheType,
-	redis_conn: &mut MultiplexedConnection,
-) -> ServiceResult<()> {
-	let cache_key = r#type.get_cache_key(hash);
-	debug!("Deleting cache for key: {cache_key}");
-	if let Err(e) = redis_conn.del(&cache_key).await {
-		warn!("cache delete failed for {cache_key}: {e}");
-	}
-	Ok(())
-}
-
 /// Push every identify cache key derived from `file` (sha256, sha1, md5,
 /// filename+size) into `out`. Skips fields that are missing on the model so
 /// the caller can pipeline a single `DEL` over only the keys that exist.
 pub fn collect_identify_cache_keys(file: &game_file::Model, out: &mut Vec<String>) {
 	if let Some(sha256) = &file.sha256 {
-		out.push(IdentifyCacheType::IdentifySha256.get_cache_key(sha256));
+		out.push(identify_cache_key(GameMatchType::SHA256, sha256));
 	}
 	if let Some(sha1) = &file.sha1 {
-		out.push(IdentifyCacheType::IdentifySha1.get_cache_key(sha1));
+		out.push(identify_cache_key(GameMatchType::SHA1, sha1));
 	}
 	if let Some(md5) = &file.md5 {
-		out.push(IdentifyCacheType::IdentifyMd5.get_cache_key(md5));
+		out.push(identify_cache_key(GameMatchType::MD5, md5));
 	}
 	if let Some(size) = file.file_size_in_bytes {
 		let key = filename_size_key(&file.file_name, size);
-		out.push(IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key));
+		out.push(identify_cache_key(GameMatchType::FileNameAndSize, &key));
 	}
 }
 
@@ -145,26 +104,23 @@ pub async fn find_game_and_metadata_ids_by_filename_size_cached(
 	db_conn: &DbConn,
 ) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
 	let key = filename_size_key(file_name, file_size);
-	let cache_key = IdentifyCacheType::IdentifyFilenameSize.get_cache_key(&key);
+	let cache_key = identify_cache_key(GameMatchType::FileNameAndSize, &key);
+	let metric_segment = GameMatchType::FileNameAndSize
+		.cache_segment()
+		.expect("FileNameAndSize is cacheable");
 
 	if let Ok(Some(cached_val)) = redis_conn
 		.get_ex(&cache_key, Expiry::EX(IDENTIFY_CACHE_LIFETIME))
 		.await
 	{
 		debug!("Cache hit for filename+size");
-		crate::metrics::record_cache_hit(
-			"identify",
-			IdentifyCacheType::IdentifyFilenameSize.metric_label(),
-		);
+		crate::metrics::record_cache_hit("identify", metric_segment);
 		let deserialized = deserialize_option_redis_value(cached_val)?;
 		return Ok(Cached(deserialized));
 	}
 
 	debug!("Cache miss for filename+size");
-	crate::metrics::record_cache_miss(
-		"identify",
-		IdentifyCacheType::IdentifyFilenameSize.metric_label(),
-	);
+	crate::metrics::record_cache_miss("identify", metric_segment);
 
 	let entry = find_game_and_id_mapping_by_name_and_size(file_name, file_size, db_conn)
 		.await?
@@ -186,33 +142,37 @@ pub async fn find_game_and_metadata_ids_by_filename_size_cached(
 
 pub async fn find_game_and_metadata_ids_by_hash_cached(
 	hash: &str,
-	r#type: IdentifyCacheType,
+	match_type: GameMatchType,
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
 ) -> ServiceResult<CacheStatus<Option<IdentifyEntry>>> {
-	let cache_key = r#type.get_cache_key(hash);
+	let cache_key = identify_cache_key(match_type, hash);
+	let metric_segment = match_type
+		.cache_segment()
+		.expect("hash cache called with non-cacheable match type");
 
 	if let Ok(Some(cached_val)) = redis_conn
 		.get_ex(&cache_key, Expiry::EX(IDENTIFY_CACHE_LIFETIME))
 		.await
 	{
 		debug!("Cache hit for key: {hash}");
-		crate::metrics::record_cache_hit("identify", r#type.metric_label());
+		crate::metrics::record_cache_hit("identify", metric_segment);
 		let deserialized = deserialize_option_redis_value(cached_val)?;
 		return Ok(Cached(deserialized));
 	}
 
 	debug!("Cache miss for key: {hash}");
-	crate::metrics::record_cache_miss("identify", r#type.metric_label());
+	crate::metrics::record_cache_miss("identify", metric_segment);
 
-	let entry = match r#type {
-		IdentifyCacheType::IdentifySha256 => {
-			find_game_and_id_mapping_by_sha256(hash, db_conn).await?
-		}
-		IdentifyCacheType::IdentifySha1 => find_game_and_id_mapping_by_sha1(hash, db_conn).await?,
-		IdentifyCacheType::IdentifyMd5 => find_game_and_id_mapping_by_md5(hash, db_conn).await?,
-		IdentifyCacheType::IdentifyFilenameSize => {
+	let entry = match match_type {
+		GameMatchType::SHA256 => find_game_and_id_mapping_by_sha256(hash, db_conn).await?,
+		GameMatchType::SHA1 => find_game_and_id_mapping_by_sha1(hash, db_conn).await?,
+		GameMatchType::MD5 => find_game_and_id_mapping_by_md5(hash, db_conn).await?,
+		GameMatchType::FileNameAndSize => {
 			unreachable!("filename+size has a dedicated cached wrapper")
+		}
+		GameMatchType::NoMatch => {
+			unreachable!("NoMatch is not a cacheable match type")
 		}
 	}
 	.map(|(game, mappings)| IdentifyEntry {

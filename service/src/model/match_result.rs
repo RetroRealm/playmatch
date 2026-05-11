@@ -73,6 +73,24 @@ impl GameMatchType {
 			GameMatchType::NoMatch => "no_match",
 		}
 	}
+
+	/// Returns the identify cache namespace segment for this match type, or
+	/// `None` for [`GameMatchType::NoMatch`] (not cached).
+	///
+	/// Note: `FileNameAndSize` returns `"filename_size"` here while
+	/// [`Self::metric_label`] returns `"filename"`. The mismatch predates
+	/// this method (cache hit/miss metrics used `"filename_size"`; identify
+	/// attempt metrics used `"filename"`) and is preserved to keep existing
+	/// Prometheus series stable. Future cleanup should align them.
+	pub fn cache_segment(&self) -> Option<&'static str> {
+		match self {
+			GameMatchType::SHA256 => Some("sha256"),
+			GameMatchType::SHA1 => Some("sha1"),
+			GameMatchType::MD5 => Some("md5"),
+			GameMatchType::FileNameAndSize => Some("filename_size"),
+			GameMatchType::NoMatch => None,
+		}
+	}
 }
 
 /// Result of a manual match.
