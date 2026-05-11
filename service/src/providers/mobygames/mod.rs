@@ -66,10 +66,6 @@ impl MobyGamesClient {
 		})
 	}
 
-	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
-		&self.redis_conn
-	}
-
 	pub async fn list_platforms(&self) -> anyhow::Result<Arc<Vec<MgPlatform>>> {
 		self.platforms_cache
 			.get_or_try_init(|| async {
@@ -279,6 +275,10 @@ impl crate::providers::MetadataProvider for MobyGamesClient {
 
 	fn provider_enum(&self) -> MetadataProviderEnum {
 		MetadataProviderEnum::Mobygames
+	}
+
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {

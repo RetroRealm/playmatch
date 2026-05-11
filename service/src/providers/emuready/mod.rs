@@ -58,10 +58,6 @@ impl EmuReadyClient {
 		})
 	}
 
-	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
-		&self.redis_conn
-	}
-
 	pub async fn list_systems(&self) -> anyhow::Result<Arc<Vec<EmuReadySystem>>> {
 		self.systems_cache
 			.get_or_try_init(|| async {
@@ -177,6 +173,10 @@ impl crate::providers::MetadataProvider for EmuReadyClient {
 
 	fn provider_enum(&self) -> MetadataProviderEnum {
 		MetadataProviderEnum::EmuReady
+	}
+
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {

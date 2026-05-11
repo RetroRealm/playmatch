@@ -1,5 +1,4 @@
 use crate::db::game::{
-	find_game_parent, find_game_signature_metadata_mapping,
 	get_automatic_match_failed_games_with_limit, get_unmatched_games_with_clone_of_with_limit,
 	get_unmatched_games_without_clone_of_with_limit,
 };
@@ -90,66 +89,13 @@ fn match_clone_of_game_to_screenscraper(
 		if client.is_quota_exhausted() {
 			return Ok(());
 		}
-
-		let mut redis_conn = client.redis_conn().clone();
-		let parent_game = find_game_parent(&game, &db_conn).await?;
-
-		if let Some(parent_game) = parent_game {
-			let parent_mapping =
-				find_game_signature_metadata_mapping(&parent_game, &db_conn).await?;
-
-			if let Some(mapping) = &parent_mapping
-				&& matches!(
-					mapping.match_type,
-					MatchTypeEnum::Automatic | MatchTypeEnum::Manual
-				) && let Some(provider_id) = mapping.provider_id.clone()
-			{
-				debug!(
-					"Matched Game \"{}\" to ScreenScraper Game ID {provider_id} (Via Parent)",
-					&game.name
-				);
-				write_auto_match_success(
-					"screenscraper",
-					MetadataProviderEnum::Screenscraper,
-					Target::Game(game.id),
-					provider_id,
-					AutomaticMatchReasonEnum::ViaParent,
-					mapping.matched_name.clone(),
-					mapping.matched_year,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-				return Ok(());
-			}
-
-			match_game_to_screenscraper(game.clone(), client.clone(), db_conn.clone()).await?;
-
-			let mapping = find_game_signature_metadata_mapping(&game, &db_conn).await?;
-
-			if let Some(mapping) = mapping
-				&& matches!(
-					mapping.match_type,
-					MatchTypeEnum::Automatic | MatchTypeEnum::Manual
-				) && let Some(provider_id) = mapping.provider_id
-			{
-				debug!("Propagating ScreenScraper match from clone to parent game (Via Child)");
-				write_auto_match_success(
-					"screenscraper",
-					MetadataProviderEnum::Screenscraper,
-					Target::Game(parent_game.id),
-					provider_id,
-					AutomaticMatchReasonEnum::ViaChild,
-					mapping.matched_name,
-					mapping.matched_year,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-			}
-		}
-
-		Ok(())
+		crate::providers::drive_clone_propagation(
+			game,
+			client,
+			db_conn,
+			match_game_to_screenscraper,
+		)
+		.await
 	})
 }
 

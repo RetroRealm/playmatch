@@ -136,10 +136,6 @@ impl ScreenScraperClient {
 		was_fresh
 	}
 
-	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
-		&self.redis_conn
-	}
-
 	pub async fn list_systems(&self) -> anyhow::Result<Arc<Vec<SsSystem>>> {
 		let cell = &self.systems_cache;
 		cell.get_or_try_init(|| async {
@@ -603,6 +599,10 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 		self.concurrency
 			.load(Ordering::Relaxed)
 			.clamp(1, MAX_CONCURRENCY)
+	}
+
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {

@@ -5,15 +5,17 @@ pub mod mobygames;
 pub mod screenscraper;
 pub mod steamgriddb;
 
+use crate::db::game::find_game_parent;
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
+	find_signature_metadata_mapping_by_platform_game_company_and_provider,
 };
 use crate::metrics::{record_background_job, record_metadata_auto_match};
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::sync::Arc;
@@ -217,6 +219,97 @@ where
 	Ok(())
 }
 
+/// Drive the clone-of-game propagation pattern shared by every provider's
+/// `match_clone_of_game_to_*` entry point. Looks up the game's parent: if the
+/// parent already has a matching mapping for this provider, propagates it
+/// down as `ViaParent`. Otherwise runs the primary `match_fn` on the child
+/// and, if the child becomes matched, propagates back up as `ViaChild`.
+pub async fn drive_clone_propagation<C>(
+	game: entity::game::Model,
+	client: Arc<C>,
+	db_conn: DbConn,
+	primary_match_fn: MatchEntityFn<entity::game::Model, C>,
+) -> anyhow::Result<()>
+where
+	C: MetadataProvider,
+{
+	let provider_label = client.provider_label();
+	let provider_enum = client.provider_enum();
+	let mut redis_conn = client.redis_conn().clone();
+
+	let Some(parent_game) = find_game_parent(&game, &db_conn).await? else {
+		return Ok(());
+	};
+
+	let parent_mapping = find_signature_metadata_mapping_by_platform_game_company_and_provider(
+		None,
+		Some(parent_game.id),
+		None,
+		provider_enum,
+		&db_conn,
+	)
+	.await?;
+
+	if let Some(mapping) = &parent_mapping
+		&& matches!(
+			mapping.match_type,
+			MatchTypeEnum::Automatic | MatchTypeEnum::Manual
+		) && let Some(provider_id) = mapping.provider_id.clone()
+	{
+		debug!(
+			"Matched Game \"{}\" to {provider_label} Game ID {provider_id} (Via Parent)",
+			&game.name
+		);
+		write_auto_match_success(
+			provider_label,
+			provider_enum,
+			Target::Game(game.id),
+			provider_id,
+			AutomaticMatchReasonEnum::ViaParent,
+			mapping.matched_name.clone(),
+			mapping.matched_year,
+			&db_conn,
+			&mut redis_conn,
+		)
+		.await?;
+		return Ok(());
+	}
+
+	primary_match_fn(game.clone(), client.clone(), db_conn.clone()).await?;
+
+	let child_mapping = find_signature_metadata_mapping_by_platform_game_company_and_provider(
+		None,
+		Some(game.id),
+		None,
+		provider_enum,
+		&db_conn,
+	)
+	.await?;
+
+	if let Some(mapping) = child_mapping
+		&& matches!(
+			mapping.match_type,
+			MatchTypeEnum::Automatic | MatchTypeEnum::Manual
+		) && let Some(provider_id) = mapping.provider_id
+	{
+		debug!("Propagating {provider_label} match from clone to parent game (Via Child)");
+		write_auto_match_success(
+			provider_label,
+			provider_enum,
+			Target::Game(parent_game.id),
+			provider_id,
+			AutomaticMatchReasonEnum::ViaChild,
+			mapping.matched_name,
+			mapping.matched_year,
+			&db_conn,
+			&mut redis_conn,
+		)
+		.await?;
+	}
+
+	Ok(())
+}
+
 /// Drive a cross-provider name retry pass for `provider`. Pages through
 /// games that this provider failed to match while at least one sibling
 /// provider has a non-null `matched_name`, then dispatches `match_fn` per
@@ -330,6 +423,12 @@ pub trait MetadataProvider: Send + Sync + 'static {
 	fn chunk_size(&self) -> usize {
 		DEFAULT_CHUNK_SIZE
 	}
+
+	/// Multiplexed Redis handle used by per-entity match fns for cache busts.
+	/// Every provider participates in the identify cache contract, so the
+	/// dependency is declared here rather than as an inherent method on each
+	/// client.
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection;
 
 	/// Run a full match cycle for this provider. Owns its own page/chunk/spawn
 	/// pipeline so providers can express custom strategies (parent/child

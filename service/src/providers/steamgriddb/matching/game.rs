@@ -1,14 +1,14 @@
 use crate::db::game::{
-	find_game_parent, get_automatic_match_failed_games_with_limit,
+	get_automatic_match_failed_games_with_limit,
 	get_unmatched_games_with_clone_of_with_limit_no_platform_gate,
 	get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 };
-use crate::db::signature_metadata_mapping::find_signature_metadata_mapping_by_platform_game_company_and_provider;
 use crate::matching::name_parse::parse_name;
 use crate::matching::scoring::{
 	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
+use crate::providers::MetadataProvider;
 use crate::providers::steamgriddb::SteamGridDbClient;
 use crate::providers::steamgriddb::model::SgdbGame;
 use crate::providers::{
@@ -17,7 +17,7 @@ use crate::providers::{
 };
 use entity::game::Model;
 use entity::sea_orm_active_enums::{
-	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
+	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
 use log::debug;
@@ -73,81 +73,12 @@ fn match_clone_of_game_to_steamgriddb(
 	client: Arc<SteamGridDbClient>,
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
-	Box::pin(async move {
-		let mut redis_conn = client.redis_conn().clone();
-		let parent_game = find_game_parent(&game, &db_conn).await?;
-
-		if let Some(parent_game) = parent_game {
-			let parent_mapping =
-				find_signature_metadata_mapping_by_platform_game_company_and_provider(
-					None,
-					Some(parent_game.id),
-					None,
-					MetadataProviderEnum::Steamgriddb,
-					&db_conn,
-				)
-				.await?;
-
-			if let Some(mapping) = &parent_mapping
-				&& matches!(
-					mapping.match_type,
-					MatchTypeEnum::Automatic | MatchTypeEnum::Manual
-				) && let Some(provider_id) = mapping.provider_id.clone()
-			{
-				debug!(
-					"Matched Game \"{}\" to SteamGridDB Game ID {provider_id} (Via Parent)",
-					&game.name
-				);
-				write_auto_match_success(
-					"steamgriddb",
-					MetadataProviderEnum::Steamgriddb,
-					Target::Game(game.id),
-					provider_id,
-					AutomaticMatchReasonEnum::ViaParent,
-					mapping.matched_name.clone(),
-					mapping.matched_year,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-				return Ok(());
-			}
-
-			match_game_to_steamgriddb(game.clone(), client.clone(), db_conn.clone()).await?;
-
-			let mapping = find_signature_metadata_mapping_by_platform_game_company_and_provider(
-				None,
-				Some(game.id),
-				None,
-				MetadataProviderEnum::Steamgriddb,
-				&db_conn,
-			)
-			.await?;
-
-			if let Some(mapping) = mapping
-				&& matches!(
-					mapping.match_type,
-					MatchTypeEnum::Automatic | MatchTypeEnum::Manual
-				) && let Some(provider_id) = mapping.provider_id
-			{
-				debug!("Propagating SteamGridDB match from clone to parent game (Via Child)");
-				write_auto_match_success(
-					"steamgriddb",
-					MetadataProviderEnum::Steamgriddb,
-					Target::Game(parent_game.id),
-					provider_id,
-					AutomaticMatchReasonEnum::ViaChild,
-					mapping.matched_name,
-					mapping.matched_year,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-			}
-		}
-
-		Ok(())
-	})
+	Box::pin(crate::providers::drive_clone_propagation(
+		game,
+		client,
+		db_conn,
+		match_game_to_steamgriddb,
+	))
 }
 
 struct ScoredCand<'a> {

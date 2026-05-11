@@ -58,10 +58,6 @@ impl SteamGridDbClient {
 		})
 	}
 
-	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
-		&self.redis_conn
-	}
-
 	pub async fn get_game_by_id(&self, id: i64) -> anyhow::Result<Option<SgdbGame>> {
 		let url = self.url(&["games", "id", &id.to_string()], &[])?;
 		match self
@@ -338,6 +334,10 @@ impl crate::providers::MetadataProvider for SteamGridDbClient {
 
 	fn provider_enum(&self) -> MetadataProviderEnum {
 		MetadataProviderEnum::Steamgriddb
+	}
+
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {

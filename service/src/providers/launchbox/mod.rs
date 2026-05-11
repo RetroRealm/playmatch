@@ -30,10 +30,6 @@ impl LaunchBoxClient {
 		})
 	}
 
-	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
-		&self.redis_conn
-	}
-
 	pub async fn ensure_imported(&self) -> anyhow::Result<import::ImportOutcome> {
 		import::ensure_imported(&self.http, &self.db_conn, &self.metadata_url).await
 	}
@@ -47,6 +43,10 @@ impl crate::providers::MetadataProvider for LaunchBoxClient {
 
 	fn provider_enum(&self) -> MetadataProviderEnum {
 		MetadataProviderEnum::Launchbox
+	}
+
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	async fn match_db(self: Arc<Self>, db_conn: &DbConn) -> anyhow::Result<()> {

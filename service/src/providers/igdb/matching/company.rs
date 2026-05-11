@@ -1,4 +1,5 @@
 use crate::db::company::get_unmatched_companies_with_limit;
+use crate::providers::MetadataProvider;
 use crate::providers::igdb::IgdbClient;
 use crate::providers::{
 	DEFAULT_CHUNK_SIZE, Target, drive_match_pipeline, write_auto_match_failed,

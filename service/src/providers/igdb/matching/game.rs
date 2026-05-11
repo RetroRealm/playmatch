@@ -1,5 +1,4 @@
 use crate::db::game::{
-	find_game_parent, find_game_signature_metadata_mapping,
 	get_automatic_match_failed_games_with_limit, get_unmatched_games_with_clone_of_with_limit,
 	get_unmatched_games_without_clone_of_with_limit,
 };
@@ -11,6 +10,7 @@ use crate::matching::scoring::{
 	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
+use crate::providers::MetadataProvider;
 use crate::providers::igdb::IgdbClient;
 use crate::providers::igdb::model::Game as IgdbGame;
 use crate::providers::{
@@ -75,71 +75,12 @@ fn match_clone_of_game_to_igdb(
 	igdb_client: Arc<IgdbClient>,
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
-	Box::pin(async move {
-		let mut redis_conn = igdb_client.redis_conn().clone();
-		let parent_game = find_game_parent(&game, &db_conn).await?;
-
-		if let Some(parent_game) = parent_game {
-			let parent_game_igdb_mapping =
-				find_game_signature_metadata_mapping(&parent_game, &db_conn).await?;
-
-			if let Some(parent_game_igdb_mapping) = &parent_game_igdb_mapping
-				&& (parent_game_igdb_mapping.match_type == MatchTypeEnum::Automatic
-					|| parent_game_igdb_mapping.match_type == MatchTypeEnum::Manual)
-			{
-				debug!(
-					"Matched Game \"{}\" to IGDB Game ID {} (Via Parent)",
-					&game.name,
-					parent_game_igdb_mapping.provider_id.clone().unwrap()
-				);
-
-				write_auto_match_success(
-					"igdb",
-					MetadataProviderEnum::Igdb,
-					Target::Game(game.id),
-					parent_game_igdb_mapping.provider_id.clone().unwrap(),
-					AutomaticMatchReasonEnum::ViaParent,
-					parent_game_igdb_mapping.matched_name.clone(),
-					parent_game_igdb_mapping.matched_year,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-
-				return Ok(());
-			}
-
-			match_game_to_igdb(game.clone(), igdb_client.clone(), db_conn.clone()).await?;
-
-			let mapping = find_game_signature_metadata_mapping(&game, &db_conn).await?;
-
-			if let Some(mapping) = mapping
-				&& (mapping.match_type == MatchTypeEnum::Automatic
-					|| mapping.match_type == MatchTypeEnum::Manual)
-			{
-				debug!(
-					"Matched Game with parent which is not matched, overriding parent mapping... (Via Child)"
-				);
-
-				write_auto_match_success(
-					"igdb",
-					MetadataProviderEnum::Igdb,
-					Target::Game(parent_game.id),
-					mapping.provider_id.unwrap(),
-					AutomaticMatchReasonEnum::ViaChild,
-					mapping.matched_name,
-					mapping.matched_year,
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
-
-				return Ok(());
-			}
-		}
-
-		Ok(())
-	})
+	Box::pin(crate::providers::drive_clone_propagation(
+		game,
+		igdb_client,
+		db_conn,
+		match_game_to_igdb,
+	))
 }
 
 struct ScoredCand<'a> {

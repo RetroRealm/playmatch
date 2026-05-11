@@ -138,10 +138,6 @@ impl IgdbClient {
 		})
 	}
 
-	pub fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
-		&self.redis_conn
-	}
-
 	pub async fn search_company_by_name(&self, name: &str) -> anyhow::Result<Vec<Company>> {
 		let literal = apicalypse::quote(name)?;
 		self.do_request_parsed::<Vec<Company>>(
@@ -1293,6 +1289,10 @@ impl crate::providers::MetadataProvider for IgdbClient {
 
 	fn provider_enum(&self) -> entity::sea_orm_active_enums::MetadataProviderEnum {
 		entity::sea_orm_active_enums::MetadataProviderEnum::Igdb
+	}
+
+	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
+		&self.redis_conn
 	}
 
 	async fn match_db(self: std::sync::Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
