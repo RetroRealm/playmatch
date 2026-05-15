@@ -110,6 +110,10 @@ pub enum MetadataProviderEnum {
 	Launchbox,
 	#[sea_orm(string_value = "emuready")]
 	EmuReady,
+	#[sea_orm(string_value = "openvgdb")]
+	#[strum(serialize = "openvgdb")]
+	#[allow(clippy::upper_case_acronyms)]
+	OpenVGDB,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

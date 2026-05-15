@@ -10,6 +10,9 @@ pub use super::launchbox_game_alternate_name::Entity as LaunchboxGameAlternateNa
 pub use super::launchbox_game_image::Entity as LaunchboxGameImage;
 pub use super::launchbox_import::Entity as LaunchboxImport;
 pub use super::launchbox_platform::Entity as LaunchboxPlatform;
+pub use super::openvgdb_import::Entity as OpenvgdbImport;
+pub use super::openvgdb_release::Entity as OpenvgdbRelease;
+pub use super::openvgdb_rom::Entity as OpenvgdbRom;
 pub use super::platform::Entity as Platform;
 pub use super::signature_group::Entity as SignatureGroup;
 pub use super::signature_metadata_mapping::Entity as SignatureMetadataMapping;
