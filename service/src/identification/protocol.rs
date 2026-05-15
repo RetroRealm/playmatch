@@ -33,10 +33,6 @@ impl IdentifyAggregator {
 	}
 
 	/// Fold one per-match-type cache outcome into the running tally.
-	///
-	/// `Break(result)` means the caller should return `result` immediately
-	/// (a hit was found, served from cache or computed). `Continue(())`
-	/// means the caller should move on to the next match type.
 	pub fn observe(
 		&mut self,
 		match_type: GameMatchType,
@@ -55,12 +51,10 @@ impl IdentifyAggregator {
 
 	/// Collapse the running tally into a final cache outcome.
 	///
-	/// Returns `Cached(None)` only when `cached_but_empty == expected_count`
-	/// and `expected_count != 0`. Note that `cached_but_empty` is bumped on
-	/// every `Cached(None)` outcome including the filename+size attempt,
-	/// while `expected_count` only counts hash fields. The asymmetry is a
-	/// known wrinkle preserved verbatim from the pre-refactor logic; see
-	/// the test module for the pinned behavior.
+	/// Returns `Cached(None)` only when every hash attempt produced
+	/// `Cached(None)`. `cached_but_empty` is bumped on every `Cached(None)`
+	/// outcome including the filename+size attempt, while `expected_count`
+	/// only counts hash fields; see the test module for the pinned behavior.
 	pub fn finalize(self) -> CacheStatus<Option<(GameMatchType, IdentifyEntry)>> {
 		if self.cached_but_empty == self.expected_count && self.cached_but_empty != 0 {
 			Cached(None)
@@ -148,7 +142,7 @@ mod tests {
 	/// filename+size attempt is also cached empty, `cached_but_empty`
 	/// (3 hashes + 1 filename = 4) no longer equals `expected_count`
 	/// (3 hashes), so the result is `NonCached(None)` even though every
-	/// attempt was cached. Worth revisiting in a follow-up.
+	/// attempt was cached.
 	#[test]
 	fn filename_size_cached_empty_breaks_cached_none_collapse() {
 		let mut agg = IdentifyAggregator::new(3);
@@ -165,8 +159,7 @@ mod tests {
 
 	/// Pins a second wrinkle: when only filename+size is attempted (no
 	/// hashes) and it returns Cached(None), the `expected_count != 0`
-	/// guard in `finalize` forces `NonCached(None)`. Also worth a
-	/// follow-up.
+	/// guard in `finalize` forces `NonCached(None)`.
 	#[test]
 	fn only_filename_size_cached_empty_yields_noncached_none() {
 		let mut agg = IdentifyAggregator::new(0);

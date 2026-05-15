@@ -1268,7 +1268,7 @@ impl IgdbClient {
 		}
 
 		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
-		// MutexGuard has to have been dropped here, so it's 2 statements
+		// Bind the future to a local so the MutexGuard drops before .await.
 		let res = rate_limited_future.await?;
 
 		let body = res.text().await?;

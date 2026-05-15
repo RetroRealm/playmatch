@@ -83,5 +83,4 @@ impl ResponseError for Error {
 	}
 }
 
-// Short hand alias, which allows you to use just Result<T>
 pub type Result<T> = std::result::Result<T, Error>;

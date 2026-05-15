@@ -23,9 +23,7 @@ pub mod model;
 
 pub const API_URL: &str = "https://api.mobygames.com/v1";
 
-/// Cheapest MobyGames tier permits one request every five seconds. Higher
-/// tiers (Bronze, Silver) raise the budget but the response shape is
-/// identical, so a future env-var knob can lift this without other changes.
+/// Cheapest MobyGames tier permits one request every five seconds.
 const RATELIMIT_AMOUNT: u64 = 1;
 const RATELIMIT_DURATION_MS: u64 = 5000;
 const MAX_RETRIES: usize = 3;

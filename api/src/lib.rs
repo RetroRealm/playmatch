@@ -503,7 +503,7 @@ fn build_screenscraper_client(
 /// Returns `None` when EMUREADY_ENABLED is unset or not "true". The EmuReady
 /// API is open and unauthenticated for read endpoints; the flag exists so
 /// existing deployments do not silently start hitting an external service on
-/// next deploy. Matching only — no proxy routes are exposed.
+/// next deploy. Matching only. No proxy routes are exposed.
 fn build_emuready_client(
 	http: Client,
 	redis_conn: redis::aio::MultiplexedConnection,

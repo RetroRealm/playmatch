@@ -90,7 +90,6 @@ async fn apply_manual_entity_match(
 				"Overwriting existing mapping for {}: {entity_id}",
 				target.label()
 			);
-			// TODO: decide how to notify the user that this entry is already matched
 		}
 
 		if let Some(provider_id) = &mapping.provider_id
@@ -186,7 +185,6 @@ pub async fn apply_manual_game_match_by_game(
 
 	let mut games_to_update = vec![];
 
-	// Find all parents and children of the same game
 	for game in games {
 		if let Some(parent) = find_game_parent(&game, db_conn).await? {
 			debug!("Found parent game: {}", parent.id);
@@ -230,7 +228,6 @@ pub async fn apply_manual_game_match_by_game(
 				&& mapping.match_type != MatchTypeEnum::None
 			{
 				debug!("Overwriting existing mapping for game: {}", game.id);
-				// TODO: decide how to notify the user that this entry is already matched
 			}
 
 			if let Some(provider_id) = &mapping.provider_id

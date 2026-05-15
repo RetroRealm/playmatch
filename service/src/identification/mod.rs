@@ -95,13 +95,9 @@ pub async fn identify_game_and_metadata_mappings(
 	}
 }
 
-/// Walk the supported match types in order (sha256, sha1, md5, name+size) and return the first
-/// hit, together with whether the hit was served from cache. If every hash that could have been
-/// checked produced a cached-but-empty result, surface a `Cached(None)`; otherwise `NonCached(None)`.
-///
-/// Cache-coherence bookkeeping lives in [`IdentifyAggregator`]; this fn is
-/// the impure dispatch shell that runs the cache lookups and records the
-/// per-attempt metric.
+/// Tries each match type in order (sha256, sha1, md5, name+size) and returns
+/// the first hit. When every attempted hash produced a cached-but-empty
+/// result the outcome collapses to `Cached(None)`, otherwise `NonCached(None)`.
 async fn identify_game(
 	search: &GameFileMatchSearch,
 	redis_conn: &mut MultiplexedConnection,

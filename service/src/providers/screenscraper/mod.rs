@@ -34,10 +34,10 @@ const SOFTNAME: &str = "playmatch";
 const POST_REQUEST_DELAY_MS: u64 = 1200;
 const MAX_RETRIES: usize = 3;
 
-/// Hard ceiling on the concurrency we will scale up to from
-/// `ssuser.maxthreads`. Defends against pathological response payloads
-/// returning a huge number that would otherwise spawn that many tokio
-/// tasks per match-cycle page.
+/// Hard ceiling on the concurrency probed from `ssuser.maxthreads`.
+/// Defends against pathological response payloads returning a huge
+/// number that would otherwise spawn that many tokio tasks per
+/// match-cycle page.
 const MAX_CONCURRENCY: usize = 16;
 
 /// At or above this fraction of the daily request budget we stop the cycle
@@ -454,10 +454,8 @@ impl ScreenScraperClient {
 		}
 	}
 
-	/// Probe the per-account thread budget from the response envelope and
-	/// grow our semaphore + chunk-size accordingly. `OnceCell`-cached probe
-	/// via `list_systems` means this runs at most once per process restart;
-	/// the cap is enforced both here (clamped target) and in `chunk_size()`.
+	/// Raise the semaphore and concurrency counter when `ssuser.maxthreads`
+	/// exceeds the current value. Monotonic; clamped by `MAX_CONCURRENCY`.
 	fn update_concurrency_from(&self, user: &Option<SsUser>) {
 		let Some(user) = user else { return };
 		let Some(target) = parse_maxthreads(user) else {
@@ -537,9 +535,8 @@ fn now_unix_secs() -> i64 {
 		.unwrap_or(0)
 }
 
-/// True when `stamp` is a non-zero exhaustion mark whose age relative to
-/// `now` is still inside [`QUOTA_BLOCK_TTL_SECS`]. Once the window has
-/// elapsed the mark is treated as cleared so the next match cycle retries.
+/// True while a non-zero `stamp` is younger than [`QUOTA_BLOCK_TTL_SECS`].
+/// Older stamps are treated as cleared so the next match cycle retries.
 fn is_within_quota_block(stamp: i64, now: i64) -> bool {
 	stamp != 0 && now.saturating_sub(stamp) < QUOTA_BLOCK_TTL_SECS
 }

@@ -11,7 +11,6 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 lazy_static! {
-	// Define the regex pattern for extracting the filename
 	static ref FILENAME_REGEX: Regex = Regex::new(r#"filename\*?=(?:UTF-8''|")?([^";]+)"#).unwrap();
 }
 
@@ -71,9 +70,7 @@ pub async fn download_file(
 	}
 }
 
-// Function to extract the filename from Content-Disposition header value
 fn extract_filename(content_disposition: &str) -> Option<String> {
-	// Using the cached regex to capture the filename part
 	if let Some(captures) = FILENAME_REGEX.captures(content_disposition) {
 		return captures.get(1).map(|c| c.as_str().to_string());
 	}

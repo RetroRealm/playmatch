@@ -288,8 +288,6 @@ async fn run_rung(
 	}
 }
 
-/// Walk every game file's md5/sha1/crc against `jeuInfos.php` until a hit
-/// lands or all hashes are exhausted.
 async fn try_match_by_hashes(
 	game: &Model,
 	system_id: i32,

@@ -117,7 +117,6 @@ pub async fn parse_and_import_dat_file(
 							})
 							.collect();
 
-						// Delete existing files that are not in the new files
 						for file in existing_files.iter() {
 							let identifier = (
 								&file.file_name,
@@ -134,7 +133,6 @@ pub async fn parse_and_import_dat_file(
 
 						let mut to_insert = vec![];
 
-						// Insert new files that are not in the existing files
 						for rom in game.rom.iter() {
 							let identifier = (
 								&rom.name,
@@ -217,10 +215,9 @@ fn parse_company_and_platform(
 ) -> anyhow::Result<(Option<String>, String, Vec<String>)> {
 	let mut dat_header = dat.header.name.clone();
 
-	// Remove Arcade - from the name as its not a company or system
+	// Remove Arcade - from the name because it is not a company or system
 	dat_header = dat_header.replace("Arcade - ", "");
 
-	// Remove subset prefix if present
 	if let Some(subset) = &dat.header.subset {
 		let subset_prefix = format!("{subset} - ");
 		if dat_header.starts_with(&subset_prefix) {
@@ -241,25 +238,21 @@ fn parse_company_and_platform(
 
 	match split.len() {
 		1 => {
-			// Single part - it's the platform, no company
 			platform = split[0].to_string();
 		}
 		2 => {
-			// Two parts - company and platform
 			company = Some(split[0].to_string());
 			platform = split[1].to_string();
 		}
 		_ => {
-			// Three or more parts
 			company = Some(split[0].to_string());
 
-			// Join the remaining parts
 			let remaining_parts = split[1..].to_vec();
 
-			// Check if this looks like extra metadata (contains brackets, "NKit", etc)
+			// Stop joining parts onto the platform once one looks like extra
+			// metadata (bracketed tags, NKit, RVZ, and similar).
 			let mut platform_parts = Vec::new();
 			for part in remaining_parts {
-				// Stop adding to platform if we hit what looks like metadata
 				if part.contains('[')
 					|| part.contains("NKit")
 					|| part.contains("RVZ")
@@ -282,10 +275,8 @@ fn parse_company_and_platform(
 
 	// Remove company name from platform if it appears there for GameCube
 	if let Some(ref company_name) = company {
-		// Remove "Company Platform" -> "Platform"
 		if platform.starts_with(company_name) && platform.to_lowercase().contains("gamecube") {
 			let after_company = platform.strip_prefix(company_name).unwrap_or(&platform);
-			// Clean up any leading spaces or separators
 			platform = after_company
 				.trim_start_matches(' ')
 				.trim_start_matches('-')
@@ -297,7 +288,6 @@ fn parse_company_and_platform(
 		let company_no_spaces = company_name.replace(' ', "");
 		if platform.starts_with(&company_no_spaces) && platform.len() > company_no_spaces.len() {
 			let potential_platform = &platform[company_no_spaces.len()..];
-			// Check if the next character is uppercase (indicating camelCase split)
 			if potential_platform
 				.chars()
 				.next()
@@ -309,10 +299,8 @@ fn parse_company_and_platform(
 		}
 	}
 
-	// Remove version from platform if present
 	platform = platform.replace(&format!(" ({version})"), "");
 
-	// Extract tags from platform
 	let mut clean_platform = platform.clone();
 	for capture in DAT_TAG_REGEX.captures_iter(&platform) {
 		if let Some(tag_match) = capture.get(1) {
@@ -337,7 +325,6 @@ fn parse_company_and_platform(
 		let number_str = number_match.as_str();
 		let number = number_str.parse::<u32>().unwrap_or(1);
 
-		// Convert PS1, PS2, PS3, etc. to PlayStation 1, PlayStation 2, etc.
 		platform = format!("PlayStation {number}");
 	}
 

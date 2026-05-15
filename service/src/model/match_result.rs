@@ -78,10 +78,10 @@ impl GameMatchType {
 	/// `None` for [`GameMatchType::NoMatch`] (not cached).
 	///
 	/// Note: `FileNameAndSize` returns `"filename_size"` here while
-	/// [`Self::metric_label`] returns `"filename"`. The mismatch predates
-	/// this method (cache hit/miss metrics used `"filename_size"`; identify
-	/// attempt metrics used `"filename"`) and is preserved to keep existing
-	/// Prometheus series stable. Future cleanup should align them.
+	/// [`Self::metric_label`] returns `"filename"`. Cache hit/miss metrics
+	/// use `"filename_size"` and identify attempt metrics use `"filename"`;
+	/// the two segments stay distinct to keep existing Prometheus series
+	/// stable.
 	pub fn cache_segment(&self) -> Option<&'static str> {
 		match self {
 			GameMatchType::SHA256 => Some("sha256"),

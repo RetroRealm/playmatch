@@ -8,7 +8,7 @@ pub mod built_info {
 }
 
 fn main() {
-	// Load environment variables from .env file, if present but do nothing if it fails
+	// optional .env load
 	let _ = dotenv();
 	env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 

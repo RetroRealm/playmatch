@@ -548,13 +548,11 @@ pub struct ApiDoc;
 pub fn create_openapi() -> utoipa::openapi::OpenApi {
 	let mut openapi = ApiDoc::openapi();
 
-	// Extract existing schemas if already generated
 	let existing_components = openapi
 		.components
 		.take()
 		.unwrap_or_else(Components::default);
 
-	// Build new components with security scheme
 	let new_components = ComponentsBuilder::from(existing_components)
 		.security_scheme(
 			"bearer_auth",
@@ -567,7 +565,6 @@ pub fn create_openapi() -> utoipa::openapi::OpenApi {
 		)
 		.build();
 
-	// Assign merged components back to OpenAPI doc
 	openapi.components = Some(new_components);
 
 	openapi
