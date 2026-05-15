@@ -22,6 +22,7 @@ lazy_static = "^1"
 unicode-normalization = "^0.1"
 futures-util = "^0.3"
 zip = "^8"
+sqlx = { version = "^0.8", default-features = false, features = ["sqlite", "runtime-tokio-rustls"] }
 async-recursion = "^1.1"
 strum = { version = "^0.28", features = ["derive"] }
 async-trait = "^0.1"

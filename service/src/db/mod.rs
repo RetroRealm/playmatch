@@ -6,6 +6,7 @@ pub mod dat_file_import;
 pub mod game;
 pub mod game_file;
 pub mod launchbox;
+pub mod openvgdb;
 pub mod platform;
 pub mod signature_group;
 pub mod signature_metadata_mapping;

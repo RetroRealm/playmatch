@@ -69,6 +69,25 @@ impl RegionTag {
 			RegionTag::Netherlands => &["Netherlands"],
 		}
 	}
+
+	pub fn ovgdb_codes(&self) -> &'static [&'static str] {
+		match self {
+			RegionTag::World => &["World"],
+			RegionTag::Usa => &["USA"],
+			RegionTag::Europe => &["Europe"],
+			RegionTag::Japan => &["Japan"],
+			RegionTag::Asia => &["Asia"],
+			RegionTag::Australia => &["Australia"],
+			RegionTag::Brazil => &["Brazil"],
+			RegionTag::Korea => &["Korea"],
+			RegionTag::China => &["China"],
+			RegionTag::Germany => &["Germany"],
+			RegionTag::France => &["France"],
+			RegionTag::Italy => &["Italy"],
+			RegionTag::Spain => &["Spain"],
+			RegionTag::Netherlands => &["Netherlands"],
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

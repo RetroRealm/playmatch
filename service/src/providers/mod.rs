@@ -2,6 +2,7 @@ pub mod emuready;
 pub mod igdb;
 pub mod launchbox;
 pub mod mobygames;
+pub mod openvgdb;
 pub mod screenscraper;
 pub mod steamgriddb;
 
@@ -400,6 +401,7 @@ fn provider_label_for(provider: MetadataProviderEnum) -> &'static str {
 		MetadataProviderEnum::Mobygames => "mobygames",
 		MetadataProviderEnum::Launchbox => "launchbox",
 		MetadataProviderEnum::EmuReady => "emuready",
+		MetadataProviderEnum::OpenVGDB => "openvgdb",
 	}
 }
 

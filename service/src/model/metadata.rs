@@ -91,6 +91,8 @@ pub enum MetadataProvider {
 	LaunchBox,
 	/// EmuReady (https://www.emuready.com/)
 	EmuReady,
+	/// OpenVGDB (https://github.com/OpenVGDB/OpenVGDB)
+	OpenVGDB,
 }
 
 /// Match types for a game
@@ -205,6 +207,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 			MetadataProviderEnum::Mobygames => MetadataProvider::MobyGames,
 			MetadataProviderEnum::Launchbox => MetadataProvider::LaunchBox,
 			MetadataProviderEnum::EmuReady => MetadataProvider::EmuReady,
+			MetadataProviderEnum::OpenVGDB => MetadataProvider::OpenVGDB,
 		}
 	}
 }
@@ -218,6 +221,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 			MetadataProvider::MobyGames => MetadataProviderEnum::Mobygames,
 			MetadataProvider::LaunchBox => MetadataProviderEnum::Launchbox,
 			MetadataProvider::EmuReady => MetadataProviderEnum::EmuReady,
+			MetadataProvider::OpenVGDB => MetadataProviderEnum::OpenVGDB,
 		}
 	}
 }

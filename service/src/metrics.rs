@@ -18,6 +18,7 @@ static CLONE_OF_RESOLUTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_ACTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_AGENTS: OnceLock<IntCounterVec> = OnceLock::new();
 static LAUNCHBOX_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
+static OPENVGDB_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_QUOTA_EXHAUSTION: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_CONCURRENCY: OnceLock<IntGauge> = OnceLock::new();
 static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -209,6 +210,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(launchbox_import_records)
 		.map_err(|_| anyhow::anyhow!("launchbox import metrics already initialised"))?;
 
+	let openvgdb_import_records = IntCounterVec::new(
+		Opts::new(
+			"api_openvgdb_import_records_total",
+			"OpenVGDB bulk metadata import records by type and outcome",
+		),
+		&["record_type", "outcome"],
+	)?;
+	registry.register(Box::new(openvgdb_import_records.clone()))?;
+	OPENVGDB_IMPORT_RECORDS
+		.set(openvgdb_import_records)
+		.map_err(|_| anyhow::anyhow!("openvgdb import metrics already initialised"))?;
+
 	let screenscraper_quota_exhaustion = IntCounterVec::new(
 		Opts::new(
 			"api_screenscraper_quota_exhaustion_total",
@@ -350,6 +363,12 @@ pub fn record_user_agent(product: &str, version: &str) {
 
 pub fn record_launchbox_import_records(record_type: &str, outcome: &str, n: u64) {
 	if let Some(counter) = LAUNCHBOX_IMPORT_RECORDS.get() {
+		counter.with_label_values(&[record_type, outcome]).inc_by(n);
+	}
+}
+
+pub fn record_openvgdb_import_records(record_type: &str, outcome: &str, n: u64) {
+	if let Some(counter) = OPENVGDB_IMPORT_RECORDS.get() {
 		counter.with_label_values(&[record_type, outcome]).inc_by(n);
 	}
 }
