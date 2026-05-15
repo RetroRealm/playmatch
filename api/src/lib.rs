@@ -79,6 +79,7 @@ use crate::routes::mobygames::{
 	get_mg_game_by_id, get_mg_game_covers, get_mg_game_screenshots, list_mg_genres,
 	list_mg_platforms, search_mg_games,
 };
+use crate::routes::openvgdb::{get_ovgdb_release_by_id, get_ovgdb_rom_by_hash};
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
 use crate::routes::screenscraper::{
 	get_ss_game_by_id, get_ss_game_by_rom_name, list_ss_systems, search_ss_games,
@@ -99,6 +100,7 @@ use crate::routes::user::{
 };
 use crate::util::{
 	wrap_download_and_parse_dats, wrap_launchbox_import, wrap_match_db_to_all_providers,
+	wrap_openvgdb_import,
 };
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
@@ -118,6 +120,7 @@ use service::providers::emuready::EmuReadyClient;
 use service::providers::igdb::IgdbClient;
 use service::providers::launchbox::LaunchBoxClient;
 use service::providers::mobygames::MobyGamesClient;
+use service::providers::openvgdb::OpenVgdbClient;
 use service::providers::screenscraper::ScreenScraperClient;
 use service::providers::steamgriddb::SteamGridDbClient;
 use service::providers::{MetadataProvider, ProviderRegistry};
@@ -188,6 +191,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let lb_http_client = Client::builder().cookie_store(false).build()?;
 
+	let ovgdb_http_client = Client::builder().cookie_store(false).build()?;
+
 	let er_http_client = Client::builder().cookie_store(false).build()?;
 
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
@@ -204,6 +209,8 @@ async fn start() -> anyhow::Result<()> {
 	let ss_client_opt = build_screenscraper_client(ss_http_client, redis_conn.clone());
 	let mg_client_opt = build_mobygames_client(mg_http_client, redis_conn.clone());
 	let lb_client_opt = build_launchbox_client(lb_http_client, redis_conn.clone(), conn.clone());
+	let ovgdb_client_opt =
+		build_openvgdb_client(ovgdb_http_client, redis_conn.clone(), conn.clone());
 	let er_client_opt = build_emuready_client(er_http_client, redis_conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
@@ -237,6 +244,9 @@ async fn start() -> anyhow::Result<()> {
 	if let Some(c) = lb_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
+	if let Some(c) = ovgdb_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
 	if let Some(c) = er_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
@@ -258,6 +268,7 @@ async fn start() -> anyhow::Result<()> {
 	let mg_data = mg_client_opt.clone().map(Data::from);
 	let mg_enabled = mg_data.is_some();
 	let lb_enabled = lb_client_opt.is_some();
+	let ovgdb_enabled = ovgdb_client_opt.is_some();
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -308,6 +319,7 @@ async fn start() -> anyhow::Result<()> {
 						ss_enabled,
 						mg_enabled,
 						lb_enabled,
+						ovgdb_enabled,
 					)
 				})
 				.service(
@@ -334,15 +346,18 @@ async fn start() -> anyhow::Result<()> {
 	let dat_client = dat_http_client_arc.clone();
 	let providers_for_cron = providers_arc.clone();
 	let lb_for_cron = lb_client_opt.clone();
+	let ovgdb_for_cron = ovgdb_client_opt.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
 			let dat_client = dat_client.clone();
 			let providers = providers_for_cron.clone();
 			let lb = lb_for_cron.clone();
+			let ovgdb = ovgdb_for_cron.clone();
 			Box::pin(async move {
 				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
 				wrap_launchbox_import(lb).await;
+				wrap_openvgdb_import(ovgdb).await;
 				wrap_match_db_to_all_providers(providers, conn.clone()).await;
 			})
 		})?)
@@ -384,6 +399,7 @@ async fn start() -> anyhow::Result<()> {
 	let http_client = dat_http_client_arc.clone();
 	let providers_for_init = providers_arc.clone();
 	let lb_for_init = lb_client_opt.clone();
+	let ovgdb_for_init = ovgdb_client_opt.clone();
 
 	let initial_data_init = env::var("INITIAL_DATA_INIT")
 		.unwrap_or("true".to_string())
@@ -399,6 +415,7 @@ async fn start() -> anyhow::Result<()> {
 		tokio::spawn(async move {
 			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
 			wrap_launchbox_import(lb_for_init).await;
+			wrap_openvgdb_import(ovgdb_for_init).await;
 			wrap_match_db_to_all_providers(providers_for_init, conn.clone()).await;
 		});
 	}
@@ -557,6 +574,36 @@ fn build_launchbox_client(
 	}
 }
 
+/// Returns `None` when OPENVGDB_ENABLED is unset or not "true". The OpenVGDB
+/// provider downloads a SQLite snapshot and persists its roms and releases
+/// into Postgres, so it is opt-in to keep small deployments lean.
+fn build_openvgdb_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+	db_conn: sea_orm::DbConn,
+) -> Option<Arc<OpenVgdbClient>> {
+	let enabled = env::var("OPENVGDB_ENABLED")
+		.unwrap_or_default()
+		.eq_ignore_ascii_case("true");
+	if !enabled {
+		warn!("OPENVGDB_ENABLED not set to true, OpenVGDB provider disabled");
+		return None;
+	}
+	let metadata_url = env::var("OPENVGDB_METADATA_URL")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	match OpenVgdbClient::new(http, redis_conn, db_conn, metadata_url) {
+		Ok(c) => {
+			info!("OpenVGDB provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("OpenVGDB provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
 /// Returns `None` when the API key is absent so self-hosters can run without
 /// the MobyGames integration. The MobyGames API requires a paid subscription;
 /// the cheapest tier permits 1 request every 5 seconds.
@@ -640,6 +687,7 @@ fn build_igdb_client(
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 fn configure_public_api_routes(
 	cfg: &mut ServiceConfig,
 	igdb_enabled: bool,
@@ -647,6 +695,7 @@ fn configure_public_api_routes(
 	ss_enabled: bool,
 	mg_enabled: bool,
 	lb_enabled: bool,
+	ovgdb_enabled: bool,
 ) {
 	cfg.service(health)
 		.service(ready)
@@ -674,6 +723,9 @@ fn configure_public_api_routes(
 	if lb_enabled {
 		configure_launchbox_routes(cfg);
 	}
+	if ovgdb_enabled {
+		configure_openvgdb_routes(cfg);
+	}
 }
 
 fn configure_launchbox_routes(cfg: &mut ServiceConfig) {
@@ -682,6 +734,11 @@ fn configure_launchbox_routes(cfg: &mut ServiceConfig) {
 		.service(search_lb_games)
 		.service(get_lb_game_alternate_names)
 		.service(get_lb_game_images);
+}
+
+fn configure_openvgdb_routes(cfg: &mut ServiceConfig) {
+	cfg.service(get_ovgdb_release_by_id)
+		.service(get_ovgdb_rom_by_hash);
 }
 
 fn configure_mobygames_routes(cfg: &mut ServiceConfig) {

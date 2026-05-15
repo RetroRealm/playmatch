@@ -17,6 +17,7 @@ pub mod igdb;
 pub mod launchbox;
 pub mod r#match;
 pub mod mobygames;
+pub mod openvgdb;
 pub mod platform;
 pub mod screenscraper;
 pub mod sgdb;

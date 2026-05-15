@@ -100,6 +100,7 @@ use crate::routes::mobygames::{
 	__path_get_mg_game_by_id, __path_get_mg_game_covers, __path_get_mg_game_screenshots,
 	__path_list_mg_genres, __path_list_mg_platforms, __path_search_mg_games,
 };
+use crate::routes::openvgdb::{__path_get_ovgdb_release_by_id, __path_get_ovgdb_rom_by_hash};
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
 use crate::routes::screenscraper::{
 	__path_get_ss_game_by_id, __path_get_ss_game_by_rom_name, __path_list_ss_systems,
@@ -160,6 +161,7 @@ use service::providers::mobygames::model::{
 	MgAltTitle, MgCover, MgCoverGroup, MgCoversResp, MgGame, MgGamePlatformBrief, MgGenre,
 	MgPlatform, MgSampleCover, MgSampleScreenshot, MgScreenshot, MgScreenshotsResp,
 };
+use service::providers::openvgdb::model::{OvgdbRelease, OvgdbRom, OvgdbRomMatch};
 use service::providers::screenscraper::model::{
 	SsEntityRef, SsGame, SsLocalizedName, SsRom, SsSystem, SsSystemNames,
 };
@@ -391,7 +393,9 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		get_lb_game_by_id,
 		search_lb_games,
 		get_lb_game_alternate_names,
-		get_lb_game_images
+		get_lb_game_images,
+		get_ovgdb_release_by_id,
+		get_ovgdb_rom_by_hash
 	),
 	components(schemas(
 		GameMetadataMatchResult,
@@ -540,7 +544,10 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		LbGame,
 		LbGameAlternateName,
 		LbGameImage,
-		LbPlatform
+		LbPlatform,
+		OvgdbRelease,
+		OvgdbRom,
+		OvgdbRomMatch
 	))
 )]
 pub struct ApiDoc;

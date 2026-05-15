@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use service::ingestion::download_and_parse_dats;
 use service::metrics::record_background_job;
 use service::providers::launchbox::LaunchBoxClient;
+use service::providers::openvgdb::OpenVgdbClient;
 use service::providers::{ProviderRegistry, match_db_to_all_providers};
 use std::sync::Arc;
 use std::time::Instant;
@@ -45,6 +46,19 @@ pub async fn wrap_launchbox_import(client: Option<Arc<LaunchBoxClient>>) {
 		}
 	};
 	record_background_job("launchbox_import", result, started.elapsed().as_secs_f64());
+}
+
+pub async fn wrap_openvgdb_import(client: Option<Arc<OpenVgdbClient>>) {
+	let Some(client) = client else { return };
+	let started = Instant::now();
+	let result = match client.ensure_imported().await {
+		Ok(_) => "success",
+		Err(e) => {
+			error!("OpenVGDB import failed: {e}");
+			"failure"
+		}
+	};
+	record_background_job("openvgdb_import", result, started.elapsed().as_secs_f64());
 }
 
 pub async fn wrap_match_db_to_all_providers(registry: Arc<ProviderRegistry>, conn: Arc<DbConn>) {
