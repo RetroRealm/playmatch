@@ -26,6 +26,8 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 - [x] Support for ScreenScraper as metadata provider
 - [x] Support for MobyGames as metadata provider
 - [x] Support for LaunchBox as metadata provider (bulk metadata import, opt-in via `LAUNCHBOX_ENABLED`)
+- [x] Support for OpenVGDB as metadata provider (offline SQLite hash matching, opt-in via `OPENVGDB_ENABLED`)
+- [x] Support for EmuReady as metadata provider (id-mapping only, opt-in via `EMUREADY_ENABLED`)
 
 ### Planned
 
