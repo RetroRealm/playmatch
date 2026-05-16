@@ -11,8 +11,23 @@ pub fn normalize_title(input: &str) -> String {
 	lazy_static! {
 		static ref RE_AMPERSAND: Regex = Regex::new(r"\s*&\s*").unwrap();
 		static ref RE_STRIP: Regex = Regex::new(r" - |: ").unwrap();
-		static ref RE_LEADING: Regex = Regex::new(r"^(?i)(the |a |an )").unwrap();
-		static ref RE_ARTICLE: Regex = Regex::new(r"(?i),\s*(the|a|an)\b").unwrap();
+		// Localised leading articles. Single-letter forms in the added locales
+		// (PT "o", IT "i") are deliberately omitted to avoid clobbering Roman
+		// numerals and short proper names; the original English "a"/"an" stay
+		// for backwards compatibility.
+		// Positional regex strips occurrences at the start of the title even
+		// when the word happens to be part of a proper name (e.g. "La Mulana"
+		// loses "La "); accepted false-positive in exchange for rescuing
+		// localised DAT releases that only differ from sibling providers'
+		// titles by a leading article.
+		static ref RE_LEADING: Regex = Regex::new(
+			r"^(?i)(the |a |an |der |die |das |le |la |les |el |los |las |il |lo |gli |os |as )"
+		)
+		.unwrap();
+		static ref RE_ARTICLE: Regex = Regex::new(
+			r"(?i),\s*(the|a|an|der|die|das|le|la|les|el|los|las|il|lo|gli|os|as)\b"
+		)
+		.unwrap();
 		static ref RE_ROMAN: Regex =
 			Regex::new(r"\b(?i:M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3}))\b").unwrap();
 	}
@@ -113,6 +128,42 @@ mod tests {
 		assert_eq!(normalize_title("Pokémon Red"), "Pokemon Red");
 		assert_eq!(normalize_title("Café del Mar"), "Cafe del Mar");
 		assert_eq!(normalize_title("Pokémon"), normalize_title("Pokemon"));
+	}
+
+	#[test]
+	fn localised_leading_articles() {
+		assert_eq!(normalize_title("Der Herr der Ringe"), "Herr der Ringe");
+		assert_eq!(normalize_title("Die Brücke"), "Brucke");
+		assert_eq!(normalize_title("Das Boot"), "Boot");
+		assert_eq!(normalize_title("Le Petit Prince"), "Petit Prince");
+		assert_eq!(normalize_title("La Cité"), "Cite");
+		assert_eq!(normalize_title("Les Misérables"), "Miserables");
+		assert_eq!(normalize_title("El Quijote"), "Quijote");
+		assert_eq!(normalize_title("Los Angeles"), "Angeles");
+		assert_eq!(normalize_title("Las Vegas"), "Vegas");
+		assert_eq!(normalize_title("Il Padrino"), "Padrino");
+		assert_eq!(normalize_title("Lo Hobbit"), "Hobbit");
+		assert_eq!(normalize_title("Gli Anelli"), "Anelli");
+		assert_eq!(normalize_title("Os Lusíadas"), "Lusiadas");
+		assert_eq!(normalize_title("As Aventuras"), "Aventuras");
+	}
+
+	#[test]
+	fn localised_trailing_articles() {
+		assert_eq!(normalize_title("Petit Prince, Le"), "Petit Prince");
+		assert_eq!(normalize_title("Quijote, El"), "Quijote");
+		assert_eq!(normalize_title("Padrino, Il"), "Padrino");
+		assert_eq!(normalize_title("Boot, Das"), "Boot");
+	}
+
+	#[test]
+	fn single_letter_locale_articles_left_alone() {
+		// Italian "i" and Portuguese "o" leading articles are intentionally
+		// not added; verifies a Roman-numeral "I" is still handled by the
+		// numeral conversion rather than mistakenly stripped as an article,
+		// and a single capital "O" word stays in place.
+		assert_eq!(normalize_title("Final Fantasy I"), "Final Fantasy 1");
+		assert_eq!(normalize_title("O Holy Night"), "O Holy Night");
 	}
 
 	#[test]
