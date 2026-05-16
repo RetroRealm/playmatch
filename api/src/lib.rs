@@ -215,7 +215,6 @@ async fn start() -> anyhow::Result<()> {
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.mask_unmatched_patterns("UNKNOWN")
-		.exclude_regex(r"^/swagger-ui(/|$)")
 		.build()
 		.map_err(|e| anyhow!(e))?;
 
@@ -273,7 +272,6 @@ async fn start() -> anyhow::Result<()> {
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
 			.wrap(Compress::default())
-			.wrap(prometheus.clone())
 			.app_data(JsonConfig::default().limit(64 * 1024))
 			.app_data(PayloadConfig::default().limit(256 * 1024))
 			.app_data(conn_data.clone())
@@ -311,6 +309,7 @@ async fn start() -> anyhow::Result<()> {
 						.add(("Vary", "Origin")),
 				)
 				.wrap(Cors::permissive())
+				.wrap(prometheus.clone())
 				.configure(move |cfg| {
 					configure_public_api_routes(
 						cfg,
