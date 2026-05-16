@@ -38,6 +38,8 @@ mod m20260510_120000_add_matched_year_and_ambiguous_reason;
 mod m20260515_120000_add_openvgdb_provider_enum_value;
 mod m20260515_120100_create_openvgdb_tables;
 mod m20260516_120000_add_openvgdb_release_normalized_title;
+mod m20260516_120100_add_retroachievements_provider_enum_value;
+mod m20260516_120200_create_retroachievements_tables;
 
 pub struct Migrator;
 
@@ -83,6 +85,8 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260515_120000_add_openvgdb_provider_enum_value::Migration),
 			Box::new(m20260515_120100_create_openvgdb_tables::Migration),
 			Box::new(m20260516_120000_add_openvgdb_release_normalized_title::Migration),
+			Box::new(m20260516_120100_add_retroachievements_provider_enum_value::Migration),
+			Box::new(m20260516_120200_create_retroachievements_tables::Migration),
 		]
 	}
 }
