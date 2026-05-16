@@ -5,7 +5,7 @@ use crate::db::game::{
 };
 use crate::matching::name_parse::{ParsedName, parse_name};
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
@@ -107,6 +107,8 @@ fn match_game_to_steamgriddb(
 			&cleaned,
 			&cleaned_normalized,
 			&cleaned,
+			"direct",
+			"normalized",
 		)
 		.await?
 		{
@@ -127,6 +129,8 @@ fn match_game_to_steamgriddb(
 				&cleaned,
 				&cleaned_normalized,
 				&cleaned_normalized,
+				"direct_normalized_query",
+				"normalized_normalized_query",
 			)
 			.await?
 		{
@@ -162,6 +166,8 @@ async fn try_sgdb_query(
 	q: &str,
 	q_norm: &str,
 	search_term: &str,
+	direct_rung: &str,
+	normalized_rung: &str,
 ) -> anyhow::Result<bool> {
 	let candidates = client.search_games(search_term).await?;
 	let (direct, normalized) = collect_sgdb_rungs(&candidates, parsed_dat, q, q_norm);
@@ -170,7 +176,11 @@ async fn try_sgdb_query(
 		db_conn,
 		redis_conn,
 		game,
-		pick_best(direct.iter().map(|s| (s, s.score))),
+		record_pick_best(
+			"steamgriddb",
+			direct_rung,
+			pick_best(direct.iter().map(|s| (s, s.score))),
+		),
 		AutomaticMatchReasonEnum::DirectName,
 		"Direct Match",
 	)
@@ -183,7 +193,11 @@ async fn try_sgdb_query(
 		db_conn,
 		redis_conn,
 		game,
-		pick_best(normalized.iter().map(|s| (s, s.score))),
+		record_pick_best(
+			"steamgriddb",
+			normalized_rung,
+			pick_best(normalized.iter().map(|s| (s, s.score))),
+		),
 		AutomaticMatchReasonEnum::NormalizedName,
 		"Normalized Match",
 	)
@@ -312,6 +326,8 @@ pub fn match_game_via_sibling_name_steamgriddb(
 				&q,
 				&q_norm,
 				&q,
+				"cross_direct",
+				"cross_normalized",
 			)
 			.await?
 			{
@@ -330,6 +346,8 @@ pub fn match_game_via_sibling_name_steamgriddb(
 					&q,
 					&q_norm,
 					&q_norm,
+					"cross_direct_normalized_query",
+					"cross_normalized_normalized_query",
 				)
 				.await?
 			{
@@ -351,6 +369,8 @@ async fn try_sgdb_sibling_query(
 	q: &str,
 	q_norm: &str,
 	search_term: &str,
+	direct_rung: &str,
+	normalized_rung: &str,
 ) -> anyhow::Result<bool> {
 	let candidates = client.search_games(search_term).await?;
 	let (direct, normalized) = collect_sgdb_rungs(&candidates, parsed_dat, q, q_norm);
@@ -360,7 +380,11 @@ async fn try_sgdb_sibling_query(
 		redis_conn,
 		game,
 		sibling,
-		pick_best(direct.iter().map(|s| (s, s.score))),
+		record_pick_best(
+			"steamgriddb",
+			direct_rung,
+			pick_best(direct.iter().map(|s| (s, s.score))),
+		),
 		AutomaticMatchReasonEnum::CrossProviderDirectName,
 		"Direct",
 	)
@@ -373,7 +397,11 @@ async fn try_sgdb_sibling_query(
 		redis_conn,
 		game,
 		sibling,
-		pick_best(normalized.iter().map(|s| (s, s.score))),
+		record_pick_best(
+			"steamgriddb",
+			normalized_rung,
+			pick_best(normalized.iter().map(|s| (s, s.score))),
+		),
 		AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 		"Normalized",
 	)

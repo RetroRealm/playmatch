@@ -146,6 +146,26 @@ pub enum Selection<'a, T> {
 	None,
 }
 
+/// Stable label for a rung outcome, used by the per-rung match metric.
+pub fn rung_outcome_label<T>(sel: &Selection<'_, T>) -> &'static str {
+	match sel {
+		Selection::Best(_) => "hit",
+		Selection::Ambiguous => "ambiguous",
+		Selection::None => "miss",
+	}
+}
+
+/// Records the outcome of a `pick_best` call as a per-rung metric and
+/// returns the `Selection` unchanged so call sites can continue to chain.
+pub fn record_pick_best<'a, T>(
+	provider: &str,
+	rung: &str,
+	sel: Selection<'a, T>,
+) -> Selection<'a, T> {
+	crate::metrics::record_match_rung(provider, rung, rung_outcome_label(&sel));
+	sel
+}
+
 /// Returns the unique max-scored candidate. Ties at the top of the score
 /// produce `Ambiguous`; empty input produces `None`.
 pub fn pick_best<'a, T>(
@@ -180,6 +200,17 @@ pub fn pick_best<'a, T>(
 mod tests {
 	use super::*;
 	use crate::matching::name_parse::RegionTag;
+
+	#[test]
+	fn rung_outcome_label_maps_each_variant() {
+		let item = "x";
+		let best: Selection<'_, &str> = Selection::Best(&item);
+		assert_eq!(rung_outcome_label(&best), "hit");
+		let ambig: Selection<'_, &str> = Selection::Ambiguous;
+		assert_eq!(rung_outcome_label(&ambig), "ambiguous");
+		let none: Selection<'_, &str> = Selection::None;
+		assert_eq!(rung_outcome_label(&none), "miss");
+	}
 
 	fn dat(year: Option<u16>) -> ParsedName {
 		ParsedName {

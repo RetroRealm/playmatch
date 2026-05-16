@@ -7,7 +7,7 @@ use crate::db::platform::{
 };
 use crate::matching::name_parse::parse_name;
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
@@ -136,7 +136,11 @@ fn match_game_to_emuready(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(direct.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"emuready",
+				"direct",
+				pick_best(direct.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::DirectName,
 			"Direct Match",
 		)
@@ -148,7 +152,11 @@ fn match_game_to_emuready(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(normalized.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"emuready",
+				"normalized",
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedName,
 			"Normalized Match",
 		)
@@ -314,7 +322,11 @@ pub fn match_game_via_sibling_name_emuready(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(direct.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"emuready",
+					"cross_direct",
+					pick_best(direct.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Direct",
 			)
@@ -327,7 +339,11 @@ pub fn match_game_via_sibling_name_emuready(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(normalized.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"emuready",
+					"cross_normalized",
+					pick_best(normalized.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized",
 			)

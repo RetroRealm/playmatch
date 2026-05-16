@@ -7,7 +7,7 @@ use crate::db::platform::{
 };
 use crate::matching::name_parse::parse_name;
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
@@ -155,7 +155,11 @@ fn match_game_to_igdb(
 			}
 		}
 
-		match pick_best(direct.iter().map(|s| (s, s.score))) {
+		match record_pick_best(
+			"igdb",
+			"direct",
+			pick_best(direct.iter().map(|s| (s, s.score))),
+		) {
 			Selection::Best(s) => {
 				return write_match(
 					&db_conn,
@@ -174,7 +178,11 @@ fn match_game_to_igdb(
 			Selection::None => {}
 		}
 
-		match pick_best(normalized.iter().map(|s| (s, s.score))) {
+		match record_pick_best(
+			"igdb",
+			"normalized",
+			pick_best(normalized.iter().map(|s| (s, s.score))),
+		) {
 			Selection::Best(s) => {
 				return write_match(
 					&db_conn,
@@ -219,7 +227,11 @@ fn match_game_to_igdb(
 			}
 		}
 
-		match pick_best(alt_direct.iter().map(|s| (s, s.score))) {
+		match record_pick_best(
+			"igdb",
+			"alternative",
+			pick_best(alt_direct.iter().map(|s| (s, s.score))),
+		) {
 			Selection::Best(s) => {
 				return write_match(
 					&db_conn,
@@ -238,7 +250,11 @@ fn match_game_to_igdb(
 			Selection::None => {}
 		}
 
-		match pick_best(alt_normalized.iter().map(|s| (s, s.score))) {
+		match record_pick_best(
+			"igdb",
+			"normalized_alternative",
+			pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+		) {
 			Selection::Best(s) => {
 				return write_match(
 					&db_conn,
@@ -448,7 +464,11 @@ pub fn match_game_via_sibling_name_igdb(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(direct.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"igdb",
+					"cross_direct",
+					pick_best(direct.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Direct",
 			)
@@ -462,7 +482,11 @@ pub fn match_game_via_sibling_name_igdb(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(normalized.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"igdb",
+					"cross_normalized",
+					pick_best(normalized.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized",
 			)
@@ -502,7 +526,11 @@ pub fn match_game_via_sibling_name_igdb(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(alt_direct.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"igdb",
+					"cross_alternative",
+					pick_best(alt_direct.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Alternative",
 			)
@@ -516,7 +544,11 @@ pub fn match_game_via_sibling_name_igdb(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"igdb",
+					"cross_normalized_alternative",
+					pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized Alternative",
 			)

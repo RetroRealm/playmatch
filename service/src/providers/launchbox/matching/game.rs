@@ -12,7 +12,7 @@ use crate::db::platform::{
 };
 use crate::matching::name_parse::{ParsedName, parse_name};
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
@@ -150,7 +150,11 @@ fn match_game_to_launchbox(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(scored.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"launchbox",
+				"direct",
+				pick_best(scored.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::DirectName,
 			"Direct Match",
 		)
@@ -171,7 +175,11 @@ fn match_game_to_launchbox(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(scored.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"launchbox",
+				"alternative",
+				pick_best(scored.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::AlternativeName,
 			"Alternative Name",
 		)
@@ -191,7 +199,11 @@ fn match_game_to_launchbox(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(scored.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"launchbox",
+				"normalized",
+				pick_best(scored.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedName,
 			"Normalized Match",
 		)
@@ -212,7 +224,11 @@ fn match_game_to_launchbox(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(scored.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"launchbox",
+				"normalized_alternative",
+				pick_best(scored.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedAlternativeName,
 			"Normalized Alternative Name",
 		)
@@ -365,7 +381,11 @@ pub fn match_game_via_sibling_name_launchbox(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(scored.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"launchbox",
+					"cross_direct",
+					pick_best(scored.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Direct",
 			)
@@ -387,7 +407,11 @@ pub fn match_game_via_sibling_name_launchbox(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(scored.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"launchbox",
+					"cross_alternative",
+					pick_best(scored.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Direct alt",
 			)
@@ -405,7 +429,11 @@ pub fn match_game_via_sibling_name_launchbox(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(scored.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"launchbox",
+					"cross_normalized",
+					pick_best(scored.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized",
 			)
@@ -428,7 +456,11 @@ pub fn match_game_via_sibling_name_launchbox(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(scored.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"launchbox",
+					"cross_normalized_alternative",
+					pick_best(scored.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized alt",
 			)

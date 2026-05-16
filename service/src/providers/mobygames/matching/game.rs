@@ -7,7 +7,7 @@ use crate::db::platform::{
 };
 use crate::matching::name_parse::parse_name;
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
@@ -181,7 +181,11 @@ fn match_game_to_mobygames(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(direct.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"mobygames",
+				"direct",
+				pick_best(direct.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::DirectName,
 			"Direct Match",
 		)
@@ -193,7 +197,11 @@ fn match_game_to_mobygames(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(normalized.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"mobygames",
+				"normalized",
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedName,
 			"Normalized Match",
 		)
@@ -205,7 +213,11 @@ fn match_game_to_mobygames(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(alt_direct.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"mobygames",
+				"alternative",
+				pick_best(alt_direct.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::AlternativeName,
 			"Alternative Name Match",
 		)
@@ -217,7 +229,11 @@ fn match_game_to_mobygames(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"mobygames",
+				"normalized_alternative",
+				pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedAlternativeName,
 			"Normalized Alternative Match",
 		)
@@ -437,7 +453,11 @@ pub fn match_game_via_sibling_name_mobygames(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(direct.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"mobygames",
+					"cross_direct",
+					pick_best(direct.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Direct",
 			)
@@ -450,7 +470,11 @@ pub fn match_game_via_sibling_name_mobygames(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(normalized.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"mobygames",
+					"cross_normalized",
+					pick_best(normalized.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized",
 			)
@@ -463,7 +487,11 @@ pub fn match_game_via_sibling_name_mobygames(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(alt_direct.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"mobygames",
+					"cross_alternative",
+					pick_best(alt_direct.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Alternative",
 			)
@@ -476,7 +504,11 @@ pub fn match_game_via_sibling_name_mobygames(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"mobygames",
+					"cross_normalized_alternative",
+					pick_best(alt_normalized.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized Alternative",
 			)

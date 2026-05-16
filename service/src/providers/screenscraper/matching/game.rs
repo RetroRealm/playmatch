@@ -8,7 +8,7 @@ use crate::db::platform::{
 };
 use crate::matching::name_parse::parse_name;
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
@@ -152,7 +152,11 @@ fn match_game_to_screenscraper(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(direct.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"screenscraper",
+				"direct",
+				pick_best(direct.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::DirectName,
 			"Direct Match",
 		)
@@ -164,7 +168,11 @@ fn match_game_to_screenscraper(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(normalized.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"screenscraper",
+				"normalized",
+				pick_best(normalized.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedName,
 			"Normalized Match",
 		)
@@ -315,59 +323,95 @@ async fn try_match_by_hashes(
 		}
 		let rom_name = file.file_name.as_str();
 		let rom_size = file.file_size_in_bytes;
-		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty())
-			&& let Some(found) = client
+		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty()) {
+			let hit = match client
 				.get_game_by_sha1(system_id, rom_name, rom_size, sha1)
 				.await?
-		{
-			record_hash_match(
-				game,
-				&found,
-				AutomaticMatchReasonEnum::Sha1Hash,
-				&dat_ss_regions,
-				db_conn,
-				redis_conn,
-			)
-			.await?;
-			return Ok(Some(()));
+			{
+				Some(found) => {
+					record_hash_match(
+						game,
+						&found,
+						AutomaticMatchReasonEnum::Sha1Hash,
+						&dat_ss_regions,
+						db_conn,
+						redis_conn,
+					)
+					.await?;
+					true
+				}
+				None => false,
+			};
+			crate::metrics::record_match_rung(
+				"screenscraper",
+				"sha1_hash",
+				if hit { "hit" } else { "miss" },
+			);
+			if hit {
+				return Ok(Some(()));
+			}
 		}
 		if client.is_quota_exhausted() {
 			return Ok(None);
 		}
-		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty())
-			&& let Some(found) = client
+		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty()) {
+			let hit = match client
 				.get_game_by_md5(system_id, rom_name, rom_size, md5)
 				.await?
-		{
-			record_hash_match(
-				game,
-				&found,
-				AutomaticMatchReasonEnum::Md5Hash,
-				&dat_ss_regions,
-				db_conn,
-				redis_conn,
-			)
-			.await?;
-			return Ok(Some(()));
+			{
+				Some(found) => {
+					record_hash_match(
+						game,
+						&found,
+						AutomaticMatchReasonEnum::Md5Hash,
+						&dat_ss_regions,
+						db_conn,
+						redis_conn,
+					)
+					.await?;
+					true
+				}
+				None => false,
+			};
+			crate::metrics::record_match_rung(
+				"screenscraper",
+				"md5_hash",
+				if hit { "hit" } else { "miss" },
+			);
+			if hit {
+				return Ok(Some(()));
+			}
 		}
 		if client.is_quota_exhausted() {
 			return Ok(None);
 		}
-		if let Some(crc) = file.crc.as_deref().filter(|s| !s.is_empty())
-			&& let Some(found) = client
+		if let Some(crc) = file.crc.as_deref().filter(|s| !s.is_empty()) {
+			let hit = match client
 				.get_game_by_crc(system_id, rom_name, rom_size, crc)
 				.await?
-		{
-			record_hash_match(
-				game,
-				&found,
-				AutomaticMatchReasonEnum::CrcHash,
-				&dat_ss_regions,
-				db_conn,
-				redis_conn,
-			)
-			.await?;
-			return Ok(Some(()));
+			{
+				Some(found) => {
+					record_hash_match(
+						game,
+						&found,
+						AutomaticMatchReasonEnum::CrcHash,
+						&dat_ss_regions,
+						db_conn,
+						redis_conn,
+					)
+					.await?;
+					true
+				}
+				None => false,
+			};
+			crate::metrics::record_match_rung(
+				"screenscraper",
+				"crc_hash",
+				if hit { "hit" } else { "miss" },
+			);
+			if hit {
+				return Ok(Some(()));
+			}
 		}
 	}
 
@@ -499,7 +543,11 @@ pub fn match_game_via_sibling_name_screenscraper(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(direct.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"screenscraper",
+					"cross_direct",
+					pick_best(direct.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderDirectName,
 				"Direct",
 			)
@@ -512,7 +560,11 @@ pub fn match_game_via_sibling_name_screenscraper(
 				&mut redis_conn,
 				&game,
 				&sibling,
-				pick_best(normalized.iter().map(|s| (s, s.score))),
+				record_pick_best(
+					"screenscraper",
+					"cross_normalized",
+					pick_best(normalized.iter().map(|s| (s, s.score))),
+				),
 				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
 				"Normalized",
 			)

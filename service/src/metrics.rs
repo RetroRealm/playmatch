@@ -8,6 +8,7 @@ static CACHE_L1_SIZE: OnceLock<IntGaugeVec> = OnceLock::new();
 static IDENTIFY_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static SERVICE_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
 static METADATA_AUTO_MATCHES: OnceLock<IntCounterVec> = OnceLock::new();
+static MATCH_RUNG_OUTCOMES: OnceLock<IntCounterVec> = OnceLock::new();
 static METADATA_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_RUNS: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_DURATION: OnceLock<HistogramVec> = OnceLock::new();
@@ -83,6 +84,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	METADATA_AUTO_MATCHES
 		.set(metadata_auto_matches)
 		.map_err(|_| anyhow::anyhow!("metadata auto match metrics already initialised"))?;
+
+	let match_rung_outcomes = IntCounterVec::new(
+		Opts::new(
+			"api_match_rung_total",
+			"Per-rung match attempt outcomes for each provider's matching ladder",
+		),
+		&["provider", "rung", "outcome"],
+	)?;
+	registry.register(Box::new(match_rung_outcomes.clone()))?;
+	MATCH_RUNG_OUTCOMES
+		.set(match_rung_outcomes)
+		.map_err(|_| anyhow::anyhow!("match rung outcome metrics already initialised"))?;
 
 	let metadata_token_refreshes = IntCounterVec::new(
 		Opts::new(
@@ -297,6 +310,15 @@ pub fn record_metadata_auto_match(provider: &str, entity_type: &str, result: &st
 		counter
 			.with_label_values(&[provider, entity_type, result, reason])
 			.inc();
+	}
+}
+
+/// Per-rung outcome counter. `outcome` is one of `hit`, `ambiguous`, `miss`.
+/// Together with `provider` and `rung` this lets dashboards compute
+/// hit-rate per rung per provider.
+pub fn record_match_rung(provider: &str, rung: &str, outcome: &str) {
+	if let Some(counter) = MATCH_RUNG_OUTCOMES.get() {
+		counter.with_label_values(&[provider, rung, outcome]).inc();
 	}
 }
 

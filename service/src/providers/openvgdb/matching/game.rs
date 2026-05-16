@@ -10,7 +10,7 @@ use crate::db::openvgdb::{
 };
 use crate::matching::name_parse::{ParsedName, parse_name};
 use crate::matching::scoring::{
-	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best, record_pick_best,
 };
 use crate::matching::util::normalize_title;
 use crate::providers::openvgdb::OpenVgdbClient;
@@ -117,7 +117,11 @@ fn match_game_to_openvgdb(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(scored.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"openvgdb",
+				"direct",
+				pick_best(scored.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::DirectName,
 			"Direct Name",
 		)
@@ -134,7 +138,11 @@ fn match_game_to_openvgdb(
 			&db_conn,
 			&mut redis_conn,
 			&game,
-			pick_best(scored.iter().map(|s| (s, s.score))),
+			record_pick_best(
+				"openvgdb",
+				"normalized",
+				pick_best(scored.iter().map(|s| (s, s.score))),
+			),
 			AutomaticMatchReasonEnum::NormalizedName,
 			"Normalized Name",
 		)
@@ -255,46 +263,74 @@ async fn try_match_by_hashes(
 			.as_deref()
 			.map(str::trim)
 			.filter(|s| !s.is_empty())
-			&& let Some(rom) = find_openvgdb_rom_by_sha1(sha1, db_conn).await?
-			&& let Some(()) = record_hash_match(
-				game,
-				&rom,
-				AutomaticMatchReasonEnum::Sha1Hash,
-				dat_regions,
-				db_conn,
-				redis_conn,
-			)
-			.await?
 		{
-			return Ok(Some(()));
+			let hit = match find_openvgdb_rom_by_sha1(sha1, db_conn).await? {
+				Some(rom) => record_hash_match(
+					game,
+					&rom,
+					AutomaticMatchReasonEnum::Sha1Hash,
+					dat_regions,
+					db_conn,
+					redis_conn,
+				)
+				.await?
+				.is_some(),
+				None => false,
+			};
+			crate::metrics::record_match_rung(
+				"openvgdb",
+				"sha1_hash",
+				if hit { "hit" } else { "miss" },
+			);
+			if hit {
+				return Ok(Some(()));
+			}
 		}
-		if let Some(md5) = file.md5.as_deref().map(str::trim).filter(|s| !s.is_empty())
-			&& let Some(rom) = find_openvgdb_rom_by_md5(md5, db_conn).await?
-			&& let Some(()) = record_hash_match(
-				game,
-				&rom,
-				AutomaticMatchReasonEnum::Md5Hash,
-				dat_regions,
-				db_conn,
-				redis_conn,
-			)
-			.await?
-		{
-			return Ok(Some(()));
+		if let Some(md5) = file.md5.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+			let hit = match find_openvgdb_rom_by_md5(md5, db_conn).await? {
+				Some(rom) => record_hash_match(
+					game,
+					&rom,
+					AutomaticMatchReasonEnum::Md5Hash,
+					dat_regions,
+					db_conn,
+					redis_conn,
+				)
+				.await?
+				.is_some(),
+				None => false,
+			};
+			crate::metrics::record_match_rung(
+				"openvgdb",
+				"md5_hash",
+				if hit { "hit" } else { "miss" },
+			);
+			if hit {
+				return Ok(Some(()));
+			}
 		}
-		if let Some(crc) = file.crc.as_deref().map(str::trim).filter(|s| !s.is_empty())
-			&& let Some(rom) = find_openvgdb_rom_by_crc(crc, db_conn).await?
-			&& let Some(()) = record_hash_match(
-				game,
-				&rom,
-				AutomaticMatchReasonEnum::CrcHash,
-				dat_regions,
-				db_conn,
-				redis_conn,
-			)
-			.await?
-		{
-			return Ok(Some(()));
+		if let Some(crc) = file.crc.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+			let hit = match find_openvgdb_rom_by_crc(crc, db_conn).await? {
+				Some(rom) => record_hash_match(
+					game,
+					&rom,
+					AutomaticMatchReasonEnum::CrcHash,
+					dat_regions,
+					db_conn,
+					redis_conn,
+				)
+				.await?
+				.is_some(),
+				None => false,
+			};
+			crate::metrics::record_match_rung(
+				"openvgdb",
+				"crc_hash",
+				if hit { "hit" } else { "miss" },
+			);
+			if hit {
+				return Ok(Some(()));
+			}
 		}
 	}
 
