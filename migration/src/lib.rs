@@ -37,6 +37,7 @@ mod m20260430_120000_add_normalized_name_to_launchbox;
 mod m20260510_120000_add_matched_year_and_ambiguous_reason;
 mod m20260515_120000_add_openvgdb_provider_enum_value;
 mod m20260515_120100_create_openvgdb_tables;
+mod m20260516_120000_add_openvgdb_release_normalized_title;
 
 pub struct Migrator;
 
@@ -81,6 +82,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260510_120000_add_matched_year_and_ambiguous_reason::Migration),
 			Box::new(m20260515_120000_add_openvgdb_provider_enum_value::Migration),
 			Box::new(m20260515_120100_create_openvgdb_tables::Migration),
+			Box::new(m20260516_120000_add_openvgdb_release_normalized_title::Migration),
 		]
 	}
 }

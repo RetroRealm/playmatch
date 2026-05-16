@@ -4,22 +4,28 @@ use crate::db::game::{
 };
 use crate::db::game_file::get_game_files_from_game_id;
 use crate::db::openvgdb::{
+	find_openvgdb_releases_by_title_lower, find_openvgdb_releases_by_title_normalized,
 	find_openvgdb_releases_for_rom, find_openvgdb_rom_by_crc, find_openvgdb_rom_by_md5,
 	find_openvgdb_rom_by_sha1,
 };
-use crate::matching::name_parse::parse_name;
+use crate::matching::name_parse::{ParsedName, parse_name};
+use crate::matching::scoring::{
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+};
+use crate::matching::util::normalize_title;
 use crate::providers::openvgdb::OpenVgdbClient;
 use crate::providers::{
 	DEFAULT_CHUNK_SIZE, MetadataProvider, Target, drive_match_pipeline, write_auto_match_failed,
 	write_auto_match_success,
 };
 use entity::game::Model;
-use entity::openvgdb_rom;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MetadataProviderEnum,
 };
+use entity::{openvgdb_release, openvgdb_rom};
 use futures_util::future::BoxFuture;
 use log::debug;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -98,6 +104,45 @@ fn match_game_to_openvgdb(
 			return Ok(());
 		}
 
+		// Name fallback: when hash matching misses (homebrew rebuild,
+		// header-stripped variant, dump newer than the OpenVGDB snapshot),
+		// fall through to title-name lookups against the imported releases.
+		let cleaned = parsed_dat.base.to_lowercase();
+		let cleaned_normalized = normalize_title(&cleaned);
+
+		let releases =
+			find_openvgdb_releases_by_title_lower(&cleaned, &dat_regions, &db_conn).await?;
+		let scored = score_ovgdb_releases(&parsed_dat, &releases);
+		if let Some(()) = run_ovgdb_name_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(scored.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::DirectName,
+			"Direct Name",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+
+		let releases =
+			find_openvgdb_releases_by_title_normalized(&cleaned_normalized, &dat_regions, &db_conn)
+				.await?;
+		let scored = score_ovgdb_releases(&parsed_dat, &releases);
+		if let Some(()) = run_ovgdb_name_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(scored.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedName,
+			"Normalized Name",
+		)
+		.await?
+		{
+			return Ok(());
+		}
+
 		debug!("No OpenVGDB match found for Game \"{}\"", &game.name);
 		write_auto_match_failed(
 			"openvgdb",
@@ -111,6 +156,86 @@ fn match_game_to_openvgdb(
 
 		Ok(())
 	})
+}
+
+#[derive(Clone)]
+struct ScoredRelease<'a> {
+	release: &'a openvgdb_release::Model,
+	score: CandidateScore,
+}
+
+fn score_ovgdb_releases<'a>(
+	parsed_dat: &ParsedName,
+	releases: &'a [openvgdb_release::Model],
+) -> Vec<ScoredRelease<'a>> {
+	releases
+		.iter()
+		.filter_map(|r| {
+			let parsed_cand = parse_name(&r.title_name);
+			let cand_year = r.release_year.and_then(|y| u16::try_from(y).ok());
+			match gate_and_score(
+				parsed_dat,
+				Some(&parsed_cand),
+				cand_year,
+				&[],
+				&[],
+				None,
+				None,
+				&[],
+			) {
+				CandidateGate::Reject => None,
+				CandidateGate::Pass(score) => Some(ScoredRelease { release: r, score }),
+			}
+		})
+		.collect()
+}
+
+async fn run_ovgdb_name_rung(
+	db_conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
+	game: &Model,
+	selection: Selection<'_, ScoredRelease<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<Option<()>> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Matched Game \"{}\" to OpenVGDB Release ID {} ({label})",
+				game.name, s.release.release_id
+			);
+			write_auto_match_success(
+				"openvgdb",
+				MetadataProviderEnum::OpenVGDB,
+				Target::Game(game.id),
+				s.release.release_id.to_string(),
+				reason,
+				Some(s.release.title_name.clone()),
+				s.release.release_year.and_then(|y| i16::try_from(y).ok()),
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::Ambiguous => {
+			debug!(
+				"Refusing to match Game \"{}\" on OpenVGDB: tied at top of score",
+				game.name
+			);
+			write_auto_match_failed(
+				"openvgdb",
+				MetadataProviderEnum::OpenVGDB,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::None => Ok(None),
+	}
 }
 
 /// Walks every game file's sha1/md5/crc against the imported `openvgdb_rom`
@@ -209,4 +334,61 @@ async fn record_hash_match(
 	)
 	.await?;
 	Ok(Some(()))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use chrono::Utc;
+	use sea_orm::prelude::Uuid;
+
+	fn ovgdb_release(release_id: i64, title: &str, year: Option<i32>) -> openvgdb_release::Model {
+		openvgdb_release::Model {
+			id: Uuid::nil(),
+			release_id,
+			rom_id: 0,
+			title_name: title.to_string(),
+			title_name_normalized: Some(normalize_title(&title.to_lowercase())),
+			region_name: None,
+			system_name: None,
+			cover_front: None,
+			cover_back: None,
+			description: None,
+			developer: None,
+			publisher: None,
+			genre: None,
+			release_date: None,
+			release_year: year,
+			reference_url: None,
+			created_at: Utc::now().fixed_offset(),
+		}
+	}
+
+	#[test]
+	fn score_ovgdb_releases_picks_year_match() {
+		let parsed_dat = parse_name("Pokemon Diamond Version (USA) (2006)");
+		let releases = vec![
+			ovgdb_release(1, "Pokemon Diamond Version", None),
+			ovgdb_release(2, "Pokemon Diamond Version", Some(2006)),
+		];
+		let scored = score_ovgdb_releases(&parsed_dat, &releases);
+		let selection = pick_best(scored.iter().map(|s| (s, s.score)));
+		match selection {
+			Selection::Best(s) => assert_eq!(s.release.release_id, 2),
+			Selection::Ambiguous => panic!("expected Best, got Ambiguous"),
+			Selection::None => panic!("expected Best, got None"),
+		}
+	}
+
+	#[test]
+	fn score_ovgdb_releases_returns_ambiguous_on_tied_top() {
+		let parsed_dat = parse_name("Pokemon Diamond Version (USA)");
+		let releases = vec![
+			ovgdb_release(10, "Pokemon Diamond Version", None),
+			ovgdb_release(20, "Pokemon Diamond Version", None),
+		];
+		let scored = score_ovgdb_releases(&parsed_dat, &releases);
+		let selection = pick_best(scored.iter().map(|s| (s, s.score)));
+		assert!(matches!(selection, Selection::Ambiguous));
+	}
 }

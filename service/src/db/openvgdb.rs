@@ -7,6 +7,9 @@ use sea_orm::{
 };
 
 const OVGDB_RELEASE_LIST_LIMIT: u64 = 50;
+/// Bounds the candidate set returned by the title-name match helpers used by
+/// the matcher's name fallback rungs.
+const OVGDB_TITLE_MATCH_LIMIT: u64 = 25;
 
 pub async fn find_openvgdb_rom_by_sha1(
 	sha1: &str,
@@ -35,6 +38,42 @@ pub async fn find_openvgdb_rom_by_crc(
 	openvgdb_rom::Entity::find()
 		.filter(openvgdb_rom::Column::RomHashCrc.eq_ignore_case(crc))
 		.one(conn)
+		.await
+}
+
+/// Case-insensitive direct title-name lookup, ordered by region preference
+/// then alphabetical. Used by the matcher's name fallback rung when hash
+/// matching has missed.
+pub async fn find_openvgdb_releases_by_title_lower(
+	title: &str,
+	prefer_regions: &[&str],
+	conn: &DbConn,
+) -> Result<Vec<openvgdb_release::Model>, DbErr> {
+	openvgdb_release::Entity::find()
+		.filter(openvgdb_release::Column::TitleName.eq_ignore_case(title))
+		.order_by(region_priority_case(prefer_regions), Order::Asc)
+		.order_by_asc(openvgdb_release::Column::RegionName)
+		.limit(OVGDB_TITLE_MATCH_LIMIT)
+		.all(conn)
+		.await
+}
+
+/// Case-insensitive normalized title-name lookup. Skips rows whose
+/// `title_name_normalized` is NULL via the implicit eq_ignore_case match
+/// (NULL never equals a non-NULL string), so existing rows that pre-date
+/// the column population stay invisible to this rung until the next
+/// OpenVGDB import refresh fills them in.
+pub async fn find_openvgdb_releases_by_title_normalized(
+	normalized: &str,
+	prefer_regions: &[&str],
+	conn: &DbConn,
+) -> Result<Vec<openvgdb_release::Model>, DbErr> {
+	openvgdb_release::Entity::find()
+		.filter(openvgdb_release::Column::TitleNameNormalized.eq_ignore_case(normalized))
+		.order_by(region_priority_case(prefer_regions), Order::Asc)
+		.order_by_asc(openvgdb_release::Column::RegionName)
+		.limit(OVGDB_TITLE_MATCH_LIMIT)
+		.all(conn)
 		.await
 }
 
@@ -167,6 +206,7 @@ pub async fn bulk_upsert_openvgdb_releases(
 				.update_columns([
 					openvgdb_release::Column::RomId,
 					openvgdb_release::Column::TitleName,
+					openvgdb_release::Column::TitleNameNormalized,
 					openvgdb_release::Column::RegionName,
 					openvgdb_release::Column::SystemName,
 					openvgdb_release::Column::CoverFront,

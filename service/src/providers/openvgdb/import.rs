@@ -210,10 +210,14 @@ async fn read_sqlite_and_insert(sqlite_path: &Path, db_conn: &DbConn) -> anyhow:
 		};
 		let release_date = row.try_get::<Option<String>, _>("releaseDate")?;
 		let release_year = release_date.as_deref().and_then(parse_year);
+		let title_name_normalized = Some(crate::matching::util::normalize_title(
+			&title_name.to_lowercase(),
+		));
 		release_batch.push(openvgdb_release::ActiveModel {
 			release_id: Set(row.try_get::<i64, _>("releaseID")?),
 			rom_id: Set(row.try_get::<i64, _>("romID")?),
 			title_name: Set(title_name),
+			title_name_normalized: Set(title_name_normalized),
 			region_name: Set(row.try_get::<Option<String>, _>("TEMPregionLocalizedName")?),
 			system_name: Set(row.try_get::<Option<String>, _>("TEMPsystemName")?),
 			cover_front: Set(row.try_get::<Option<String>, _>("releaseCoverFront")?),

@@ -10,6 +10,7 @@ pub struct Model {
 	pub release_id: i64,
 	pub rom_id: i64,
 	pub title_name: String,
+	pub title_name_normalized: Option<String>,
 	pub region_name: Option<String>,
 	pub system_name: Option<String>,
 	pub cover_front: Option<String>,
