@@ -308,20 +308,22 @@ async fn try_match_by_hashes(
 		.collect();
 
 	for file in &files {
+		// SHA1 first: stronger collision resistance than MD5 and the dominant
+		// hash in modern DAT sets. CRC is the weakest fallback.
 		if client.is_quota_exhausted() {
 			return Ok(None);
 		}
 		let rom_name = file.file_name.as_str();
 		let rom_size = file.file_size_in_bytes;
-		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty())
+		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty())
 			&& let Some(found) = client
-				.get_game_by_md5(system_id, rom_name, rom_size, md5)
+				.get_game_by_sha1(system_id, rom_name, rom_size, sha1)
 				.await?
 		{
 			record_hash_match(
 				game,
 				&found,
-				AutomaticMatchReasonEnum::Md5Hash,
+				AutomaticMatchReasonEnum::Sha1Hash,
 				&dat_ss_regions,
 				db_conn,
 				redis_conn,
@@ -332,15 +334,15 @@ async fn try_match_by_hashes(
 		if client.is_quota_exhausted() {
 			return Ok(None);
 		}
-		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty())
+		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty())
 			&& let Some(found) = client
-				.get_game_by_sha1(system_id, rom_name, rom_size, sha1)
+				.get_game_by_md5(system_id, rom_name, rom_size, md5)
 				.await?
 		{
 			record_hash_match(
 				game,
 				&found,
-				AutomaticMatchReasonEnum::Sha1Hash,
+				AutomaticMatchReasonEnum::Md5Hash,
 				&dat_ss_regions,
 				db_conn,
 				redis_conn,
