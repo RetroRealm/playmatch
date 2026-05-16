@@ -3,15 +3,17 @@ use crate::db::game::{
 	get_unmatched_games_without_clone_of_with_limit,
 };
 use crate::db::launchbox::{
-	find_lb_game_by_platform_and_alternate_name_region_priority,
-	find_lb_game_by_platform_and_alternate_normalized_name_region_priority,
-	find_lb_game_by_platform_and_name, find_lb_game_by_platform_and_normalized_name,
+	find_lb_games_by_platform_and_alternate_name_region_priority,
+	find_lb_games_by_platform_and_alternate_normalized_name_region_priority,
+	find_lb_games_by_platform_and_name, find_lb_games_by_platform_and_normalized_name,
 };
 use crate::db::platform::{
 	find_platform_of_game, find_platform_related_signature_metadata_mapping,
 };
 use crate::matching::name_parse::{ParsedName, parse_name};
-use crate::matching::scoring::{CandidateGate, gate_and_score};
+use crate::matching::scoring::{
+	CandidateGate, CandidateScore, Selection, gate_and_score, pick_best,
+};
 use crate::matching::util::{clean_name, normalize_title};
 use crate::providers::MetadataProvider;
 use crate::providers::launchbox::LaunchBoxClient;
@@ -25,6 +27,7 @@ use entity::sea_orm_active_enums::{
 };
 use futures_util::future::BoxFuture;
 use log::debug;
+use redis::aio::MultiplexedConnection;
 use sea_orm::DbConn;
 use std::sync::Arc;
 
@@ -89,22 +92,37 @@ fn lb_year(found: &launchbox_game::Model) -> Option<i16> {
 	found.release_year.and_then(|y| i16::try_from(y).ok())
 }
 
-fn lb_passes_gate(parsed_dat: &ParsedName, found: &launchbox_game::Model) -> bool {
-	let parsed_cand = parse_name(&found.name);
-	let candidate_year = found.release_year.and_then(|y| u16::try_from(y).ok());
-	matches!(
-		gate_and_score(
-			parsed_dat,
-			Some(&parsed_cand),
-			candidate_year,
-			&[],
-			&[],
-			None,
-			None,
-			&[]
-		),
-		CandidateGate::Pass(_)
-	)
+#[derive(Clone)]
+struct ScoredCand<'a> {
+	cand: &'a launchbox_game::Model,
+	score: CandidateScore,
+}
+
+/// Score every candidate via `gate_and_score`, drop the rejects.
+fn score_lb_candidates<'a>(
+	parsed_dat: &ParsedName,
+	candidates: &'a [launchbox_game::Model],
+) -> Vec<ScoredCand<'a>> {
+	candidates
+		.iter()
+		.filter_map(|c| {
+			let parsed_cand = parse_name(&c.name);
+			let candidate_year = c.release_year.and_then(|y| u16::try_from(y).ok());
+			match gate_and_score(
+				parsed_dat,
+				Some(&parsed_cand),
+				candidate_year,
+				&[],
+				&[],
+				None,
+				None,
+				&[],
+			) {
+				CandidateGate::Reject => None,
+				CandidateGate::Pass(score) => Some(ScoredCand { cand: c, score }),
+			}
+		})
+		.collect()
 }
 
 fn match_game_to_launchbox(
@@ -125,106 +143,81 @@ fn match_game_to_launchbox(
 			.flat_map(|r| r.lb_codes().iter().copied())
 			.collect();
 
-		if let Some(found) =
-			find_lb_game_by_platform_and_name(&platform_name, &cleaned, &db_conn).await?
-			&& lb_passes_gate(&parsed_dat, &found)
+		let candidates =
+			find_lb_games_by_platform_and_name(&platform_name, &cleaned, &db_conn).await?;
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		if let Some(()) = run_lb_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(scored.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::DirectName,
+			"Direct Match",
+		)
+		.await?
 		{
-			debug!(
-				"Matched Game \"{}\" to LaunchBox Game ID {} (Direct Match)",
-				&cleaned, found.database_id
-			);
-			write_auto_match_success(
-				"launchbox",
-				MetadataProviderEnum::Launchbox,
-				Target::Game(game.id),
-				found.database_id.to_string(),
-				AutomaticMatchReasonEnum::DirectName,
-				Some(found.name.clone()),
-				lb_year(&found),
-				&db_conn,
-				&mut redis_conn,
-			)
-			.await?;
 			return Ok(());
 		}
 
-		if let Some(found) = find_lb_game_by_platform_and_alternate_name_region_priority(
+		let candidates = find_lb_games_by_platform_and_alternate_name_region_priority(
 			&platform_name,
 			&cleaned,
 			&dat_lb_regions,
 			&db_conn,
 		)
-		.await? && lb_passes_gate(&parsed_dat, &found)
+		.await?;
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		if let Some(()) = run_lb_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(scored.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::AlternativeName,
+			"Alternative Name",
+		)
+		.await?
 		{
-			debug!(
-				"Matched Game \"{}\" to LaunchBox Game ID {} (Alternative Name)",
-				&cleaned, found.database_id
-			);
-			write_auto_match_success(
-				"launchbox",
-				MetadataProviderEnum::Launchbox,
-				Target::Game(game.id),
-				found.database_id.to_string(),
-				AutomaticMatchReasonEnum::AlternativeName,
-				Some(found.name.clone()),
-				lb_year(&found),
-				&db_conn,
-				&mut redis_conn,
-			)
-			.await?;
 			return Ok(());
 		}
 
-		if let Some(found) = find_lb_game_by_platform_and_normalized_name(
+		let candidates = find_lb_games_by_platform_and_normalized_name(
 			&platform_name,
 			&cleaned_normalized,
 			&db_conn,
 		)
-		.await? && lb_passes_gate(&parsed_dat, &found)
+		.await?;
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		if let Some(()) = run_lb_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(scored.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedName,
+			"Normalized Match",
+		)
+		.await?
 		{
-			debug!(
-				"Matched Game \"{}\" to LaunchBox Game ID {} (Normalized Match)",
-				&cleaned, found.database_id
-			);
-			write_auto_match_success(
-				"launchbox",
-				MetadataProviderEnum::Launchbox,
-				Target::Game(game.id),
-				found.database_id.to_string(),
-				AutomaticMatchReasonEnum::NormalizedName,
-				Some(found.name.clone()),
-				lb_year(&found),
-				&db_conn,
-				&mut redis_conn,
-			)
-			.await?;
 			return Ok(());
 		}
 
-		if let Some(found) = find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
+		let candidates = find_lb_games_by_platform_and_alternate_normalized_name_region_priority(
 			&platform_name,
 			&cleaned_normalized,
 			&dat_lb_regions,
 			&db_conn,
 		)
-		.await? && lb_passes_gate(&parsed_dat, &found)
+		.await?;
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		if let Some(()) = run_lb_rung(
+			&db_conn,
+			&mut redis_conn,
+			&game,
+			pick_best(scored.iter().map(|s| (s, s.score))),
+			AutomaticMatchReasonEnum::NormalizedAlternativeName,
+			"Normalized Alternative Name",
+		)
+		.await?
 		{
-			debug!(
-				"Matched Game \"{}\" to LaunchBox Game ID {} (Normalized Alternative Name)",
-				&cleaned, found.database_id
-			);
-			write_auto_match_success(
-				"launchbox",
-				MetadataProviderEnum::Launchbox,
-				Target::Game(game.id),
-				found.database_id.to_string(),
-				AutomaticMatchReasonEnum::NormalizedAlternativeName,
-				Some(found.name.clone()),
-				lb_year(&found),
-				&db_conn,
-				&mut redis_conn,
-			)
-			.await?;
 			return Ok(());
 		}
 
@@ -241,6 +234,54 @@ fn match_game_to_launchbox(
 
 		Ok(())
 	})
+}
+
+async fn run_lb_rung(
+	db_conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
+	game: &Model,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<Option<()>> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Matched Game \"{}\" to LaunchBox Game ID {} ({label})",
+				&game.name, s.cand.database_id
+			);
+			write_auto_match_success(
+				"launchbox",
+				MetadataProviderEnum::Launchbox,
+				Target::Game(game.id),
+				s.cand.database_id.to_string(),
+				reason,
+				Some(s.cand.name.clone()),
+				lb_year(s.cand),
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::Ambiguous => {
+			debug!(
+				"Refusing to match Game \"{}\" on LaunchBox: tied at top of score",
+				&game.name
+			);
+			write_auto_match_failed(
+				"launchbox",
+				MetadataProviderEnum::Launchbox,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(Some(()))
+		}
+		Selection::None => Ok(None),
+	}
 }
 
 async fn get_game_platform_launchbox_name(
@@ -298,6 +339,7 @@ pub fn match_game_via_sibling_name_launchbox(
 		let platform_name = get_game_platform_launchbox_name(&game, &db_conn).await?;
 		let parsed_dat = parse_name(&game.name);
 		let cleaned_playmatch = parsed_dat.base.to_lowercase();
+		let normalized_playmatch = normalize_title(&cleaned_playmatch);
 		let dat_lb_regions: Vec<&'static str> = parsed_dat
 			.regions
 			.iter()
@@ -305,6 +347,7 @@ pub fn match_game_via_sibling_name_launchbox(
 			.collect();
 		let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
 		tried.insert(cleaned_playmatch);
+		tried.insert(normalized_playmatch);
 
 		for sibling in sibling_names {
 			let q = clean_name(&sibling).to_lowercase();
@@ -312,108 +355,208 @@ pub fn match_game_via_sibling_name_launchbox(
 				continue;
 			}
 			let q_norm = normalize_title(&q);
+			tried.insert(q_norm.clone());
 
-			if let Some(found) =
-				find_lb_game_by_platform_and_name(&platform_name, &q, &db_conn).await?
-				&& lb_passes_gate(&parsed_dat, &found)
+			let candidates =
+				find_lb_games_by_platform_and_name(&platform_name, &q, &db_conn).await?;
+			let scored = score_lb_candidates(&parsed_dat, &candidates);
+			if try_write_lb_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(scored.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Direct",
+			)
+			.await?
 			{
-				debug!(
-					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct)",
-					&game.name, found.database_id, &sibling
-				);
-				write_auto_match_success(
-					"launchbox",
-					MetadataProviderEnum::Launchbox,
-					Target::Game(game.id),
-					found.database_id.to_string(),
-					AutomaticMatchReasonEnum::CrossProviderDirectName,
-					Some(found.name.clone()),
-					lb_year(&found),
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
 				return Ok(());
 			}
 
-			if let Some(found) = find_lb_game_by_platform_and_alternate_name_region_priority(
+			let candidates = find_lb_games_by_platform_and_alternate_name_region_priority(
 				&platform_name,
 				&q,
 				&dat_lb_regions,
 				&db_conn,
 			)
-			.await? && lb_passes_gate(&parsed_dat, &found)
+			.await?;
+			let scored = score_lb_candidates(&parsed_dat, &candidates);
+			if try_write_lb_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(scored.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderDirectName,
+				"Direct alt",
+			)
+			.await?
 			{
-				debug!(
-					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Direct alt)",
-					&game.name, found.database_id, &sibling
-				);
-				write_auto_match_success(
-					"launchbox",
-					MetadataProviderEnum::Launchbox,
-					Target::Game(game.id),
-					found.database_id.to_string(),
-					AutomaticMatchReasonEnum::CrossProviderDirectName,
-					Some(found.name.clone()),
-					lb_year(&found),
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
 				return Ok(());
 			}
 
-			if let Some(found) =
-				find_lb_game_by_platform_and_normalized_name(&platform_name, &q_norm, &db_conn)
-					.await? && lb_passes_gate(&parsed_dat, &found)
+			let candidates =
+				find_lb_games_by_platform_and_normalized_name(&platform_name, &q_norm, &db_conn)
+					.await?;
+			let scored = score_lb_candidates(&parsed_dat, &candidates);
+			if try_write_lb_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(scored.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized",
+			)
+			.await?
 			{
-				debug!(
-					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized)",
-					&game.name, found.database_id, &sibling
-				);
-				write_auto_match_success(
-					"launchbox",
-					MetadataProviderEnum::Launchbox,
-					Target::Game(game.id),
-					found.database_id.to_string(),
-					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-					Some(found.name.clone()),
-					lb_year(&found),
-					&db_conn,
-					&mut redis_conn,
-				)
-				.await?;
 				return Ok(());
 			}
 
-			if let Some(found) =
-				find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
+			let candidates =
+				find_lb_games_by_platform_and_alternate_normalized_name_region_priority(
 					&platform_name,
 					&q_norm,
 					&dat_lb_regions,
 					&db_conn,
 				)
-				.await? && lb_passes_gate(&parsed_dat, &found)
-			{
-				debug!(
-					"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" (Normalized alt)",
-					&game.name, found.database_id, &sibling
-				);
-				write_auto_match_success(
-					"launchbox",
-					MetadataProviderEnum::Launchbox,
-					Target::Game(game.id),
-					found.database_id.to_string(),
-					AutomaticMatchReasonEnum::CrossProviderNormalizedName,
-					Some(found.name.clone()),
-					lb_year(&found),
-					&db_conn,
-					&mut redis_conn,
-				)
 				.await?;
+			let scored = score_lb_candidates(&parsed_dat, &candidates);
+			if try_write_lb_cross(
+				&db_conn,
+				&mut redis_conn,
+				&game,
+				&sibling,
+				pick_best(scored.iter().map(|s| (s, s.score))),
+				AutomaticMatchReasonEnum::CrossProviderNormalizedName,
+				"Normalized alt",
+			)
+			.await?
+			{
 				return Ok(());
 			}
 		}
 		Ok(())
 	})
+}
+
+async fn try_write_lb_cross(
+	db_conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
+	game: &Model,
+	sibling: &str,
+	selection: Selection<'_, ScoredCand<'_>>,
+	reason: AutomaticMatchReasonEnum,
+	label: &str,
+) -> anyhow::Result<bool> {
+	match selection {
+		Selection::Best(s) => {
+			debug!(
+				"Cross-matched Game \"{}\" to LaunchBox Game ID {} via sibling \"{}\" ({label})",
+				&game.name, s.cand.database_id, sibling
+			);
+			write_auto_match_success(
+				"launchbox",
+				MetadataProviderEnum::Launchbox,
+				Target::Game(game.id),
+				s.cand.database_id.to_string(),
+				reason,
+				Some(s.cand.name.clone()),
+				lb_year(s.cand),
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::Ambiguous => {
+			write_auto_match_failed(
+				"launchbox",
+				MetadataProviderEnum::Launchbox,
+				Target::Game(game.id),
+				FailedMatchReasonEnum::Ambiguous,
+				db_conn,
+				redis_conn,
+			)
+			.await?;
+			Ok(true)
+		}
+		Selection::None => Ok(false),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use chrono::Utc;
+	use sea_orm::prelude::Uuid;
+
+	fn lb_candidate(
+		database_id: i64,
+		name: &str,
+		release_year: Option<i32>,
+	) -> launchbox_game::Model {
+		launchbox_game::Model {
+			id: Uuid::nil(),
+			database_id,
+			name: name.to_string(),
+			name_normalized: Some(normalize_title(&name.to_lowercase())),
+			platform_name: "Nintendo DS".to_string(),
+			release_date: None,
+			release_year,
+			overview: None,
+			developer: None,
+			publisher: None,
+			genres: None,
+			max_players: None,
+			cooperative: None,
+			esrb: None,
+			release_type: None,
+			status: None,
+			wikipedia_url: None,
+			video_url: None,
+			community_rating: None,
+			community_rating_count: None,
+			created_at: Utc::now().fixed_offset(),
+			updated_at: Utc::now().fixed_offset(),
+		}
+	}
+
+	#[test]
+	fn score_lb_candidates_picks_year_match_over_unknown() {
+		let parsed_dat = parse_name("Pokemon Diamond Version (USA) (2006)");
+		let candidates = vec![
+			lb_candidate(1, "Pokemon Diamond Version", None),
+			lb_candidate(2, "Pokemon Diamond Version", Some(2006)),
+		];
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		let selection = pick_best(scored.iter().map(|s| (s, s.score)));
+		match selection {
+			Selection::Best(s) => assert_eq!(s.cand.database_id, 2),
+			Selection::Ambiguous => panic!("expected Best, got Ambiguous"),
+			Selection::None => panic!("expected Best, got None"),
+		}
+	}
+
+	#[test]
+	fn score_lb_candidates_returns_ambiguous_on_tied_top() {
+		let parsed_dat = parse_name("Pokemon Diamond Version (USA)");
+		let candidates = vec![
+			lb_candidate(10, "Pokemon Diamond Version", None),
+			lb_candidate(20, "Pokemon Diamond Version", None),
+		];
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		let selection = pick_best(scored.iter().map(|s| (s, s.score)));
+		assert!(matches!(selection, Selection::Ambiguous));
+	}
+
+	#[test]
+	fn score_lb_candidates_returns_none_when_year_two_off() {
+		let parsed_dat = parse_name("Pokemon Diamond Version (USA) (2006)");
+		let candidates = vec![lb_candidate(99, "Pokemon Diamond Version", Some(2010))];
+		let scored = score_lb_candidates(&parsed_dat, &candidates);
+		let selection = pick_best(scored.iter().map(|s| (s, s.score)));
+		assert!(matches!(selection, Selection::None));
+	}
 }

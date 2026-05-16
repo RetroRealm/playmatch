@@ -9,8 +9,13 @@ use sea_orm::{
 	ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, Order, QueryFilter, QueryOrder, QuerySelect,
 	RelationTrait,
 };
+use std::collections::HashSet;
 
 const LB_SEARCH_LIMIT: u64 = 50;
+/// Bounds the candidate set returned by the per-rung match helpers. Higher
+/// than `LB_SEARCH_LIMIT` because alt-name joins can return the same game
+/// once per matching alternate row before the Rust-side dedup runs.
+const LB_MATCH_LIMIT: u64 = 50;
 
 pub async fn list_lb_platforms(conn: &DbConn) -> Result<Vec<launchbox_platform::Model>, DbErr> {
 	launchbox_platform::Entity::find()
@@ -46,18 +51,19 @@ pub async fn search_lb_games(
 		.await
 }
 
-pub async fn find_lb_game_by_platform_and_name(
+pub async fn find_lb_games_by_platform_and_name(
 	platform_name: &str,
 	name: &str,
 	conn: &DbConn,
-) -> Result<Option<launchbox_game::Model>, DbErr> {
+) -> Result<Vec<launchbox_game::Model>, DbErr> {
 	launchbox_game::Entity::find()
 		.filter(
 			launchbox_game::Column::PlatformName
 				.eq_ignore_case(platform_name)
 				.and(launchbox_game::Column::Name.eq_ignore_case(name)),
 		)
-		.one(conn)
+		.limit(LB_MATCH_LIMIT)
+		.all(conn)
 		.await
 }
 
@@ -80,18 +86,19 @@ pub async fn find_lb_game_by_platform_and_alternate_name(
 /// `name_normalized` is populated at import time with `normalize_title`,
 /// which Postgres `lower()` cannot reproduce (NFKD, symbol stripping,
 /// `&` folding).
-pub async fn find_lb_game_by_platform_and_normalized_name(
+pub async fn find_lb_games_by_platform_and_normalized_name(
 	platform_name: &str,
 	normalized_name: &str,
 	conn: &DbConn,
-) -> Result<Option<launchbox_game::Model>, DbErr> {
+) -> Result<Vec<launchbox_game::Model>, DbErr> {
 	launchbox_game::Entity::find()
 		.filter(
 			launchbox_game::Column::PlatformName
 				.eq_ignore_case(platform_name)
 				.and(launchbox_game::Column::NameNormalized.eq_ignore_case(normalized_name)),
 		)
-		.one(conn)
+		.limit(LB_MATCH_LIMIT)
+		.all(conn)
 		.await
 }
 
@@ -114,14 +121,16 @@ pub async fn find_lb_game_by_platform_and_alternate_normalized_name(
 }
 
 /// Order: rows whose `region` is in `prefer_regions` first, then NULL
-/// regions, then everything else.
-pub async fn find_lb_game_by_platform_and_alternate_name_region_priority(
+/// regions, then everything else. The Rust-side dedup keeps the first
+/// occurrence per `database_id`, so each game is represented by its
+/// best-region alt row.
+pub async fn find_lb_games_by_platform_and_alternate_name_region_priority(
 	platform_name: &str,
 	name: &str,
 	prefer_regions: &[&str],
 	conn: &DbConn,
-) -> Result<Option<launchbox_game::Model>, DbErr> {
-	launchbox_game::Entity::find()
+) -> Result<Vec<launchbox_game::Model>, DbErr> {
+	let rows = launchbox_game::Entity::find()
 		.join(
 			JoinType::InnerJoin,
 			launchbox_game::Relation::AlternateName.def(),
@@ -130,17 +139,19 @@ pub async fn find_lb_game_by_platform_and_alternate_name_region_priority(
 		.filter(launchbox_game_alternate_name::Column::Name.eq_ignore_case(name))
 		.order_by(region_priority_case(prefer_regions), Order::Asc)
 		.order_by_asc(launchbox_game_alternate_name::Column::Region)
-		.one(conn)
-		.await
+		.limit(LB_MATCH_LIMIT)
+		.all(conn)
+		.await?;
+	Ok(dedup_by_database_id(rows))
 }
 
-pub async fn find_lb_game_by_platform_and_alternate_normalized_name_region_priority(
+pub async fn find_lb_games_by_platform_and_alternate_normalized_name_region_priority(
 	platform_name: &str,
 	normalized_name: &str,
 	prefer_regions: &[&str],
 	conn: &DbConn,
-) -> Result<Option<launchbox_game::Model>, DbErr> {
-	launchbox_game::Entity::find()
+) -> Result<Vec<launchbox_game::Model>, DbErr> {
+	let rows = launchbox_game::Entity::find()
 		.join(
 			JoinType::InnerJoin,
 			launchbox_game::Relation::AlternateName.def(),
@@ -151,8 +162,17 @@ pub async fn find_lb_game_by_platform_and_alternate_normalized_name_region_prior
 		)
 		.order_by(region_priority_case(prefer_regions), Order::Asc)
 		.order_by_asc(launchbox_game_alternate_name::Column::Region)
-		.one(conn)
-		.await
+		.limit(LB_MATCH_LIMIT)
+		.all(conn)
+		.await?;
+	Ok(dedup_by_database_id(rows))
+}
+
+fn dedup_by_database_id(rows: Vec<launchbox_game::Model>) -> Vec<launchbox_game::Model> {
+	let mut seen: HashSet<i64> = HashSet::with_capacity(rows.len());
+	rows.into_iter()
+		.filter(|m| seen.insert(m.database_id))
+		.collect()
 }
 
 fn region_priority_case(prefer_regions: &[&str]) -> SimpleExpr {
