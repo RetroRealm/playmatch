@@ -88,6 +88,15 @@ impl RegionTag {
 			RegionTag::Netherlands => &["Netherlands"],
 		}
 	}
+
+	/// Region label fragments RetroAchievements uses when surfacing regional
+	/// variants. RA does not currently expose per-game region metadata; the
+	/// stub is here for symmetry with the other providers' helpers so future
+	/// region-aware scoring can be wired in without touching every provider.
+	#[allow(dead_code)]
+	pub fn ra_codes(&self) -> &'static [&'static str] {
+		&[]
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

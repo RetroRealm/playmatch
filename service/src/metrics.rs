@@ -20,6 +20,7 @@ static USER_ACTIONS: OnceLock<IntCounterVec> = OnceLock::new();
 static USER_AGENTS: OnceLock<IntCounterVec> = OnceLock::new();
 static LAUNCHBOX_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static OPENVGDB_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
+static RETROACHIEVEMENTS_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_QUOTA_EXHAUSTION: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_CONCURRENCY: OnceLock<IntGauge> = OnceLock::new();
 static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -235,6 +236,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(openvgdb_import_records)
 		.map_err(|_| anyhow::anyhow!("openvgdb import metrics already initialised"))?;
 
+	let retroachievements_import_records = IntCounterVec::new(
+		Opts::new(
+			"api_retroachievements_import_records_total",
+			"RetroAchievements bulk metadata import records by type and outcome",
+		),
+		&["record_type", "outcome"],
+	)?;
+	registry.register(Box::new(retroachievements_import_records.clone()))?;
+	RETROACHIEVEMENTS_IMPORT_RECORDS
+		.set(retroachievements_import_records)
+		.map_err(|_| anyhow::anyhow!("retroachievements import metrics already initialised"))?;
+
 	let screenscraper_quota_exhaustion = IntCounterVec::new(
 		Opts::new(
 			"api_screenscraper_quota_exhaustion_total",
@@ -391,6 +404,12 @@ pub fn record_launchbox_import_records(record_type: &str, outcome: &str, n: u64)
 
 pub fn record_openvgdb_import_records(record_type: &str, outcome: &str, n: u64) {
 	if let Some(counter) = OPENVGDB_IMPORT_RECORDS.get() {
+		counter.with_label_values(&[record_type, outcome]).inc_by(n);
+	}
+}
+
+pub fn record_retroachievements_import_records(record_type: &str, outcome: &str, n: u64) {
+	if let Some(counter) = RETROACHIEVEMENTS_IMPORT_RECORDS.get() {
 		counter.with_label_values(&[record_type, outcome]).inc_by(n);
 	}
 }
