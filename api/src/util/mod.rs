@@ -9,6 +9,7 @@ use service::ingestion::download_and_parse_dats;
 use service::metrics::record_background_job;
 use service::providers::launchbox::LaunchBoxClient;
 use service::providers::openvgdb::OpenVgdbClient;
+use service::providers::retroachievements::RetroAchievementsClient;
 use service::providers::{ProviderRegistry, match_db_to_all_providers};
 use std::sync::Arc;
 use std::time::Instant;
@@ -59,6 +60,23 @@ pub async fn wrap_openvgdb_import(client: Option<Arc<OpenVgdbClient>>) {
 		}
 	};
 	record_background_job("openvgdb_import", result, started.elapsed().as_secs_f64());
+}
+
+pub async fn wrap_retroachievements_import(client: Option<Arc<RetroAchievementsClient>>) {
+	let Some(client) = client else { return };
+	let started = Instant::now();
+	let result = match client.ensure_imported().await {
+		Ok(_) => "success",
+		Err(e) => {
+			error!("RetroAchievements import failed: {e}");
+			"failure"
+		}
+	};
+	record_background_job(
+		"retroachievements_import",
+		result,
+		started.elapsed().as_secs_f64(),
+	);
 }
 
 pub async fn wrap_match_db_to_all_providers(registry: Arc<ProviderRegistry>, conn: Arc<DbConn>) {

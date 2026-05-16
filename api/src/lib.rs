@@ -81,6 +81,9 @@ use crate::routes::mobygames::{
 };
 use crate::routes::openvgdb::{get_ovgdb_release_by_id, get_ovgdb_rom_by_hash};
 use crate::routes::platform::{get_all_platforms, get_platform_by_id};
+use crate::routes::retroachievements::{
+	get_ra_game_by_hash, get_ra_game_by_id, list_ra_systems, search_ra_games,
+};
 use crate::routes::screenscraper::{
 	get_ss_game_by_id, get_ss_game_by_rom_name, list_ss_systems, search_ss_games,
 };
@@ -100,7 +103,7 @@ use crate::routes::user::{
 };
 use crate::util::{
 	wrap_download_and_parse_dats, wrap_launchbox_import, wrap_match_db_to_all_providers,
-	wrap_openvgdb_import,
+	wrap_openvgdb_import, wrap_retroachievements_import,
 };
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
@@ -121,6 +124,7 @@ use service::providers::igdb::IgdbClient;
 use service::providers::launchbox::LaunchBoxClient;
 use service::providers::mobygames::MobyGamesClient;
 use service::providers::openvgdb::OpenVgdbClient;
+use service::providers::retroachievements::RetroAchievementsClient;
 use service::providers::screenscraper::ScreenScraperClient;
 use service::providers::steamgriddb::SteamGridDbClient;
 use service::providers::{MetadataProvider, ProviderRegistry};
@@ -193,6 +197,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let ovgdb_http_client = Client::builder().cookie_store(false).build()?;
 
+	let ra_http_client = Client::builder().cookie_store(false).build()?;
+
 	let er_http_client = Client::builder().cookie_store(false).build()?;
 
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
@@ -211,6 +217,8 @@ async fn start() -> anyhow::Result<()> {
 	let lb_client_opt = build_launchbox_client(lb_http_client, redis_conn.clone(), conn.clone());
 	let ovgdb_client_opt =
 		build_openvgdb_client(ovgdb_http_client, redis_conn.clone(), conn.clone());
+	let ra_client_opt =
+		build_retroachievements_client(ra_http_client, redis_conn.clone(), conn.clone());
 	let er_client_opt = build_emuready_client(er_http_client, redis_conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
@@ -246,6 +254,9 @@ async fn start() -> anyhow::Result<()> {
 	if let Some(c) = ovgdb_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
+	if let Some(c) = ra_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
 	if let Some(c) = er_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
@@ -268,6 +279,7 @@ async fn start() -> anyhow::Result<()> {
 	let mg_enabled = mg_data.is_some();
 	let lb_enabled = lb_client_opt.is_some();
 	let ovgdb_enabled = ovgdb_client_opt.is_some();
+	let ra_enabled = ra_client_opt.is_some();
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -319,6 +331,7 @@ async fn start() -> anyhow::Result<()> {
 						mg_enabled,
 						lb_enabled,
 						ovgdb_enabled,
+						ra_enabled,
 					)
 				})
 				.service(
@@ -346,6 +359,7 @@ async fn start() -> anyhow::Result<()> {
 	let providers_for_cron = providers_arc.clone();
 	let lb_for_cron = lb_client_opt.clone();
 	let ovgdb_for_cron = ovgdb_client_opt.clone();
+	let ra_for_cron = ra_client_opt.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
@@ -353,10 +367,12 @@ async fn start() -> anyhow::Result<()> {
 			let providers = providers_for_cron.clone();
 			let lb = lb_for_cron.clone();
 			let ovgdb = ovgdb_for_cron.clone();
+			let ra = ra_for_cron.clone();
 			Box::pin(async move {
 				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
 				wrap_launchbox_import(lb).await;
 				wrap_openvgdb_import(ovgdb).await;
+				wrap_retroachievements_import(ra).await;
 				wrap_match_db_to_all_providers(providers, conn.clone()).await;
 			})
 		})?)
@@ -399,6 +415,7 @@ async fn start() -> anyhow::Result<()> {
 	let providers_for_init = providers_arc.clone();
 	let lb_for_init = lb_client_opt.clone();
 	let ovgdb_for_init = ovgdb_client_opt.clone();
+	let ra_for_init = ra_client_opt.clone();
 
 	let initial_data_init = env::var("INITIAL_DATA_INIT")
 		.unwrap_or("true".to_string())
@@ -415,6 +432,7 @@ async fn start() -> anyhow::Result<()> {
 			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
 			wrap_launchbox_import(lb_for_init).await;
 			wrap_openvgdb_import(ovgdb_for_init).await;
+			wrap_retroachievements_import(ra_for_init).await;
 			wrap_match_db_to_all_providers(providers_for_init, conn.clone()).await;
 		});
 	}
@@ -603,6 +621,41 @@ fn build_openvgdb_client(
 	}
 }
 
+/// Returns `None` when either credential is missing so self-hosters can run
+/// without the RetroAchievements integration. The provider bulk-imports RA's
+/// game and hash lists once per cycle; the API key + username pair is needed
+/// to make the underlying `API_GetGameList.php` calls.
+fn build_retroachievements_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+	db_conn: sea_orm::DbConn,
+) -> Option<Arc<RetroAchievementsClient>> {
+	let username = match env::var("RETROACHIEVEMENTS_USERNAME") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("RETROACHIEVEMENTS_USERNAME not set, RetroAchievements provider disabled");
+			return None;
+		}
+	};
+	let api_key = match env::var("RETROACHIEVEMENTS_API_KEY") {
+		Ok(v) if !v.trim().is_empty() => v,
+		_ => {
+			warn!("RETROACHIEVEMENTS_API_KEY not set, RetroAchievements provider disabled");
+			return None;
+		}
+	};
+	match RetroAchievementsClient::new(username, api_key, http, redis_conn, db_conn) {
+		Ok(c) => {
+			info!("RetroAchievements provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("RetroAchievements provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
 /// Returns `None` when the API key is absent so self-hosters can run without
 /// the MobyGames integration. The MobyGames API requires a paid subscription;
 /// the cheapest tier permits 1 request every 5 seconds.
@@ -695,6 +748,7 @@ fn configure_public_api_routes(
 	mg_enabled: bool,
 	lb_enabled: bool,
 	ovgdb_enabled: bool,
+	ra_enabled: bool,
 ) {
 	cfg.service(health)
 		.service(ready)
@@ -725,6 +779,16 @@ fn configure_public_api_routes(
 	if ovgdb_enabled {
 		configure_openvgdb_routes(cfg);
 	}
+	if ra_enabled {
+		configure_retroachievements_routes(cfg);
+	}
+}
+
+fn configure_retroachievements_routes(cfg: &mut ServiceConfig) {
+	cfg.service(list_ra_systems)
+		.service(get_ra_game_by_id)
+		.service(get_ra_game_by_hash)
+		.service(search_ra_games);
 }
 
 fn configure_launchbox_routes(cfg: &mut ServiceConfig) {
