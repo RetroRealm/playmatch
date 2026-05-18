@@ -95,6 +95,8 @@ pub enum MetadataProvider {
 	OpenVGDB,
 	/// RetroAchievements (https://retroachievements.org/)
 	RetroAchievements,
+	/// TheGamesDB (https://thegamesdb.net/)
+	TheGamesDB,
 }
 
 /// Match types for a game
@@ -211,6 +213,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 			MetadataProviderEnum::EmuReady => MetadataProvider::EmuReady,
 			MetadataProviderEnum::OpenVGDB => MetadataProvider::OpenVGDB,
 			MetadataProviderEnum::RetroAchievements => MetadataProvider::RetroAchievements,
+			MetadataProviderEnum::TheGamesDB => MetadataProvider::TheGamesDB,
 		}
 	}
 }
@@ -226,6 +229,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 			MetadataProvider::EmuReady => MetadataProviderEnum::EmuReady,
 			MetadataProvider::OpenVGDB => MetadataProviderEnum::OpenVGDB,
 			MetadataProvider::RetroAchievements => MetadataProviderEnum::RetroAchievements,
+			MetadataProvider::TheGamesDB => MetadataProviderEnum::TheGamesDB,
 		}
 	}
 }

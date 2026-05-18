@@ -12,6 +12,7 @@ pub mod retroachievements;
 pub mod signature_group;
 pub mod signature_metadata_mapping;
 pub mod signature_metadata_mapping_suggestions;
+pub mod thegamesdb;
 pub mod user;
 
 /// Generate a `get_unmatched_*_with_limit(provider, limit, conn)` fn that returns up to

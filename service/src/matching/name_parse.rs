@@ -97,6 +97,14 @@ impl RegionTag {
 	pub fn ra_codes(&self) -> &'static [&'static str] {
 		&[]
 	}
+
+	/// Region label fragments TheGamesDB would surface if region metadata were
+	/// available. The bootstrap CSV carries no platform or region info, so the
+	/// stub is here for symmetry with the other providers' helpers.
+	#[allow(dead_code)]
+	pub fn tgdb_codes(&self) -> &'static [&'static str] {
+		&[]
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

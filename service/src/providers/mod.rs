@@ -6,6 +6,7 @@ pub mod openvgdb;
 pub mod retroachievements;
 pub mod screenscraper;
 pub mod steamgriddb;
+pub mod thegamesdb;
 
 use crate::db::game::find_game_parent;
 use crate::db::signature_metadata_mapping::{
@@ -404,6 +405,7 @@ fn provider_label_for(provider: MetadataProviderEnum) -> &'static str {
 		MetadataProviderEnum::EmuReady => "emuready",
 		MetadataProviderEnum::OpenVGDB => "openvgdb",
 		MetadataProviderEnum::RetroAchievements => "retroachievements",
+		MetadataProviderEnum::TheGamesDB => "thegamesdb",
 	}
 }
 

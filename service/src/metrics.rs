@@ -24,6 +24,7 @@ static RETROACHIEVEMENTS_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new
 static SCREENSCRAPER_QUOTA_EXHAUSTION: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_CONCURRENCY: OnceLock<IntGauge> = OnceLock::new();
 static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
+static THEGAMESDB_API_CALLS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -281,6 +282,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(cross_match_attempts)
 		.map_err(|_| anyhow::anyhow!("cross match metrics already initialised"))?;
 
+	let thegamesdb_api_calls = IntCounterVec::new(
+		Opts::new(
+			"api_thegamesdb_api_calls_total",
+			"TheGamesDB outbound API call outcomes (hit, miss, quota_exhausted, probe, error)",
+		),
+		&["outcome"],
+	)?;
+	registry.register(Box::new(thegamesdb_api_calls.clone()))?;
+	THEGAMESDB_API_CALLS
+		.set(thegamesdb_api_calls)
+		.map_err(|_| anyhow::anyhow!("thegamesdb api metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -429,5 +442,11 @@ pub fn set_screenscraper_concurrency(permits: i64) {
 pub fn record_cross_match_attempt(provider: &str, outcome: &str) {
 	if let Some(counter) = CROSS_MATCH_ATTEMPTS.get() {
 		counter.with_label_values(&[provider, outcome]).inc();
+	}
+}
+
+pub fn record_thegamesdb_api_call(outcome: &str) {
+	if let Some(counter) = THEGAMESDB_API_CALLS.get() {
+		counter.with_label_values(&[outcome]).inc();
 	}
 }
