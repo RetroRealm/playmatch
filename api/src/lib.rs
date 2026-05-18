@@ -127,6 +127,7 @@ use service::providers::openvgdb::OpenVgdbClient;
 use service::providers::retroachievements::RetroAchievementsClient;
 use service::providers::screenscraper::ScreenScraperClient;
 use service::providers::steamgriddb::SteamGridDbClient;
+use service::providers::thegamesdb::TheGamesDbClient;
 use service::providers::{MetadataProvider, ProviderRegistry};
 use std::env;
 use std::sync::Arc;
@@ -201,6 +202,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let er_http_client = Client::builder().cookie_store(false).build()?;
 
+	let tgdb_http_client = Client::builder().cookie_store(false).build()?;
+
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
 	// would replay on subsequent requests to the same host.
 	let dat_http_client = Client::builder().cookie_store(false).build()?;
@@ -220,6 +223,8 @@ async fn start() -> anyhow::Result<()> {
 	let ra_client_opt =
 		build_retroachievements_client(ra_http_client, redis_conn.clone(), conn.clone());
 	let er_client_opt = build_emuready_client(er_http_client, redis_conn.clone());
+	let tgdb_client_opt =
+		build_thegamesdb_client(tgdb_http_client, redis_conn.clone(), conn.clone());
 
 	let prometheus = PrometheusMetricsBuilder::new("api")
 		.mask_unmatched_patterns("UNKNOWN")
@@ -258,6 +263,9 @@ async fn start() -> anyhow::Result<()> {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if let Some(c) = er_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
+	if let Some(c) = tgdb_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if providers.is_empty() {
@@ -556,6 +564,43 @@ fn build_emuready_client(
 		}
 		Err(e) => {
 			warn!("EmuReady provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
+/// Returns `None` when TGDB_ENABLED is unset or not "true". TheGamesDB is
+/// match-only; no proxy routes are exposed. The bootstrap dataset is seeded
+/// via a migration so no daily import job runs. TGDB_API_KEY is optional;
+/// without it the provider still runs but skips the search-on-miss API rung
+/// and falls back to local-only matching.
+fn build_thegamesdb_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+	db_conn: sea_orm::DbConn,
+) -> Option<Arc<TheGamesDbClient>> {
+	let enabled = env::var("TGDB_ENABLED")
+		.unwrap_or_default()
+		.eq_ignore_ascii_case("true");
+	if !enabled {
+		warn!("TGDB_ENABLED not set to true, TheGamesDB provider disabled");
+		return None;
+	}
+	let api_key = env::var("TGDB_API_KEY")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	if api_key.is_none() {
+		warn!(
+			"TGDB_API_KEY not set; TheGamesDB will match locally against the seeded dataset only"
+		);
+	}
+	match TheGamesDbClient::new(http, redis_conn, db_conn, api_key) {
+		Ok(c) => {
+			info!("TheGamesDB provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("TheGamesDB provider construction failed, disabled: {e}");
 			None
 		}
 	}
