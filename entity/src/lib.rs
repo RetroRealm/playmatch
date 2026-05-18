@@ -24,4 +24,6 @@ pub mod sea_orm_active_enums;
 pub mod signature_group;
 pub mod signature_metadata_mapping;
 pub mod signature_metadata_mapping_suggestions;
+pub mod tgdb_game;
+pub mod tgdb_game_alias;
 pub mod user;

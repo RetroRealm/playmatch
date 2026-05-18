@@ -116,6 +116,10 @@ pub enum MetadataProviderEnum {
 	OpenVGDB,
 	#[sea_orm(string_value = "retroachievements")]
 	RetroAchievements,
+	#[sea_orm(string_value = "thegamesdb")]
+	#[strum(serialize = "thegamesdb")]
+	#[allow(clippy::upper_case_acronyms)]
+	TheGamesDB,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

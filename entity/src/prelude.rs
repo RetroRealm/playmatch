@@ -21,4 +21,6 @@ pub use super::retroachievements_system::Entity as RetroachievementsSystem;
 pub use super::signature_group::Entity as SignatureGroup;
 pub use super::signature_metadata_mapping::Entity as SignatureMetadataMapping;
 pub use super::signature_metadata_mapping_suggestions::Entity as SignatureMetadataMappingSuggestions;
+pub use super::tgdb_game::Entity as TgdbGame;
+pub use super::tgdb_game_alias::Entity as TgdbGameAlias;
 pub use super::user::Entity as User;
