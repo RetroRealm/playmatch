@@ -29,6 +29,7 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 - [x] Support for OpenVGDB as metadata provider (offline SQLite hash matching, opt-in via `OPENVGDB_ENABLED`)
 - [x] Support for EmuReady as metadata provider (id-mapping only, opt-in via `EMUREADY_ENABLED`)
 - [x] Support for RetroAchievements as metadata provider (bulk import via API, MD5 hash matching plus name fallback, opt-in via `RETROACHIEVEMENTS_USERNAME` + `RETROACHIEVEMENTS_API_KEY`)
+- [x] Support for TheGamesDB as metadata provider (catalogue seeded via migration, capped API search-on-miss with Redis-backed quota, opt-in via `TGDB_ENABLED` plus optional `TGDB_API_KEY`)
 
 ### Planned
 
