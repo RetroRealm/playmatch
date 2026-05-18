@@ -40,6 +40,8 @@ mod m20260515_120100_create_openvgdb_tables;
 mod m20260516_120000_add_openvgdb_release_normalized_title;
 mod m20260516_120100_add_retroachievements_provider_enum_value;
 mod m20260516_120200_create_retroachievements_tables;
+mod m20260518_120000_add_thegamesdb_provider_enum_value;
+mod m20260518_120100_create_thegamesdb_tables;
 
 pub struct Migrator;
 
@@ -87,6 +89,8 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260516_120000_add_openvgdb_release_normalized_title::Migration),
 			Box::new(m20260516_120100_add_retroachievements_provider_enum_value::Migration),
 			Box::new(m20260516_120200_create_retroachievements_tables::Migration),
+			Box::new(m20260518_120000_add_thegamesdb_provider_enum_value::Migration),
+			Box::new(m20260518_120100_create_thegamesdb_tables::Migration),
 		]
 	}
 }
