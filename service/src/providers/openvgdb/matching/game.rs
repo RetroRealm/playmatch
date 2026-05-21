@@ -1,6 +1,7 @@
 use crate::db::game::{
-	get_automatic_match_failed_games_with_limit, get_unmatched_games_with_clone_of_with_limit,
-	get_unmatched_games_without_clone_of_with_limit,
+	get_automatic_match_failed_games_with_limit,
+	get_unmatched_games_with_clone_of_with_limit_no_platform_gate,
+	get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 };
 use crate::db::game_file::get_game_files_from_game_id;
 use crate::db::openvgdb::{
@@ -36,7 +37,7 @@ pub async fn match_games_to_openvgdb(
 	drive_match_pipeline(
 		"game",
 		MetadataProviderEnum::OpenVGDB,
-		get_unmatched_games_without_clone_of_with_limit,
+		get_unmatched_games_without_clone_of_with_limit_no_platform_gate,
 		match_game_to_openvgdb,
 		client.clone(),
 		db_conn,
@@ -48,7 +49,7 @@ pub async fn match_games_to_openvgdb(
 	drive_match_pipeline(
 		"game",
 		MetadataProviderEnum::OpenVGDB,
-		get_unmatched_games_with_clone_of_with_limit,
+		get_unmatched_games_with_clone_of_with_limit_no_platform_gate,
 		match_clone_of_game_to_openvgdb,
 		client.clone(),
 		db_conn,
