@@ -347,9 +347,10 @@ pub async fn get_unpopulated_clone_of_games(
 pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(provider, true, true, page_size, conn)
+	get_unmatched_games_with_limit(provider, true, true, page_size, cursor, conn)
 }
 
 /// Return up to `page_size` games without a successful mapping for `provider` that are
@@ -357,9 +358,10 @@ pub fn get_unmatched_games_without_clone_of_with_limit<'a>(
 pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(provider, false, true, page_size, conn)
+	get_unmatched_games_with_limit(provider, false, true, page_size, cursor, conn)
 }
 
 /// Same as [`get_unmatched_games_without_clone_of_with_limit`] but does not require the
@@ -369,9 +371,10 @@ pub fn get_unmatched_games_with_clone_of_with_limit<'a>(
 pub fn get_unmatched_games_without_clone_of_with_limit_no_platform_gate<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(provider, true, false, page_size, conn)
+	get_unmatched_games_with_limit(provider, true, false, page_size, cursor, conn)
 }
 
 /// Same as [`get_unmatched_games_with_clone_of_with_limit`] but without the platform
@@ -379,9 +382,10 @@ pub fn get_unmatched_games_without_clone_of_with_limit_no_platform_gate<'a>(
 pub fn get_unmatched_games_with_clone_of_with_limit_no_platform_gate<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
-	get_unmatched_games_with_limit(provider, false, false, page_size, conn)
+	get_unmatched_games_with_limit(provider, false, false, page_size, cursor, conn)
 }
 
 /// Min interval between cross-pass attempts on the same failed mapping.
@@ -401,13 +405,14 @@ pub const CROSS_MATCH_RETRY_INTERVAL_DAYS: i64 = 7;
 pub fn get_failed_games_for_cross_pass_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
 	Box::pin(async move {
 		let cooldown = Utc::now() - Duration::days(CROSS_MATCH_RETRY_INTERVAL_DAYS);
 		let cooldown_naive: NaiveDateTime = cooldown.naive_utc();
 
-		let res = Game::find()
+		let mut query = Game::find()
 			.join(
 				JoinType::InnerJoin,
 				game::Relation::SignatureMetadataMapping.def(),
@@ -450,7 +455,13 @@ pub fn get_failed_games_for_cross_pass_with_limit<'a>(
 							)
 							.to_owned(),
 					)),
-			)
+			);
+
+		if let Some(after) = cursor {
+			query = query.filter(game::Column::Id.gt(after));
+		}
+
+		let res = query
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)
 			.all(&conn)
@@ -470,13 +481,14 @@ pub fn get_failed_games_for_cross_pass_with_limit<'a>(
 pub fn get_automatic_match_failed_games_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
 	Box::pin(async move {
 		let sixty_days_ago = Utc::now() - Duration::days(60);
 		let sixty_days_ago_naive: NaiveDateTime = sixty_days_ago.naive_utc();
 
-		let res = Game::find()
+		let mut query = Game::find()
 			.join(
 				JoinType::LeftJoin,
 				game::Relation::SignatureMetadataMapping.def(),
@@ -490,7 +502,13 @@ pub fn get_automatic_match_failed_games_with_limit<'a>(
 					)
 					.and(signature_metadata_mapping::Column::UpdatedAt.lt(sixty_days_ago_naive))
 					.and(signature_metadata_mapping::Column::Provider.eq(provider)),
-			)
+			);
+
+		if let Some(after) = cursor {
+			query = query.filter(game::Column::Id.gt(after));
+		}
+
+		let res = query
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)
 			.all(&conn)
@@ -509,6 +527,7 @@ fn get_unmatched_games_with_limit<'a>(
 	clone_of_null: bool,
 	require_platform_mapping: bool,
 	page_size: u64,
+	cursor: Option<Uuid>,
 	conn: DbConn,
 ) -> BoxFuture<'a, anyhow::Result<Option<Vec<game::Model>>>> {
 	Box::pin(async move {
@@ -543,7 +562,7 @@ fn get_unmatched_games_with_limit<'a>(
 				);
 		}
 
-		let res = query
+		query = query
 			.filter(if clone_of_null {
 				game::Column::CloneOf.is_null()
 			} else {
@@ -569,7 +588,13 @@ fn get_unmatched_games_with_limit<'a>(
 						.to_owned(),
 				)
 				.not(),
-			)
+			);
+
+		if let Some(after) = cursor {
+			query = query.filter(game::Column::Id.gt(after));
+		}
+
+		let res = query
 			.order_by_asc(game::Column::Id)
 			.limit(page_size)
 			.all(&conn)

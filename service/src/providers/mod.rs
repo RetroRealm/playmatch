@@ -18,7 +18,7 @@ use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum,
 };
 use futures_util::future::BoxFuture;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::sync::Arc;
@@ -30,11 +30,42 @@ pub const DEFAULT_CHUNK_SIZE: usize = 4;
 
 pub const DEFAULT_PAGE_SIZE: u64 = 100;
 
+/// Exposes the primary-key UUID used as the keyset pagination cursor.
+/// [`drive_match_pipeline`] reads `page_cursor()` off the last row of each
+/// page and passes it back to the next [`FetchPageFn`] call so the query
+/// can use `WHERE id > $cursor` instead of re-scanning from the start.
+pub trait PageCursor {
+	fn page_cursor(&self) -> Uuid;
+}
+
+impl PageCursor for entity::game::Model {
+	fn page_cursor(&self) -> Uuid {
+		self.id
+	}
+}
+
+impl PageCursor for entity::company::Model {
+	fn page_cursor(&self) -> Uuid {
+		self.id
+	}
+}
+
+impl PageCursor for entity::platform::Model {
+	fn page_cursor(&self) -> Uuid {
+		self.id
+	}
+}
+
 /// Function pointer signature for the per-page fetch callback used by
-/// [`drive_match_pipeline`]. Returns the next page of unmatched entities of
-/// type `M` for the given provider, or `None` when the queue is drained.
-pub type FetchPageFn<M> =
-	fn(MetadataProviderEnum, u64, DbConn) -> BoxFuture<'static, anyhow::Result<Option<Vec<M>>>>;
+/// [`drive_match_pipeline`]. Takes a `cursor` of the last id from the previous
+/// page (or `None` for the first call) so the underlying query can skip rows
+/// that have already been processed.
+pub type FetchPageFn<M> = fn(
+	MetadataProviderEnum,
+	u64,
+	Option<Uuid>,
+	DbConn,
+) -> BoxFuture<'static, anyhow::Result<Option<Vec<M>>>>;
 
 /// Function pointer signature for the per-entity match callback used by
 /// [`drive_match_pipeline`]. Receives one entity, an `Arc` clone of the
@@ -178,11 +209,9 @@ fn failed_reason_label(r: FailedMatchReasonEnum) -> &'static str {
 /// Per-entity errors are logged with the `label` prefix and do not abort
 /// the loop.
 ///
-/// The loop also aborts when two consecutive page fetches return the same
-/// entities. That happens when every task in a page bailed without writing
-/// (e.g. ScreenScraper hit its quota and every game-task early-returns
-/// `Ok(())` without a mapping write); without this guard the page query
-/// would keep returning the same set forever and starve the next provider.
+/// Uses keyset pagination via [`PageCursor`]: the last id of each page seeds
+/// the next `fetch_fn` call so the query skips already-processed rows in
+/// O(log N) rather than re-scanning from the smallest id every iteration.
 pub async fn drive_match_pipeline<M, C>(
 	label: &'static str,
 	provider: MetadataProviderEnum,
@@ -193,17 +222,12 @@ pub async fn drive_match_pipeline<M, C>(
 	chunk_size: usize,
 ) -> anyhow::Result<()>
 where
-	M: Clone + PartialEq + Send + 'static,
+	M: Clone + PageCursor + Send + 'static,
 	C: Send + Sync + 'static,
 {
-	let mut last_page: Option<Vec<M>> = None;
-	while let Some(page) = fetch_fn(provider, DEFAULT_PAGE_SIZE, db_conn.clone()).await? {
-		if last_page.as_ref() == Some(&page) {
-			warn!(
-				"Provider returned the same {label} page twice in a row; aborting cycle to avoid infinite loop (likely cause: upstream quota or persistent error)"
-			);
-			break;
-		}
+	let mut cursor: Option<Uuid> = None;
+	while let Some(page) = fetch_fn(provider, DEFAULT_PAGE_SIZE, cursor, db_conn.clone()).await? {
+		let next_cursor = page.last().map(PageCursor::page_cursor);
 		for chunk in page.chunks(chunk_size) {
 			let mut handles = Vec::with_capacity(chunk.len());
 			for entity in chunk.iter().cloned() {
@@ -217,7 +241,10 @@ where
 				}
 			}
 		}
-		last_page = Some(page);
+		cursor = match next_cursor {
+			Some(c) => Some(c),
+			None => break,
+		};
 	}
 	Ok(())
 }
@@ -340,13 +367,16 @@ where
 	C: Send + Sync + 'static,
 {
 	let provider_label = provider_label_for(provider);
+	let mut cursor: Option<Uuid> = None;
 	while let Some(page) = crate::db::game::get_failed_games_for_cross_pass_with_limit(
 		provider,
 		DEFAULT_PAGE_SIZE,
+		cursor,
 		db_conn.clone(),
 	)
 	.await?
 	{
+		let next_cursor = page.last().map(PageCursor::page_cursor);
 		for chunk in page.chunks(chunk_size) {
 			let mut handles = Vec::with_capacity(chunk.len());
 			for game in chunk.iter().cloned() {
@@ -389,6 +419,10 @@ where
 				);
 			}
 		}
+		cursor = match next_cursor {
+			Some(c) => Some(c),
+			None => break,
+		};
 	}
 	Ok(())
 }

@@ -34,11 +34,12 @@ macro_rules! unmatched_entities_with_limit {
 		pub fn $fn(
 			provider: ::entity::sea_orm_active_enums::MetadataProviderEnum,
 			limit: u64,
+			cursor: ::std::option::Option<::sea_orm::prelude::Uuid>,
 			conn: ::sea_orm::DbConn,
 		) -> ::futures_util::future::BoxFuture<'static, ::anyhow::Result<Option<Vec<$model>>>> {
 			Box::pin(async move {
 				use ::sea_orm::ActiveEnum;
-				let rows = $entity::find()
+				let mut query = $entity::find()
 					.filter(
 						::sea_orm::sea_query::Expr::exists(
 							::sea_orm::sea_query::Query::select()
@@ -63,7 +64,11 @@ macro_rules! unmatched_entities_with_limit {
 								.to_owned(),
 						)
 						.not(),
-					)
+					);
+				if let ::std::option::Option::Some(after) = cursor {
+					query = query.filter($column.gt(after));
+				}
+				let rows = query
 					.order_by_asc($column)
 					.limit(limit)
 					.all(&conn)
