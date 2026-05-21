@@ -316,106 +316,141 @@ async fn try_match_by_hashes(
 		.collect();
 
 	for file in &files {
-		// SHA1 first: stronger collision resistance than MD5 and the dominant
-		// hash in modern DAT sets. CRC is the weakest fallback.
 		if client.is_quota_exhausted() {
 			return Ok(None);
 		}
 		let rom_name = file.file_name.as_str();
 		let rom_size = file.file_size_in_bytes;
-		if let Some(sha1) = file.sha1.as_deref().filter(|s| !s.is_empty()) {
-			let hit = match client
-				.get_game_by_sha1(system_id, rom_name, rom_size, sha1)
-				.await?
-			{
-				Some(found) => {
-					record_hash_match(
-						game,
-						&found,
-						AutomaticMatchReasonEnum::Sha1Hash,
-						&dat_ss_regions,
-						db_conn,
-						redis_conn,
-					)
-					.await?;
-					true
+		let sha1 = file
+			.sha1
+			.as_deref()
+			.map(str::trim)
+			.filter(|s| !s.is_empty());
+		let md5 = file.md5.as_deref().map(str::trim).filter(|s| !s.is_empty());
+		let crc = file.crc.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+		let submitted = submitted_hashes(sha1, md5, crc);
+		if submitted.is_empty() {
+			continue;
+		}
+
+		let found = client
+			.get_game_by_hashes(system_id, rom_name, rom_size, md5, sha1, crc)
+			.await?;
+
+		match found {
+			Some(found) => {
+				let winning = pick_winning_hash(&found, sha1, md5, crc, &submitted);
+				record_hash_match(
+					game,
+					&found,
+					reason_for(winning),
+					&dat_ss_regions,
+					db_conn,
+					redis_conn,
+				)
+				.await?;
+				for h in &submitted {
+					let outcome = if *h == winning { "hit" } else { "miss" };
+					crate::metrics::record_match_rung("screenscraper", rung_for(*h), outcome);
 				}
-				None => false,
-			};
-			crate::metrics::record_match_rung(
-				"screenscraper",
-				"sha1_hash",
-				if hit { "hit" } else { "miss" },
-			);
-			if hit {
 				return Ok(Some(()));
 			}
-		}
-		if client.is_quota_exhausted() {
-			return Ok(None);
-		}
-		if let Some(md5) = file.md5.as_deref().filter(|s| !s.is_empty()) {
-			let hit = match client
-				.get_game_by_md5(system_id, rom_name, rom_size, md5)
-				.await?
-			{
-				Some(found) => {
-					record_hash_match(
-						game,
-						&found,
-						AutomaticMatchReasonEnum::Md5Hash,
-						&dat_ss_regions,
-						db_conn,
-						redis_conn,
-					)
-					.await?;
-					true
+			None => {
+				for h in &submitted {
+					crate::metrics::record_match_rung("screenscraper", rung_for(*h), "miss");
 				}
-				None => false,
-			};
-			crate::metrics::record_match_rung(
-				"screenscraper",
-				"md5_hash",
-				if hit { "hit" } else { "miss" },
-			);
-			if hit {
-				return Ok(Some(()));
-			}
-		}
-		if client.is_quota_exhausted() {
-			return Ok(None);
-		}
-		if let Some(crc) = file.crc.as_deref().filter(|s| !s.is_empty()) {
-			let hit = match client
-				.get_game_by_crc(system_id, rom_name, rom_size, crc)
-				.await?
-			{
-				Some(found) => {
-					record_hash_match(
-						game,
-						&found,
-						AutomaticMatchReasonEnum::CrcHash,
-						&dat_ss_regions,
-						db_conn,
-						redis_conn,
-					)
-					.await?;
-					true
-				}
-				None => false,
-			};
-			crate::metrics::record_match_rung(
-				"screenscraper",
-				"crc_hash",
-				if hit { "hit" } else { "miss" },
-			);
-			if hit {
-				return Ok(Some(()));
 			}
 		}
 	}
 
 	Ok(None)
+}
+
+/// `Ord` derive is load-bearing: variants are listed weakest to strongest so
+/// `pick_winning_hash` can resolve which hash matched via `.max()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum HashKind {
+	Crc,
+	Md5,
+	Sha1,
+}
+
+fn submitted_hashes(sha1: Option<&str>, md5: Option<&str>, crc: Option<&str>) -> Vec<HashKind> {
+	let mut out = Vec::with_capacity(3);
+	if sha1.is_some() {
+		out.push(HashKind::Sha1);
+	}
+	if md5.is_some() {
+		out.push(HashKind::Md5);
+	}
+	if crc.is_some() {
+		out.push(HashKind::Crc);
+	}
+	out
+}
+
+fn rung_for(kind: HashKind) -> &'static str {
+	match kind {
+		HashKind::Sha1 => "sha1_hash",
+		HashKind::Md5 => "md5_hash",
+		HashKind::Crc => "crc_hash",
+	}
+}
+
+fn reason_for(kind: HashKind) -> AutomaticMatchReasonEnum {
+	match kind {
+		HashKind::Sha1 => AutomaticMatchReasonEnum::Sha1Hash,
+		HashKind::Md5 => AutomaticMatchReasonEnum::Md5Hash,
+		HashKind::Crc => AutomaticMatchReasonEnum::CrcHash,
+	}
+}
+
+/// ScreenScraper's response doesn't tag which hash matched, so we derive it
+/// from the rom carrying a matching field. Falls back to the strongest hash
+/// we submitted when `roms` is absent or no rom matches.
+fn pick_winning_hash(
+	found: &SsGame,
+	sha1: Option<&str>,
+	md5: Option<&str>,
+	crc: Option<&str>,
+	submitted: &[HashKind],
+) -> HashKind {
+	let strongest_submitted = *submitted
+		.iter()
+		.max()
+		.expect("submitted must be non-empty when pick_winning_hash is called");
+
+	let Some(roms) = found.roms.as_ref() else {
+		return strongest_submitted;
+	};
+
+	let mut best: Option<HashKind> = None;
+	let consider = |best: &mut Option<HashKind>, kind: HashKind| {
+		if best.map(|b| kind > b).unwrap_or(true) {
+			*best = Some(kind);
+		}
+	};
+
+	for rom in roms {
+		if let (Some(want), Some(got)) = (sha1, rom.romsha1.as_deref())
+			&& want.eq_ignore_ascii_case(got)
+		{
+			consider(&mut best, HashKind::Sha1);
+		}
+		if let (Some(want), Some(got)) = (md5, rom.rommd5.as_deref())
+			&& want.eq_ignore_ascii_case(got)
+		{
+			consider(&mut best, HashKind::Md5);
+		}
+		if let (Some(want), Some(got)) = (crc, rom.romcrc.as_deref())
+			&& want.eq_ignore_ascii_case(got)
+		{
+			consider(&mut best, HashKind::Crc);
+		}
+	}
+
+	best.unwrap_or(strongest_submitted)
 }
 
 async fn record_hash_match(
@@ -619,5 +654,107 @@ async fn try_write_cross(
 			Ok(true)
 		}
 		Selection::None => Ok(false),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::providers::screenscraper::model::SsRom;
+
+	fn ss_game(roms: Option<Vec<SsRom>>) -> SsGame {
+		SsGame {
+			id: Some(1),
+			noms: vec![],
+			roms,
+			editeur: None,
+			developpeur: None,
+		}
+	}
+
+	fn rom(sha1: Option<&str>, md5: Option<&str>, crc: Option<&str>) -> SsRom {
+		SsRom {
+			romfilename: None,
+			rommd5: md5.map(str::to_string),
+			romsha1: sha1.map(str::to_string),
+			romcrc: crc.map(str::to_string),
+		}
+	}
+
+	#[test]
+	fn pick_winning_hash_prefers_sha1_when_response_carries_it() {
+		let sha1 = "AABBCC";
+		let md5 = "112233";
+		let crc = "DEADBEEF";
+		let game = ss_game(Some(vec![rom(Some(sha1), Some(md5), Some(crc))]));
+		let submitted = submitted_hashes(Some(sha1), Some(md5), Some(crc));
+		assert_eq!(
+			pick_winning_hash(&game, Some(sha1), Some(md5), Some(crc), &submitted),
+			HashKind::Sha1,
+		);
+	}
+
+	#[test]
+	fn pick_winning_hash_picks_md5_when_only_md5_matches_in_response() {
+		let md5 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+		let game = ss_game(Some(vec![rom(None, Some(md5), None)]));
+		let submitted = submitted_hashes(Some("noop_sha1"), Some(md5), Some("noop_crc"));
+		assert_eq!(
+			pick_winning_hash(
+				&game,
+				Some("noop_sha1"),
+				Some(md5),
+				Some("noop_crc"),
+				&submitted
+			),
+			HashKind::Md5,
+		);
+	}
+
+	#[test]
+	fn pick_winning_hash_is_case_insensitive() {
+		let sha1_upper = "ABCDEF1234567890ABCDEF1234567890ABCDEF12";
+		let sha1_lower = sha1_upper.to_lowercase();
+		let game = ss_game(Some(vec![rom(Some(&sha1_lower), None, None)]));
+		let submitted = submitted_hashes(Some(sha1_upper), None, None);
+		assert_eq!(
+			pick_winning_hash(&game, Some(sha1_upper), None, None, &submitted),
+			HashKind::Sha1,
+		);
+	}
+
+	#[test]
+	fn pick_winning_hash_falls_back_to_strongest_submitted_when_response_has_no_roms() {
+		let game = ss_game(None);
+		let submitted = submitted_hashes(None, Some("md5"), Some("crc"));
+		assert_eq!(
+			pick_winning_hash(&game, None, Some("md5"), Some("crc"), &submitted),
+			HashKind::Md5,
+		);
+	}
+
+	#[test]
+	fn pick_winning_hash_falls_back_when_no_rom_matches() {
+		let game = ss_game(Some(vec![rom(Some("zzz"), Some("yyy"), Some("xxx"))]));
+		let submitted = submitted_hashes(Some("aaa"), None, Some("bbb"));
+		assert_eq!(
+			pick_winning_hash(&game, Some("aaa"), None, Some("bbb"), &submitted),
+			HashKind::Sha1,
+		);
+	}
+
+	#[test]
+	fn submitted_hashes_orders_strongest_first() {
+		let submitted = submitted_hashes(Some("s"), Some("m"), Some("c"));
+		assert_eq!(
+			submitted,
+			vec![HashKind::Sha1, HashKind::Md5, HashKind::Crc]
+		);
+	}
+
+	#[test]
+	fn submitted_hashes_skips_absent_inputs() {
+		let submitted = submitted_hashes(None, Some("m"), None);
+		assert_eq!(submitted, vec![HashKind::Md5]);
 	}
 }

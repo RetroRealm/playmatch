@@ -209,77 +209,57 @@ impl ScreenScraperClient {
 		self.fetch_optional_game("game_by_rom", url).await
 	}
 
-	pub async fn get_game_by_md5(
+	/// Submits `sha1`, `md5` and `crc` in one `jeuInfos.php` call rather than
+	/// three sequential calls. Halves outbound traffic per file, which matters
+	/// under the per-day-KO ceiling.
+	pub async fn get_game_by_hashes(
 		&self,
 		system_id: i32,
 		rom_name: &str,
 		rom_size: Option<i64>,
-		md5: &str,
+		md5: Option<&str>,
+		sha1: Option<&str>,
+		crc: Option<&str>,
 	) -> anyhow::Result<Option<SsGame>> {
-		self.get_game_by_hash("game_by_md5", system_id, rom_name, rom_size, "md5", md5)
-			.await
-	}
-
-	pub async fn get_game_by_sha1(
-		&self,
-		system_id: i32,
-		rom_name: &str,
-		rom_size: Option<i64>,
-		sha1: &str,
-	) -> anyhow::Result<Option<SsGame>> {
-		self.get_game_by_hash("game_by_sha1", system_id, rom_name, rom_size, "sha1", sha1)
-			.await
-	}
-
-	pub async fn get_game_by_crc(
-		&self,
-		system_id: i32,
-		rom_name: &str,
-		rom_size: Option<i64>,
-		crc: &str,
-	) -> anyhow::Result<Option<SsGame>> {
-		self.get_game_by_hash("game_by_crc", system_id, rom_name, rom_size, "crc", crc)
-			.await
-	}
-
-	/// `jeuInfos.php` hash lookups require `systemeid`, `romnom` and a hash;
-	/// `romtaille` is optional but improves the hit rate. Calls without
-	/// `romnom` come back as HTTP 400 "Il manque des champs obligatoires
-	/// dans l'url", so guard for it here.
-	async fn get_game_by_hash(
-		&self,
-		endpoint_label: &'static str,
-		system_id: i32,
-		rom_name: &str,
-		rom_size: Option<i64>,
-		hash_param: &'static str,
-		hash_value: &str,
-	) -> anyhow::Result<Option<SsGame>> {
+		const ENDPOINT_LABEL: &str = "game_by_hashes";
 		if !valid_system_id(system_id) {
-			debug!("screenscraper {endpoint_label} skipped: invalid system_id ({system_id})");
-			return Ok(None);
-		}
-		let trimmed_hash = hash_value.trim();
-		if trimmed_hash.is_empty() {
-			debug!("screenscraper {endpoint_label} skipped: empty {hash_param}");
+			debug!("screenscraper {ENDPOINT_LABEL} skipped: invalid system_id ({system_id})");
 			return Ok(None);
 		}
 		let trimmed_name = rom_name.trim();
 		if trimmed_name.is_empty() {
-			debug!("screenscraper {endpoint_label} skipped: empty rom_name");
+			debug!("screenscraper {ENDPOINT_LABEL} skipped: empty rom_name");
 			return Ok(None);
 		}
+
+		let md5 = md5.map(str::trim).filter(|s| !s.is_empty());
+		let sha1 = sha1.map(str::trim).filter(|s| !s.is_empty());
+		let crc = crc.map(str::trim).filter(|s| !s.is_empty());
+		if md5.is_none() && sha1.is_none() && crc.is_none() {
+			debug!("screenscraper {ENDPOINT_LABEL} skipped: no hashes available");
+			return Ok(None);
+		}
+
 		let mut params: Vec<(&'static str, String)> = vec![
 			("systemeid", system_id.to_string()),
 			("romtype", "rom".to_string()),
 			("romnom", trimmed_name.to_string()),
-			(hash_param, trimmed_hash.to_string()),
 		];
+		if let Some(v) = sha1 {
+			params.push(("sha1", v.to_string()));
+		}
+		if let Some(v) = md5 {
+			params.push(("md5", v.to_string()));
+		}
+		if let Some(v) = crc {
+			params.push(("crc", v.to_string()));
+		}
 		if let Some(size) = rom_size.filter(|s| *s > 0) {
 			params.push(("romtaille", size.to_string()));
 		}
+
 		let url = self.url("jeuInfos.php", &params)?;
-		self.fetch_optional_game(endpoint_label, url).await
+		self.fetch_optional_game(ENDPOINT_LABEL, url).await
 	}
 
 	async fn fetch_optional_game(
