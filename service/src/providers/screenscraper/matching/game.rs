@@ -119,10 +119,9 @@ fn match_game_to_screenscraper(
 		let mut redis_conn = client.redis_conn().clone();
 		let system_id = get_game_platform_screenscraper_id(&game, &db_conn).await?;
 
-		if let Some(()) =
-			try_match_by_hashes(&game, system_id, &client, &db_conn, &mut redis_conn).await?
-		{
-			return Ok(());
+		match try_match_by_hashes(&game, system_id, &client, &db_conn, &mut redis_conn).await? {
+			HashPassOutcome::Matched | HashPassOutcome::SkippedTooMany => return Ok(()),
+			HashPassOutcome::Missed => {}
 		}
 
 		if client.is_quota_exhausted() {
@@ -296,16 +295,44 @@ async fn run_rung(
 	}
 }
 
+/// ScreenScraper indexes whole games, not file chunks. Anything above the
+/// cap gets a `Failed/TooManyFiles` row without an API call.
+const MAX_GAME_FILES_FOR_SCREENSCRAPER: usize = 5;
+
+enum HashPassOutcome {
+	Matched,
+	SkippedTooMany,
+	Missed,
+}
+
 async fn try_match_by_hashes(
 	game: &Model,
 	system_id: i32,
 	client: &ScreenScraperClient,
 	db_conn: &DbConn,
 	redis_conn: &mut redis::aio::MultiplexedConnection,
-) -> anyhow::Result<Option<()>> {
+) -> anyhow::Result<HashPassOutcome> {
 	let files = get_game_files_from_game_id(game.id, db_conn).await?;
 	if files.is_empty() {
-		return Ok(None);
+		return Ok(HashPassOutcome::Missed);
+	}
+	if files.len() > MAX_GAME_FILES_FOR_SCREENSCRAPER {
+		debug!(
+			"ScreenScraper skip for Game \"{}\": {} files exceeds cap of {}",
+			game.name,
+			files.len(),
+			MAX_GAME_FILES_FOR_SCREENSCRAPER
+		);
+		write_auto_match_failed(
+			"screenscraper",
+			MetadataProviderEnum::Screenscraper,
+			Target::Game(game.id),
+			FailedMatchReasonEnum::TooManyFiles,
+			db_conn,
+			redis_conn,
+		)
+		.await?;
+		return Ok(HashPassOutcome::SkippedTooMany);
 	}
 
 	let parsed_dat = parse_name(&game.name);
@@ -317,7 +344,7 @@ async fn try_match_by_hashes(
 
 	for file in &files {
 		if client.is_quota_exhausted() {
-			return Ok(None);
+			return Ok(HashPassOutcome::Missed);
 		}
 		let rom_name = file.file_name.as_str();
 		let rom_size = file.file_size_in_bytes;
@@ -341,7 +368,7 @@ async fn try_match_by_hashes(
 		match found {
 			Some(found) => {
 				let winning = pick_winning_hash(&found, sha1, md5, crc, &submitted);
-				record_hash_match(
+				let wrote = record_hash_match(
 					game,
 					&found,
 					reason_for(winning),
@@ -350,11 +377,16 @@ async fn try_match_by_hashes(
 					redis_conn,
 				)
 				.await?;
-				for h in &submitted {
-					let outcome = if *h == winning { "hit" } else { "miss" };
-					crate::metrics::record_match_rung("screenscraper", rung_for(*h), outcome);
+				if wrote {
+					for h in &submitted {
+						let outcome = if *h == winning { "hit" } else { "miss" };
+						crate::metrics::record_match_rung("screenscraper", rung_for(*h), outcome);
+					}
+					return Ok(HashPassOutcome::Matched);
 				}
-				return Ok(Some(()));
+				for h in &submitted {
+					crate::metrics::record_match_rung("screenscraper", rung_for(*h), "miss");
+				}
 			}
 			None => {
 				for h in &submitted {
@@ -364,7 +396,7 @@ async fn try_match_by_hashes(
 		}
 	}
 
-	Ok(None)
+	Ok(HashPassOutcome::Missed)
 }
 
 /// `Ord` derive is load-bearing: variants are listed weakest to strongest so
@@ -453,6 +485,8 @@ fn pick_winning_hash(
 	best.unwrap_or(strongest_submitted)
 }
 
+/// `Ok(false)` when the response carried no game id and no row was written;
+/// the caller treats it as a miss and moves on to the next file.
 async fn record_hash_match(
 	game: &Model,
 	found: &SsGame,
@@ -460,13 +494,13 @@ async fn record_hash_match(
 	dat_ss_regions: &[&str],
 	db_conn: &DbConn,
 	redis_conn: &mut redis::aio::MultiplexedConnection,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
 	let Some(found_id) = found.id else {
 		debug!(
 			"ScreenScraper hash response missing id for Game \"{}\"; skipping",
 			game.name
 		);
-		return Ok(());
+		return Ok(false);
 	};
 	debug!(
 		"Matched Game \"{}\" to ScreenScraper Game ID {} ({:?})",
@@ -487,7 +521,8 @@ async fn record_hash_match(
 		db_conn,
 		redis_conn,
 	)
-	.await
+	.await?;
+	Ok(true)
 }
 
 async fn get_game_platform_screenscraper_id(game: &Model, db_conn: &DbConn) -> anyhow::Result<i32> {
