@@ -9,11 +9,8 @@ use entity::signature_metadata_mapping;
 use entity::signature_metadata_mapping::Model;
 use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
-use sea_orm::sea_query::Expr;
-use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, IntoActiveModel, QueryFilter,
-	TryIntoModel,
-};
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter};
 
 /// Builder input for [`create_or_update_signature_metadata_mapping`]. Exactly one of
 /// `company_id`, `game_id`, `platform_id` should be set.
@@ -119,50 +116,70 @@ pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provid
 		.await
 }
 
-/// Upsert a signature metadata mapping. Looks up the existing row by its identifying tuple,
-/// updates it in place if found, or inserts a new row otherwise. Touches `updated_at` on every call.
+/// `matched_name` and `matched_year` use COALESCE on conflict so a follow-up
+/// call that doesn't carry those fields (e.g. a hash-only retry) preserves
+/// values written by an earlier hit. Every other column is overwritten.
 pub async fn create_or_update_signature_metadata_mapping(
 	input: SignatureMetadataMappingInput,
 	db_conn: &DbConn,
 ) -> Result<Model, DbErr> {
-	let signature_metadata_mapping =
-		find_signature_metadata_mapping_by_platform_game_company_and_provider(
-			input.platform_id,
-			input.game_id,
-			input.company_id,
-			input.provider,
-			db_conn,
-		)
-		.await?;
-
-	let mut active_model = if let Some(signature_metadata_mapping) = signature_metadata_mapping {
-		signature_metadata_mapping.into_active_model()
-	} else {
-		signature_metadata_mapping::ActiveModel {
-			..Default::default()
+	let target_col = match (input.game_id, input.platform_id, input.company_id) {
+		(Some(_), None, None) => signature_metadata_mapping::Column::GameId,
+		(None, Some(_), None) => signature_metadata_mapping::Column::PlatformId,
+		(None, None, Some(_)) => signature_metadata_mapping::Column::CompanyId,
+		_ => {
+			return Err(DbErr::Custom(
+				"SignatureMetadataMappingInput requires exactly one of game_id, platform_id, or company_id".to_string(),
+			));
 		}
 	};
 
-	active_model.platform_id = Set(input.platform_id);
-	active_model.game_id = Set(input.game_id);
-	active_model.company_id = Set(input.company_id);
-	active_model.provider = Set(input.provider);
-	active_model.provider_id = Set(input.provider_id);
-	active_model.match_type = Set(input.match_type);
-	active_model.manual_match_type = Set(input.manual_match_type);
-	active_model.failed_match_reason = Set(input.failed_match_reason);
-	active_model.comment = Set(input.comment);
-	active_model.automatic_match_reason = Set(input.automatic_match_reason);
-	active_model.manually_matched_by = Set(input.manually_matched_by);
-	if input.matched_name.is_some() {
-		active_model.matched_name = Set(input.matched_name);
-	}
-	if input.matched_year.is_some() {
-		active_model.matched_year = Set(input.matched_year);
-	}
-	active_model.updated_at = Set(Utc::now().fixed_offset());
+	let active_model = signature_metadata_mapping::ActiveModel {
+		platform_id: Set(input.platform_id),
+		game_id: Set(input.game_id),
+		company_id: Set(input.company_id),
+		provider: Set(input.provider),
+		provider_id: Set(input.provider_id),
+		match_type: Set(input.match_type),
+		manual_match_type: Set(input.manual_match_type),
+		failed_match_reason: Set(input.failed_match_reason),
+		comment: Set(input.comment),
+		automatic_match_reason: Set(input.automatic_match_reason),
+		manually_matched_by: Set(input.manually_matched_by),
+		matched_name: Set(input.matched_name),
+		matched_year: Set(input.matched_year),
+		updated_at: Set(Utc::now().fixed_offset()),
+		..Default::default()
+	};
 
-	active_model = active_model.save(db_conn).await?;
+	let on_conflict =
+		OnConflict::columns([target_col, signature_metadata_mapping::Column::Provider])
+			.update_columns([
+				signature_metadata_mapping::Column::ProviderId,
+				signature_metadata_mapping::Column::MatchType,
+				signature_metadata_mapping::Column::ManualMatchType,
+				signature_metadata_mapping::Column::FailedMatchReason,
+				signature_metadata_mapping::Column::Comment,
+				signature_metadata_mapping::Column::AutomaticMatchReason,
+				signature_metadata_mapping::Column::ManuallyMatchedBy,
+				signature_metadata_mapping::Column::UpdatedAt,
+			])
+			.value(
+				signature_metadata_mapping::Column::MatchedName,
+				Expr::cust(
+					"COALESCE(EXCLUDED.matched_name, signature_metadata_mapping.matched_name)",
+				),
+			)
+			.value(
+				signature_metadata_mapping::Column::MatchedYear,
+				Expr::cust(
+					"COALESCE(EXCLUDED.matched_year, signature_metadata_mapping.matched_year)",
+				),
+			)
+			.to_owned();
 
-	active_model.try_into_model()
+	signature_metadata_mapping::Entity::insert(active_model)
+		.on_conflict(on_conflict)
+		.exec_with_returning(db_conn)
+		.await
 }
