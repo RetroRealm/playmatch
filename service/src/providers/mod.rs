@@ -200,6 +200,7 @@ fn failed_reason_label(r: FailedMatchReasonEnum) -> &'static str {
 		FailedMatchReasonEnum::NoDirectMatch => "no_direct_match",
 		FailedMatchReasonEnum::TooManyMatches => "too_many_matches",
 		FailedMatchReasonEnum::Ambiguous => "ambiguous",
+		FailedMatchReasonEnum::TooManyFiles => "too_many_files",
 	}
 }
 

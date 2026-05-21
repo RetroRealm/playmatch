@@ -139,6 +139,10 @@ pub enum FailedMatchReason {
 
 	/// Multiple candidates tied at the top of the score; matcher refused to pick.
 	Ambiguous,
+
+	/// Skipped because the game has more files than the provider's catalogue
+	/// indexes (multi-track arcade dumps, per-disc-segment images).
+	TooManyFiles,
 }
 
 /// Reason why a game was automatically matched.
@@ -272,6 +276,7 @@ impl From<FailedMatchReasonEnum> for FailedMatchReason {
 			FailedMatchReasonEnum::NoDirectMatch => FailedMatchReason::NoDirectMatch,
 			FailedMatchReasonEnum::TooManyMatches => FailedMatchReason::TooManyMatches,
 			FailedMatchReasonEnum::Ambiguous => FailedMatchReason::Ambiguous,
+			FailedMatchReasonEnum::TooManyFiles => FailedMatchReason::TooManyFiles,
 		}
 	}
 }

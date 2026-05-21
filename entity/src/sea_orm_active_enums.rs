@@ -52,6 +52,8 @@ pub enum FailedMatchReasonEnum {
 	TooManyMatches,
 	#[sea_orm(string_value = "ambiguous")]
 	Ambiguous,
+	#[sea_orm(string_value = "too_many_files")]
+	TooManyFiles,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(
