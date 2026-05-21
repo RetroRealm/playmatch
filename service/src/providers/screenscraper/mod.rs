@@ -56,13 +56,16 @@ const QUOTA_BLOCK_TTL_SECS: i64 = 24 * 60 * 60;
 /// parse a body as JSON because incident pages come back with HTTP 200.
 /// Sourced from the Skyscraper project.
 const INCIDENT_PHRASES: &[&str] = &[
-	"non trouvée",
 	"API totalement fermé",
 	"blacklisté",
 	"Votre quota de scrape est",
 	"API fermé pour les non membres",
 	"maximum threads",
 ];
+
+/// Body fragments ScreenScraper returns on a per-request miss. Routed to
+/// `Ok(None)` so the matcher records a miss instead of bailing.
+const NOT_FOUND_PHRASES: &[&str] = &["non trouvée"];
 
 pub struct ScreenScraperClient {
 	client: Client,
@@ -170,10 +173,15 @@ impl ScreenScraperClient {
 				("recherche", trimmed.to_string()),
 			],
 		)?;
+		// `header.success="false"` on jeuRecherche.php is "no matches", not an
+		// error; treat as an empty page so the matcher's bottom
+		// `write_auto_match_failed` still fires.
 		let env = self
-			.do_get_envelope::<JeuxPayload>("game_search", url)
+			.do_get_envelope_optional::<JeuxPayload>("game_search", url)
 			.await?;
-		Ok(env.response.map(|r| r.payload.jeux).unwrap_or_default())
+		Ok(env
+			.and_then(|env| env.response.map(|r| r.payload.jeux))
+			.unwrap_or_default())
 	}
 
 	pub async fn get_game_by_id(&self, game_id: i64) -> anyhow::Result<Option<SsGame>> {
@@ -360,26 +368,29 @@ impl ScreenScraperClient {
 				body_preview(&body)
 			)),
 			_ if body.is_empty() => Ok(None),
-			_ => {
-				parse_or_incident(&body, content_type.as_deref())?;
-				let env: SsEnvelope<T> = serde_json::from_str(&body)
-					.with_context(|| "failed to parse screenscraper response envelope")?;
-				let header_signals_failure = env
-					.header
-					.as_ref()
-					.is_some_and(|h| h.success.eq_ignore_ascii_case("false"));
-				if let Some(resp) = env.response.as_ref() {
-					self.update_quota_from(&resp.ssuser);
-					self.update_concurrency_from(&resp.ssuser);
+			_ => match parse_or_incident(&body, content_type.as_deref())? {
+				ParseOutcome::NotFound => Ok(None),
+				ParseOutcome::Parseable => {
+					let env: SsEnvelope<T> = serde_json::from_str(&body)
+						.with_context(|| "failed to parse screenscraper response envelope")?;
+					if let Some(resp) = env.response.as_ref() {
+						self.update_quota_from(&resp.ssuser);
+						self.update_concurrency_from(&resp.ssuser);
+					}
+					let header_signals_failure = env
+						.header
+						.as_ref()
+						.is_some_and(|h| h.success.eq_ignore_ascii_case("false"));
+					if header_signals_failure {
+						debug!(
+							"screenscraper header.success=false for {endpoint_label}: {:?}",
+							env.header.and_then(|h| h.error)
+						);
+						return Ok(None);
+					}
+					Ok(Some(env))
 				}
-				if header_signals_failure {
-					return Err(anyhow!(
-						"screenscraper header reported failure: {:?}",
-						env.header.and_then(|h| h.error)
-					));
-				}
-				Ok(Some(env))
-			}
+			},
 		}
 	}
 
@@ -540,7 +551,12 @@ fn body_preview(body: &str) -> String {
 /// Returns `Err` when the body looks like a French incident message or the
 /// content type is not JSON, so the caller does not try to parse the body and
 /// the per-game match logs an error instead of aborting the whole cycle.
-fn parse_or_incident(body: &str, content_type: Option<&str>) -> anyhow::Result<()> {
+enum ParseOutcome {
+	Parseable,
+	NotFound,
+}
+
+fn parse_or_incident(body: &str, content_type: Option<&str>) -> anyhow::Result<ParseOutcome> {
 	if let Some(ct) = content_type
 		&& !ct.to_ascii_lowercase().contains("application/json")
 	{
@@ -551,6 +567,11 @@ fn parse_or_incident(body: &str, content_type: Option<&str>) -> anyhow::Result<(
 
 	let prefix: String = body.chars().take(1024).collect();
 	let prefix_lower = prefix.to_lowercase();
+	for phrase in NOT_FOUND_PHRASES {
+		if prefix_lower.contains(&phrase.to_lowercase()) {
+			return Ok(ParseOutcome::NotFound);
+		}
+	}
 	for phrase in INCIDENT_PHRASES {
 		if prefix_lower.contains(&phrase.to_lowercase()) {
 			return Err(anyhow!(
@@ -559,7 +580,7 @@ fn parse_or_incident(body: &str, content_type: Option<&str>) -> anyhow::Result<(
 		}
 	}
 
-	Ok(())
+	Ok(ParseOutcome::Parseable)
 }
 
 #[async_trait::async_trait]
@@ -682,7 +703,24 @@ mod tests {
 	#[test]
 	fn parse_or_incident_accepts_valid_json_body() {
 		let body = "{\"header\": {\"success\": \"true\"}}";
-		assert!(parse_or_incident(body, Some("application/json")).is_ok());
+		assert!(matches!(
+			parse_or_incident(body, Some("application/json")),
+			Ok(ParseOutcome::Parseable)
+		));
+	}
+
+	#[test]
+	fn parse_or_incident_classifies_not_found_phrases_as_misses() {
+		for phrase in NOT_FOUND_PHRASES {
+			let body = format!("Erreur : ROM/ISO/Fichier {phrase} !");
+			assert!(
+				matches!(
+					parse_or_incident(&body, Some("application/json")),
+					Ok(ParseOutcome::NotFound)
+				),
+				"phrase {phrase} should classify as NotFound, got something else"
+			);
+		}
 	}
 
 	#[test]
