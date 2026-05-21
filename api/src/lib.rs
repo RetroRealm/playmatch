@@ -362,12 +362,18 @@ async fn start() -> anyhow::Result<()> {
 	.workers(worker_amount)
 	.run();
 
+	// Without this lock the noon-UTC cron and the INITIAL_DATA_INIT spawn can
+	// race on a boot near noon, doubling outbound quota burn and racing into
+	// the signature_metadata_mapping unique indexes.
+	let maintenance_lock: Arc<tokio::sync::Mutex<()>> = Arc::new(tokio::sync::Mutex::new(()));
+
 	let conn = conn_arc.clone();
 	let dat_client = dat_http_client_arc.clone();
 	let providers_for_cron = providers_arc.clone();
 	let lb_for_cron = lb_client_opt.clone();
 	let ovgdb_for_cron = ovgdb_client_opt.clone();
 	let ra_for_cron = ra_client_opt.clone();
+	let maintenance_lock_cron = maintenance_lock.clone();
 	sched
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
@@ -376,7 +382,9 @@ async fn start() -> anyhow::Result<()> {
 			let lb = lb_for_cron.clone();
 			let ovgdb = ovgdb_for_cron.clone();
 			let ra = ra_for_cron.clone();
+			let lock = maintenance_lock_cron.clone();
 			Box::pin(async move {
+				let _guard = lock.lock().await;
 				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
 				wrap_launchbox_import(lb).await;
 				wrap_openvgdb_import(ovgdb).await;
@@ -436,7 +444,9 @@ async fn start() -> anyhow::Result<()> {
 		== "true";
 
 	if initial_data_init {
+		let maintenance_lock_init = maintenance_lock.clone();
 		tokio::spawn(async move {
+			let _guard = maintenance_lock_init.lock().await;
 			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
 			wrap_launchbox_import(lb_for_init).await;
 			wrap_openvgdb_import(ovgdb_for_init).await;
