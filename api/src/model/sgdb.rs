@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use service::providers::steamgriddb::model::{AssetFilters, SgdbPlatform, SgdbTriState};
-use utoipa::IntoParams;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct SgdbIdQuery {
@@ -22,7 +22,7 @@ pub struct SgdbSearchQuery {
 /// Comma-separated string fields accept whatever values SGDB accepts; the
 /// proxy does not pre-validate the enum values, so future SGDB additions
 /// flow through without a code change.
-#[derive(Debug, Default, Serialize, Deserialize, IntoParams)]
+#[derive(Debug, Default, Serialize, Deserialize, IntoParams, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct SgdbAssetFilterQuery {
 	pub styles: Option<String>,

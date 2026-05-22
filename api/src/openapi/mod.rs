@@ -1,3 +1,4 @@
+use crate::model::sgdb::SgdbAssetFilterQuery;
 use crate::routes::company::{__path_get_all_companies, __path_get_company_by_id};
 use crate::routes::game::{
 	__path_get_playmatch_game_by_id, __path_get_playmatch_game_with_relations_by_id,
@@ -532,6 +533,7 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		SgdbContentTag,
 		SgdbTriState,
 		AssetFilters,
+		SgdbAssetFilterQuery,
 		SsGame,
 		SsLocalizedName,
 		SsRom,
