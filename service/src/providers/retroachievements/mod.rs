@@ -80,4 +80,8 @@ impl crate::providers::MetadataProvider for RetroAchievementsClient {
 	async fn match_db(self: Arc<Self>, db_conn: &DbConn) -> anyhow::Result<()> {
 		matching::match_db_to_retroachievements_entities(self, db_conn).await
 	}
+
+	fn supports_cross_match(&self) -> bool {
+		false
+	}
 }

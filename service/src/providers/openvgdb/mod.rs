@@ -52,4 +52,8 @@ impl crate::providers::MetadataProvider for OpenVgdbClient {
 	async fn match_db(self: Arc<Self>, db_conn: &DbConn) -> anyhow::Result<()> {
 		matching::match_db_to_openvgdb_entities(self, db_conn).await
 	}
+
+	fn supports_cross_match(&self) -> bool {
+		false
+	}
 }

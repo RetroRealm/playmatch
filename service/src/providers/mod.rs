@@ -8,7 +8,10 @@ pub mod screenscraper;
 pub mod steamgriddb;
 pub mod thegamesdb;
 
-use crate::db::game::find_game_parent;
+use crate::db::game::{
+	find_game_parent, has_outstanding_cross_match_work_for_provider,
+	has_outstanding_match_work_for_provider,
+};
 use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 	find_signature_metadata_mapping_by_platform_game_company_and_provider,
@@ -23,6 +26,7 @@ use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::task::JoinSet;
 
 /// Tuned for IGDB's 4 req/s rate limit. Providers with a different rate
 /// budget should override [`MetadataProvider::chunk_size`].
@@ -486,63 +490,178 @@ pub trait MetadataProvider: Send + Sync + 'static {
 	async fn match_via_sibling_names(self: Arc<Self>, _db_conn: &DbConn) -> anyhow::Result<()> {
 		Ok(())
 	}
+
+	/// Providers without a `match_via_sibling_names` implementation should
+	/// override this to `false` so the cross-match wave skips the EXISTS
+	/// pre-check round trip entirely.
+	fn supports_cross_match(&self) -> bool {
+		true
+	}
+
+	/// Cheap `EXISTS` probe used by the parallel orchestrator to decide
+	/// whether to spawn a primary match task for this provider.
+	async fn has_outstanding_match_work(&self, db_conn: &DbConn) -> anyhow::Result<bool> {
+		has_outstanding_match_work_for_provider(self.provider_enum(), db_conn).await
+	}
+
+	/// Cheap `EXISTS` probe used by the parallel orchestrator to decide
+	/// whether to spawn a cross-match task for this provider.
+	async fn has_outstanding_cross_match_work(&self, db_conn: &DbConn) -> anyhow::Result<bool> {
+		if !self.supports_cross_match() {
+			return Ok(false);
+		}
+		has_outstanding_cross_match_work_for_provider(self.provider_enum(), db_conn).await
+	}
 }
 
-/// Cron runs providers in registration order.
 pub type ProviderRegistry = Vec<Arc<dyn MetadataProvider>>;
 
+#[derive(Clone, Copy)]
+enum Phase {
+	Primary,
+	CrossMatch,
+}
+
+/// Run the per-provider `EXISTS` probes in parallel and return only the
+/// providers that have something to do this cycle. A probe error is treated
+/// as "skip this provider this cycle"; the next cycle picks it back up.
+async fn filter_outstanding(
+	registry: &ProviderRegistry,
+	db_conn: &DbConn,
+	phase: Phase,
+) -> Vec<Arc<dyn MetadataProvider>> {
+	let mut checks: JoinSet<(usize, &'static str, anyhow::Result<bool>)> = JoinSet::new();
+	for (idx, provider) in registry.iter().enumerate() {
+		let provider = provider.clone();
+		let db_conn = db_conn.clone();
+		checks.spawn(async move {
+			let label = provider.provider_label();
+			let res = match phase {
+				Phase::Primary => provider.has_outstanding_match_work(&db_conn).await,
+				Phase::CrossMatch => provider.has_outstanding_cross_match_work(&db_conn).await,
+			};
+			(idx, label, res)
+		});
+	}
+
+	let mut keep = vec![false; registry.len()];
+	while let Some(joined) = checks.join_next().await {
+		match joined {
+			Ok((idx, _, Ok(true))) => {
+				keep[idx] = true;
+			}
+			Ok((_, _, Ok(false))) => {}
+			Ok((_, label, Err(e))) => {
+				error!("Outstanding-work check for '{label}' failed: {e:?}; skipping this cycle");
+			}
+			Err(join_err) => {
+				error!("Outstanding-work check task panicked: {join_err:?}");
+			}
+		}
+	}
+
+	registry
+		.iter()
+		.enumerate()
+		.filter_map(|(idx, p)| if keep[idx] { Some(p.clone()) } else { None })
+		.collect()
+}
+
+fn join_labels(providers: &[Arc<dyn MetadataProvider>]) -> String {
+	let mut labels: Vec<&'static str> = providers.iter().map(|p| p.provider_label()).collect();
+	labels.sort_unstable();
+	labels.join(", ")
+}
+
+async fn run_primary_wave(registry: &ProviderRegistry, db_conn: &DbConn) {
+	let outstanding = filter_outstanding(registry, db_conn, Phase::Primary).await;
+	if outstanding.is_empty() {
+		info!("No providers have outstanding match work this cycle");
+		return;
+	}
+	let labels = join_labels(&outstanding);
+	info!("Starting match cycle for providers {labels}");
+
+	let mut set: JoinSet<()> = JoinSet::new();
+	for provider in outstanding {
+		let db_conn = db_conn.clone();
+		set.spawn(async move {
+			let label = provider.provider_label();
+			let started = Instant::now();
+			let result = match provider.clone().match_db(&db_conn).await {
+				Ok(()) => {
+					info!("Finished match cycle for provider '{label}'");
+					"success"
+				}
+				Err(e) => {
+					error!("Provider '{label}' match cycle failed: {e:?}");
+					"failure"
+				}
+			};
+			record_background_job(
+				&format!("{label}_match"),
+				result,
+				started.elapsed().as_secs_f64(),
+			);
+		});
+	}
+	while let Some(res) = set.join_next().await {
+		if let Err(join_err) = res {
+			error!("Provider match task panicked or was cancelled: {join_err:?}");
+		}
+	}
+}
+
+async fn run_cross_match_wave(registry: &ProviderRegistry, db_conn: &DbConn) {
+	let outstanding = filter_outstanding(registry, db_conn, Phase::CrossMatch).await;
+	if outstanding.is_empty() {
+		info!("No providers have outstanding cross-provider match work this cycle");
+		return;
+	}
+	let labels = join_labels(&outstanding);
+	info!("Starting cross-provider name retry pass for providers {labels}");
+
+	let mut set: JoinSet<()> = JoinSet::new();
+	for provider in outstanding {
+		let db_conn = db_conn.clone();
+		set.spawn(async move {
+			let label = provider.provider_label();
+			let started = Instant::now();
+			let result = match provider.clone().match_via_sibling_names(&db_conn).await {
+				Ok(()) => {
+					info!("Finished cross-provider name retry pass for provider '{label}'");
+					"success"
+				}
+				Err(e) => {
+					error!("Provider '{label}' cross-provider name pass failed: {e:?}");
+					"failure"
+				}
+			};
+			record_background_job(
+				&format!("{label}_cross_match"),
+				result,
+				started.elapsed().as_secs_f64(),
+			);
+		});
+	}
+	while let Some(res) = set.join_next().await {
+		if let Err(join_err) = res {
+			error!("Cross-provider match task panicked or was cancelled: {join_err:?}");
+		}
+	}
+}
+
 /// Per-provider failures are logged and recorded as `{label}_match` failure
-/// metrics; they do not stop other providers. After every provider's primary
-/// cycle finishes, a second wave runs `match_via_sibling_names` so each
-/// provider can use the full set of sibling matched_names recorded across
-/// the registry.
+/// metrics; they do not stop other providers. Wave 2 (cross-provider) runs
+/// only after every provider's Wave 1 task has finished so each provider's
+/// cross-pass sees the full set of sibling `matched_name` values.
 pub async fn match_db_to_all_providers(
 	registry: &ProviderRegistry,
 	db_conn: &DbConn,
 ) -> anyhow::Result<()> {
 	let aggregate_started = Instant::now();
-	for provider in registry {
-		let label = provider.provider_label();
-		info!("Starting match cycle for provider '{label}'");
-		let started = Instant::now();
-		let result = match provider.clone().match_db(db_conn).await {
-			Ok(()) => {
-				info!("Finished match cycle for provider '{label}'");
-				"success"
-			}
-			Err(e) => {
-				error!("Provider '{label}' match cycle failed: {e:?}");
-				"failure"
-			}
-		};
-		record_background_job(
-			&format!("{label}_match"),
-			result,
-			started.elapsed().as_secs_f64(),
-		);
-	}
-
-	for provider in registry {
-		let label = provider.provider_label();
-		info!("Starting cross-provider name retry pass for '{label}'");
-		let started = Instant::now();
-		let result = match provider.clone().match_via_sibling_names(db_conn).await {
-			Ok(()) => {
-				info!("Finished cross-provider name retry pass for '{label}'");
-				"success"
-			}
-			Err(e) => {
-				error!("Provider '{label}' cross-provider name pass failed: {e:?}");
-				"failure"
-			}
-		};
-		record_background_job(
-			&format!("{label}_cross_match"),
-			result,
-			started.elapsed().as_secs_f64(),
-		);
-	}
-
+	run_primary_wave(registry, db_conn).await;
+	run_cross_match_wave(registry, db_conn).await;
 	record_background_job(
 		"provider_match_all",
 		"success",
