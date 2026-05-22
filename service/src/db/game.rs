@@ -522,6 +522,140 @@ pub fn get_automatic_match_failed_games_with_limit<'a>(
 	})
 }
 
+/// True if the provider has any game still needing a primary match: either an
+/// unmatched game (no SMM row for this provider) or a stale
+/// `Failed/NoDirectMatch` row past the 60-day retry window.
+pub async fn has_outstanding_match_work_for_provider(
+	provider: MetadataProviderEnum,
+	conn: &DbConn,
+) -> anyhow::Result<bool> {
+	let unmatched_fut = async {
+		let one = Game::find()
+			.select_only()
+			.column(game::Column::Id)
+			.filter(
+				Expr::exists(
+					::sea_orm::sea_query::Query::select()
+						.expr(Expr::val(1))
+						.from(signature_metadata_mapping::Entity)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::GameId)
+								.equals((game::Entity, game::Column::Id)),
+						)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::Provider)
+								.eq(provider.as_enum()),
+						)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::MatchType)
+								.ne(MatchTypeEnum::None.as_enum()),
+						)
+						.to_owned(),
+				)
+				.not(),
+			)
+			.limit(1)
+			.into_tuple::<Uuid>()
+			.one(conn)
+			.await?;
+		anyhow::Ok(one.is_some())
+	};
+
+	let stale_failed_fut = async {
+		let sixty_days_ago = Utc::now() - Duration::days(60);
+		let sixty_days_ago_naive: NaiveDateTime = sixty_days_ago.naive_utc();
+		let one = Game::find()
+			.select_only()
+			.column(game::Column::Id)
+			.join(
+				JoinType::InnerJoin,
+				game::Relation::SignatureMetadataMapping.def(),
+			)
+			.filter(
+				signature_metadata_mapping::Column::MatchType
+					.eq(MatchTypeEnum::Failed)
+					.and(
+						signature_metadata_mapping::Column::FailedMatchReason
+							.eq(FailedMatchReasonEnum::NoDirectMatch),
+					)
+					.and(signature_metadata_mapping::Column::UpdatedAt.lt(sixty_days_ago_naive))
+					.and(signature_metadata_mapping::Column::Provider.eq(provider)),
+			)
+			.limit(1)
+			.into_tuple::<Uuid>()
+			.one(conn)
+			.await?;
+		anyhow::Ok(one.is_some())
+	};
+
+	let (unmatched, stale) = tokio::try_join!(unmatched_fut, stale_failed_fut)?;
+	Ok(unmatched || stale)
+}
+
+/// True if the provider has any `Failed/NoDirectMatch` row whose cross-match
+/// cooldown has elapsed and which has at least one sibling provider mapping
+/// carrying a non-null `matched_name`.
+pub async fn has_outstanding_cross_match_work_for_provider(
+	provider: MetadataProviderEnum,
+	conn: &DbConn,
+) -> anyhow::Result<bool> {
+	let cooldown = Utc::now() - Duration::days(CROSS_MATCH_RETRY_INTERVAL_DAYS);
+	let cooldown_naive: NaiveDateTime = cooldown.naive_utc();
+
+	let one = Game::find()
+		.select_only()
+		.column(game::Column::Id)
+		.join(
+			JoinType::InnerJoin,
+			game::Relation::SignatureMetadataMapping.def(),
+		)
+		.filter(
+			signature_metadata_mapping::Column::Provider
+				.eq(provider)
+				.and(signature_metadata_mapping::Column::MatchType.eq(MatchTypeEnum::Failed))
+				.and(
+					signature_metadata_mapping::Column::FailedMatchReason
+						.eq(FailedMatchReasonEnum::NoDirectMatch),
+				)
+				.and(
+					signature_metadata_mapping::Column::CrossMatchLastTriedAt
+						.is_null()
+						.or(signature_metadata_mapping::Column::CrossMatchLastTriedAt
+							.lt(cooldown_naive)),
+				)
+				.and(Expr::exists(
+					sea_orm::sea_query::Query::select()
+						.expr(Expr::val(1))
+						.from(signature_metadata_mapping::Entity)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::GameId)
+								.equals((game::Entity, game::Column::Id)),
+						)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::Provider)
+								.ne(provider.as_enum()),
+						)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::MatchType).is_in([
+								MatchTypeEnum::Automatic.as_enum(),
+								MatchTypeEnum::Manual.as_enum(),
+							]),
+						)
+						.and_where(
+							Expr::col(signature_metadata_mapping::Column::MatchedName)
+								.is_not_null(),
+						)
+						.to_owned(),
+				)),
+		)
+		.limit(1)
+		.into_tuple::<Uuid>()
+		.one(conn)
+		.await?;
+
+	Ok(one.is_some())
+}
+
 fn get_unmatched_games_with_limit<'a>(
 	provider: MetadataProviderEnum,
 	clone_of_null: bool,
