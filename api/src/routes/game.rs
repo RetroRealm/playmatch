@@ -11,7 +11,7 @@ use uuid::Uuid;
 	context_path = "/api",
 	tag = "Game",
 	responses(
-		(status = 200, description = "Returns the found game", body = PlaymatchGame)
+		(status = 200, description = "Returns the found game", body = GameMetadataResponse)
 	)
 )]
 #[get("/game/{id}")]

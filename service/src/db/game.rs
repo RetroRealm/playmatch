@@ -310,6 +310,18 @@ pub async fn find_game_signature_metadata_mapping(
 		.await
 }
 
+/// Return every signature metadata mapping row attached to the given game,
+/// one per matched provider.
+pub async fn find_all_signature_metadata_mappings_for_game(
+	game_id: Uuid,
+	conn: &DbConn,
+) -> Result<Vec<signature_metadata_mapping::Model>, DbErr> {
+	signature_metadata_mapping::Entity::find()
+		.filter(signature_metadata_mapping::Column::GameId.eq(game_id))
+		.all(conn)
+		.await
+}
+
 /// Resolve the dat file id this game was imported from via its dat file import record.
 pub async fn get_dat_file_id_of_game(game: &game::Model, conn: &DbConn) -> Result<Uuid, DbErr> {
 	let dat_file_import = dat_file_import::Entity::find()

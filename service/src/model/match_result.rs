@@ -185,4 +185,8 @@ pub struct GameAndRelationsResult {
 
 	/// if a match was found, the dat file import this game belongs to.
 	pub dat_file_import: PlaymatchDatFileImport,
+
+	/// External metadata mappings for the game (one row per matched provider).
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
 }

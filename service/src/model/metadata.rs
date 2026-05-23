@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use derive_builder::Builder;
 use entity::sea_orm_active_enums::{
 	AutomaticMatchReasonEnum, FailedMatchReasonEnum, ManualMatchModeEnum, MatchTypeEnum,
@@ -41,6 +42,39 @@ pub struct PlatformMetadataResponse {
 	pub company_id: Option<Uuid>,
 
 	/// External metadata for the platform.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub external_metadata: Vec<ExternalMetadata>,
+}
+
+/// Response for a game including external metadata.
+#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GameMetadataResponse {
+	/// The ID of the game.
+	pub id: Uuid,
+
+	/// The name of the game.
+	pub name: String,
+
+	/// Optional description of the game.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub description: Option<String>,
+
+	/// Optional categories for the game.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub categories: Option<Vec<String>>,
+
+	/// Optional which game this game is a clone of (different editions/versions).
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub clone_of: Option<Uuid>,
+
+	/// When the game was created inside playmatch.
+	pub created_at: DateTime<Utc>,
+
+	/// When the game was last updated inside playmatch.
+	pub updated_at: DateTime<Utc>,
+
+	/// External metadata mappings for the game (one row per matched provider).
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub external_metadata: Vec<ExternalMetadata>,
 }

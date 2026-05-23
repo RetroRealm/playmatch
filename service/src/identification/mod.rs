@@ -3,7 +3,9 @@ mod protocol;
 
 use crate::cache::CacheStatus;
 use crate::cache::CacheStatus::{Cached, NonCached};
-use crate::db::game::{find_all_relations_of_game, get_game_by_id};
+use crate::db::game::{
+	find_all_relations_of_game, find_all_signature_metadata_mappings_for_game, get_game_by_id,
+};
 use crate::error::{ServiceError, ServiceResult};
 use crate::identification::cache::{
 	IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
@@ -14,7 +16,7 @@ use crate::matching::manual::build_result;
 use crate::model::{
 	GameAndRelationMatchResult, GameAndRelationMatchResultBuilder, GameAndRelationsResult,
 	GameAndRelationsResultBuilder, GameFileMatchSearch, GameMatchType, GameMetadataMatchResult,
-	PlaymatchGame,
+	GameMetadataResponse,
 };
 use log::debug;
 use redis::aio::MultiplexedConnection;
@@ -23,12 +25,26 @@ use sea_orm::prelude::Uuid;
 use std::ops::ControlFlow;
 use strum::IntoEnumIterator;
 
-pub async fn get_game_by_id_from_db(game_id: Uuid, conn: &DbConn) -> ServiceResult<PlaymatchGame> {
-	let game_opt = get_game_by_id(game_id, conn).await?;
+pub async fn get_game_by_id_from_db(
+	game_id: Uuid,
+	conn: &DbConn,
+) -> ServiceResult<GameMetadataResponse> {
+	let game = get_game_by_id(game_id, conn)
+		.await?
+		.ok_or(ServiceError::GameNotFound)?;
 
-	let game = game_opt.ok_or(ServiceError::GameNotFound)?;
+	let mappings = find_all_signature_metadata_mappings_for_game(game.id, conn).await?;
 
-	Ok(game.into())
+	Ok(GameMetadataResponse {
+		id: game.id,
+		name: game.name,
+		description: game.description,
+		categories: game.categories,
+		clone_of: game.clone_of,
+		created_at: game.created_at.into(),
+		updated_at: game.updated_at.into(),
+		external_metadata: mappings.into_iter().map(Into::into).collect(),
+	})
 }
 
 pub async fn get_game_and_all_relations(
@@ -42,6 +58,8 @@ pub async fn get_game_and_all_relations(
 	let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
 		find_all_relations_of_game(&game, conn).await?;
 
+	let mappings = find_all_signature_metadata_mappings_for_game(game.id, conn).await?;
+
 	Ok(GameAndRelationsResultBuilder::default()
 		.game(game.into())
 		.platform(platform.into())
@@ -50,6 +68,7 @@ pub async fn get_game_and_all_relations(
 		.dat_file(dat_file.into())
 		.dat_file_import(dat_file_import.into())
 		.signature_group(signature_group.into())
+		.external_metadata(mappings.into_iter().map(Into::into).collect())
 		.build()?)
 }
 

@@ -141,9 +141,10 @@ use service::model::user::{
 use service::model::{
 	AutomaticMatchReason, CompanyMetadataResponse, ExternalMetadata, FailedMatchReason,
 	GameAndRelationMatchResult, GameAndRelationsResult, GameMatchType, GameMetadataMatchResult,
-	ManualMatchMode, MetadataMatchType, MetadataProvider, PlatformMetadataResponse,
-	PlaymatchCompany, PlaymatchDatFile, PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile,
-	PlaymatchPlatform, PlaymatchSignatureGroup, UpdatedMatchResult,
+	GameMetadataResponse, ManualMatchMode, MetadataMatchType, MetadataProvider,
+	PlatformMetadataResponse, PlaymatchCompany, PlaymatchDatFile, PlaymatchDatFileImport,
+	PlaymatchGame, PlaymatchGameFile, PlaymatchPlatform, PlaymatchSignatureGroup,
+	UpdatedMatchResult,
 };
 use service::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
@@ -409,6 +410,7 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 	),
 	components(schemas(
 		GameMetadataMatchResult,
+		GameMetadataResponse,
 		CompanyMetadataResponse,
 		PlatformMetadataResponse,
 		GameMatchType,
