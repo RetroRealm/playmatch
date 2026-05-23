@@ -75,17 +75,17 @@ pub async fn match_games_to_thegamesdb(
 	Ok(())
 }
 
+// TGDB stores a separate row per regional release (for example the iQue
+// Chinese Super Mario 64 DS is id 105388, while the world release is 110420).
+// Cross-clone propagation would let a region-specific child match stamp the
+// parent (or a world-release parent stamp every regional child), so clones
+// match independently here instead of going through drive_clone_propagation.
 fn match_clone_of_game_to_thegamesdb(
 	game: Model,
 	client: Arc<TheGamesDbClient>,
 	db_conn: DbConn,
 ) -> BoxFuture<'static, anyhow::Result<()>> {
-	Box::pin(crate::providers::drive_clone_propagation(
-		game,
-		client,
-		db_conn,
-		match_game_to_thegamesdb,
-	))
+	match_game_to_thegamesdb(game, client, db_conn)
 }
 
 #[derive(Clone)]
