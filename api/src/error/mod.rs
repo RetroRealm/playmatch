@@ -8,7 +8,7 @@ pub enum Error {
 	InternalError(#[from] anyhow::Error),
 
 	#[error("a database error occurred: {0}")]
-	DbError(#[from] sea_orm::DbErr),
+	DbError(anyhow::Error),
 
 	#[error("Authentication failed: {0}")]
 	InvalidAuth(String),
@@ -25,8 +25,20 @@ pub enum Error {
 	#[error(transparent)]
 	ServiceError(#[from] ServiceError),
 
-	#[error(transparent)]
-	RedisError(#[from] redis::RedisError),
+	#[error("{0}")]
+	RedisError(anyhow::Error),
+}
+
+impl From<sea_orm::DbErr> for Error {
+	fn from(e: sea_orm::DbErr) -> Self {
+		Self::DbError(anyhow::Error::from(e))
+	}
+}
+
+impl From<redis::RedisError> for Error {
+	fn from(e: redis::RedisError) -> Self {
+		Self::RedisError(anyhow::Error::from(e))
+	}
 }
 
 impl Error {
@@ -79,6 +91,11 @@ impl ResponseError for Error {
 	fn error_response(&self) -> HttpResponse {
 		let (status, label) = self.status_and_metric();
 		service::metrics::record_service_error(label);
+
+		if status.is_server_error() {
+			log::error!("HTTP {} ({label}): {self:?}", status.as_u16());
+		}
+
 		HttpResponse::build(status).body(self.to_string())
 	}
 }
