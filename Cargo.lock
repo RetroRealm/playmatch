@@ -3860,6 +3860,7 @@ dependencies = [
  "async-trait",
  "bigdecimal",
  "chrono",
+ "chrono-tz",
  "derive_builder",
  "entity",
  "futures-util",

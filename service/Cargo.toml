@@ -16,6 +16,7 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
 rand = "^0.10"
 regex = "^1"
 lazy_static = "^1"

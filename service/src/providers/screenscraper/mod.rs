@@ -4,13 +4,18 @@ use crate::providers::screenscraper::model::{
 	JeuPayload, JeuxPayload, SsEnvelope, SsGame, SsSystem, SsUser, SystemesPayload,
 };
 use anyhow::{Context, anyhow};
+use chrono::{Duration as ChronoDuration, TimeZone, Utc};
+use chrono_tz::Europe::Paris;
 use entity::sea_orm_active_enums::MetadataProviderEnum;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
+use rand::RngExt;
+use redis::AsyncCommands;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, OnceCell, Semaphore};
 use tokio::time::sleep;
@@ -35,9 +40,6 @@ const POST_REQUEST_DELAY_MS: u64 = 1200;
 const MAX_RETRIES: usize = 3;
 
 /// Hard ceiling on the concurrency probed from `ssuser.maxthreads`.
-/// Defends against pathological response payloads returning a huge
-/// number that would otherwise spawn that many tokio tasks per
-/// match-cycle page.
 const MAX_CONCURRENCY: usize = 16;
 
 /// At or above this fraction of the daily request budget we stop the cycle
@@ -46,10 +48,18 @@ const MAX_CONCURRENCY: usize = 16;
 const QUOTA_SOFT_LIMIT_NUMERATOR: u64 = 95;
 const QUOTA_SOFT_LIMIT_DENOMINATOR: u64 = 100;
 
-/// How long an exhaustion mark blocks further requests. ScreenScraper's
-/// daily request budget resets every 24 hours, so any block (quota,
-/// thread limit, transient overload) is safe to retry past this window.
-const QUOTA_BLOCK_TTL_SECS: i64 = 24 * 60 * 60;
+/// Retries for HTTP 429 thread-cap responses on the same credentials. 429
+/// does not charge a quota request; it just means too many in flight right
+/// now. Backoff entries are milliseconds, jitter added per attempt.
+const MAX_429_RETRIES: usize = 3;
+const RETRY_BACKOFF_MS: &[u64] = &[250, 500, 1000];
+
+/// HTTP 423 indicates the upstream API is fully closed. Suppress further
+/// traffic for this window so we do not pile retries on a server that just
+/// told us to back off.
+const OUTAGE_BLOCK_SECS: i64 = 300;
+
+const REDIS_KEY_PREFIX: &str = "playmatch:screenscraper:account:";
 
 /// French phrases ScreenScraper returns as plain text (or embedded in HTML)
 /// when the API is overloaded or rejecting traffic. Sniffed before we try to
@@ -67,24 +77,48 @@ const INCIDENT_PHRASES: &[&str] = &[
 /// `Ok(None)` so the matcher records a miss instead of bailing.
 const NOT_FOUND_PHRASES: &[&str] = &["non trouvée"];
 
+struct Account {
+	id: String,
+	password: String,
+	exhausted_until_unix: AtomicI64,
+	last_used_at_unix: AtomicI64,
+	concurrency: AtomicUsize,
+	permits: Arc<Semaphore>,
+	redis_key: String,
+}
+
+impl Account {
+	fn new(id: String, password: String) -> Self {
+		let redis_key = format!("{REDIS_KEY_PREFIX}{}:exhausted_until", sha256_hex(&id));
+		Self {
+			id,
+			password,
+			exhausted_until_unix: AtomicI64::new(0),
+			last_used_at_unix: AtomicI64::new(0),
+			concurrency: AtomicUsize::new(1),
+			permits: Arc::new(Semaphore::new(1)),
+			redis_key,
+		}
+	}
+}
+
 pub struct ScreenScraperClient {
 	client: Client,
 	service: Mutex<Retry<RetryPolicy, Client>>,
 	dev_id: String,
 	dev_password: String,
-	user: Option<(String, String)>,
-	quota_exhausted_at: AtomicI64,
+	accounts: Vec<Arc<Account>>,
+	outage_until_unix: AtomicI64,
+	blacklisted: AtomicBool,
 	systems_cache: OnceCell<Arc<Vec<SsSystem>>>,
 	redis_conn: redis::aio::MultiplexedConnection,
-	concurrency: AtomicUsize,
-	permits: Arc<Semaphore>,
 }
 
 impl ScreenScraperClient {
 	pub fn new(
 		dev_id: String,
 		dev_password: String,
-		user: Option<(String, String)>,
+		users: Vec<(String, String)>,
 		client: Client,
 		redis_conn: redis::aio::MultiplexedConnection,
 	) -> anyhow::Result<Self> {
@@ -94,49 +128,39 @@ impl ScreenScraperClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
-		crate::metrics::set_screenscraper_concurrency(1);
+		let accounts: Vec<Arc<Account>> = users
+			.into_iter()
+			.map(|(id, pw)| Arc::new(Account::new(id, pw)))
+			.collect();
+
+		crate::metrics::set_screenscraper_concurrency(accounts.len().max(1) as i64);
 		Ok(Self {
 			client,
 			service: Mutex::new(service),
 			dev_id,
 			dev_password,
-			user,
-			quota_exhausted_at: AtomicI64::new(0),
+			accounts,
+			outage_until_unix: AtomicI64::new(0),
+			blacklisted: AtomicBool::new(false),
 			systems_cache: OnceCell::new(),
 			redis_conn,
-			concurrency: AtomicUsize::new(1),
-			permits: Arc::new(Semaphore::new(1)),
 		})
 	}
 
 	pub fn is_quota_exhausted(&self) -> bool {
-		let stamp = self.quota_exhausted_at.load(Ordering::Relaxed);
-		if !is_within_quota_block(stamp, now_unix_secs()) {
-			if stamp != 0 {
-				let _ = self.quota_exhausted_at.compare_exchange(
-					stamp,
-					0,
-					Ordering::Relaxed,
-					Ordering::Relaxed,
-				);
-			}
+		if self.blacklisted.load(Ordering::Relaxed) {
+			return true;
+		}
+		let now = now_unix_secs();
+		if self.outage_until_unix.load(Ordering::Relaxed) > now {
+			return true;
+		}
+		if self.accounts.is_empty() {
 			return false;
 		}
-		true
-	}
-
-	/// Records a fresh exhaustion timestamp and returns whether this is a
-	/// new transition (the previous mark was unset or already past its
-	/// 24h TTL). Callers that emit metrics or warn-level logs gate on the
-	/// returned bool so we don't spam on every repeat 430.
-	fn mark_quota_exhausted(&self, reason: &str) -> bool {
-		let now = now_unix_secs();
-		let prev = self.quota_exhausted_at.swap(now, Ordering::Relaxed);
-		let was_fresh = !is_within_quota_block(prev, now);
-		if was_fresh {
-			crate::metrics::record_screenscraper_quota_exhaustion(reason);
-		}
-		was_fresh
+		self.accounts
+			.iter()
+			.all(|a| a.exhausted_until_unix.load(Ordering::Relaxed) > now)
 	}
 
 	pub async fn list_systems(&self) -> anyhow::Result<Arc<Vec<SsSystem>>> {
@@ -284,18 +308,13 @@ impl ScreenScraperClient {
 		}
 	}
 
-	fn auth_query_pairs(&self) -> Vec<(&'static str, String)> {
-		let mut pairs: Vec<(&'static str, String)> = vec![
+	fn dev_query_pairs(&self) -> Vec<(&'static str, String)> {
+		vec![
 			("devid", self.dev_id.clone()),
 			("devpassword", self.dev_password.clone()),
 			("softname", SOFTNAME.to_string()),
 			("output", "json".to_string()),
-		];
-		if let Some((id, pw)) = &self.user {
-			pairs.push(("ssid", id.clone()));
-			pairs.push(("sspassword", pw.clone()));
-		}
-		pairs
+		]
 	}
 
 	fn url(&self, endpoint: &str, extra: &[(&'static str, String)]) -> anyhow::Result<Url> {
@@ -303,7 +322,7 @@ impl ScreenScraperClient {
 		url.path_segments_mut()
 			.map_err(|_| anyhow!("screenscraper base url cannot have path segments"))?
 			.push(endpoint);
-		let mut pairs = self.auth_query_pairs();
+		let mut pairs = self.dev_query_pairs();
 		pairs.extend(extra.iter().map(|(k, v)| (*k, v.clone())));
 		url.query_pairs_mut()
 			.extend_pairs(pairs.iter().map(|(k, v)| (*k, v.as_str())));
@@ -325,7 +344,8 @@ impl ScreenScraperClient {
 	}
 
 	/// 404 maps to `Ok(None)`. Other non-success statuses are errors. Updates
-	/// `quota_exhausted` from the envelope's `ssuser` block on success.
+	/// quota and concurrency state from the envelope's `ssuser` block on
+	/// success.
 	async fn do_get_envelope_optional<T: DeserializeOwned>(
 		&self,
 		endpoint_label: &'static str,
@@ -335,8 +355,8 @@ impl ScreenScraperClient {
 		let sanitised_url = url_for_log(&url);
 		let result = self.execute_get(url).await;
 		let outcome = match &result {
-			Ok((status, _, _)) if status.is_success() => "success",
-			Ok((status, _, _)) if *status == StatusCode::NOT_FOUND => "not_found",
+			Ok((status, _, _, _)) if status.is_success() => "success",
+			Ok((status, _, _, _)) if *status == StatusCode::NOT_FOUND => "not_found",
 			Ok(_) => "error",
 			Err(_) => "error",
 		};
@@ -347,22 +367,10 @@ impl ScreenScraperClient {
 			started.elapsed().as_secs_f64(),
 		);
 
-		let (status, content_type, body) = result?;
+		let (status, content_type, body, account) = result?;
 
 		match status {
 			s if s == StatusCode::NOT_FOUND => Ok(None),
-			s if s.as_u16() == 430 => {
-				self.mark_quota_exhausted("http_430");
-				Err(anyhow!(
-					"screenscraper daily quota exhausted (HTTP 430), aborting cycle"
-				))
-			}
-			s if matches!(s.as_u16(), 401 | 426 | 429 | 431) => {
-				self.mark_quota_exhausted(&format!("http_{}", s.as_u16()));
-				Err(anyhow!(
-					"screenscraper rejected the request with HTTP {s} (server overloaded or thread limit), aborting cycle"
-				))
-			}
 			s if !s.is_success() => Err(anyhow!(
 				"screenscraper {endpoint_label} returned non-success status: {s} for {sanitised_url} (body preview: {:?})",
 				body_preview(&body)
@@ -373,9 +381,11 @@ impl ScreenScraperClient {
 				ParseOutcome::Parseable => {
 					let env: SsEnvelope<T> = serde_json::from_str(&body)
 						.with_context(|| "failed to parse screenscraper response envelope")?;
-					if let Some(resp) = env.response.as_ref() {
-						self.update_quota_from(&resp.ssuser);
-						self.update_concurrency_from(&resp.ssuser);
+					if let Some(resp) = env.response.as_ref()
+						&& let Some(account_ref) = account.as_ref()
+					{
+						self.update_quota_from(account_ref, &resp.ssuser);
+						self.update_concurrency_from(account_ref, &resp.ssuser);
 					}
 					let header_signals_failure = env
 						.header
@@ -394,7 +404,100 @@ impl ScreenScraperClient {
 		}
 	}
 
-	async fn execute_get(&self, url: Url) -> anyhow::Result<(StatusCode, Option<String>, String)> {
+	async fn execute_get(
+		&self,
+		url: Url,
+	) -> anyhow::Result<(StatusCode, Option<String>, String, Option<Arc<Account>>)> {
+		if self.blacklisted.load(Ordering::Relaxed) {
+			return Err(anyhow!(
+				"screenscraper client is blacklisted (HTTP 426 received earlier); restart required after fixing the integration"
+			));
+		}
+		let now = now_unix_secs();
+		let outage_until = self.outage_until_unix.load(Ordering::Relaxed);
+		if outage_until > now {
+			return Err(anyhow!(
+				"screenscraper api in outage window (HTTP 423); retry in {}s",
+				outage_until - now
+			));
+		}
+
+		let max_rotations = self.accounts.len().max(1);
+		for _ in 0..max_rotations {
+			let account = self.pick_account().await?;
+
+			let mut url_for_call = url.clone();
+			if let Some(a) = account.as_ref() {
+				url_for_call
+					.query_pairs_mut()
+					.append_pair("ssid", &a.id)
+					.append_pair("sspassword", &a.password);
+			}
+
+			let _permit = match account.as_ref() {
+				Some(a) => Some(a.permits.clone().acquire_owned().await?),
+				None => None,
+			};
+
+			let mut attempt: usize = 0;
+			let outcome = loop {
+				let (status, content_type, body) = self.send_one(url_for_call.clone()).await?;
+				match status.as_u16() {
+					429 if attempt < MAX_429_RETRIES => {
+						let base = RETRY_BACKOFF_MS[attempt.min(RETRY_BACKOFF_MS.len() - 1)];
+						let jitter: u64 = rand::rng().random_range(0..=100);
+						sleep(Duration::from_millis(base + jitter)).await;
+						attempt += 1;
+						continue;
+					}
+					429 => break Outcome::Backoff429,
+					423 => break Outcome::Outage,
+					426 => break Outcome::Blacklist,
+					430 | 431 => break Outcome::Rotate(status.as_u16()),
+					_ => break Outcome::Done(status, content_type, body),
+				}
+			};
+
+			sleep(Duration::from_millis(POST_REQUEST_DELAY_MS)).await;
+			drop(_permit);
+
+			match outcome {
+				Outcome::Done(status, ct, body) => return Ok((status, ct, body, account)),
+				Outcome::Backoff429 => {
+					return Err(anyhow!(
+						"screenscraper 429 thread-limit; exhausted {MAX_429_RETRIES} retries"
+					));
+				}
+				Outcome::Outage => {
+					self.outage_until_unix
+						.store(now_unix_secs() + OUTAGE_BLOCK_SECS, Ordering::Relaxed);
+					crate::metrics::record_screenscraper_quota_exhaustion("http_423");
+					return Err(anyhow!(
+						"screenscraper api totally closed (HTTP 423), outage block engaged"
+					));
+				}
+				Outcome::Blacklist => {
+					self.blacklisted.store(true, Ordering::Relaxed);
+					crate::metrics::record_screenscraper_quota_exhaustion("http_426");
+					error!(
+						"screenscraper client blacklisted (HTTP 426); the integration is non-compliant or obsolete and requires a code update"
+					);
+					return Err(anyhow!(
+						"screenscraper client blacklisted (HTTP 426), requires update"
+					));
+				}
+				Outcome::Rotate(code) => {
+					if let Some(a) = account.as_ref() {
+						self.mark_account_exhausted(a, code).await;
+					}
+				}
+			}
+		}
+
+		Err(anyhow!("screenscraper request retries exhausted"))
+	}
+
+	async fn send_one(&self, url: Url) -> anyhow::Result<(StatusCode, Option<String>, String)> {
 		let mut headers = HeaderMap::new();
 		headers.insert("User-Agent", REQWEST_DEFAULT_USER_AGENT.parse()?);
 		headers.insert("Accept", "application/json,text/plain;q=0.5".parse()?);
@@ -408,12 +511,6 @@ impl ScreenScraperClient {
 
 		debug!("screenscraper request: {} {url_for_log}", req.method());
 
-		// Owned permit so we can hold it across the request future and the
-		// post-request sleep without borrowing self. The mutex around the
-		// retry stack only serialises the brief poll-readiness call; the
-		// HTTP work itself runs unlocked, gated by the semaphore.
-		let _permit = self.permits.clone().acquire_owned().await?;
-
 		let inflight = self.service.lock().await.ready().await?.call(req);
 		let res = inflight.await?;
 		let status = res.status();
@@ -423,40 +520,115 @@ impl ScreenScraperClient {
 			.and_then(|v| v.to_str().ok())
 			.map(|s| s.to_string());
 		let body = res.text().await?;
-
-		// Body preview deliberately omitted: the response embeds an `ssuser`
-		// block with the account username, numeric user id, tier, and last
-		// visit, which would leak through the debug logs.
-
-		// Hold the permit through the courtesy interval so each thread
-		// paces itself before releasing the slot for the next caller.
-		sleep(Duration::from_millis(POST_REQUEST_DELAY_MS)).await;
-
 		Ok((status, content_type, body))
 	}
 
-	fn update_quota_from(&self, user: &Option<SsUser>) {
-		let Some(user) = user else { return };
-		if quota_should_mark_exhausted(user) && self.mark_quota_exhausted("ssuser_threshold") {
-			let (today, max) = parsed_quota(user).unwrap_or((0, 0));
-			warn!(
-				"screenscraper quota near limit ({today}/{max}); short-circuiting remaining match cycle"
-			);
+	async fn pick_account(&self) -> anyhow::Result<Option<Arc<Account>>> {
+		if self.accounts.is_empty() {
+			return Ok(None);
+		}
+		self.refresh_exhaustion_mirrors().await;
+		let now = now_unix_secs();
+		let mut available: Vec<&Arc<Account>> = self
+			.accounts
+			.iter()
+			.filter(|a| a.exhausted_until_unix.load(Ordering::Relaxed) <= now)
+			.collect();
+		if available.is_empty() {
+			return Err(anyhow!(
+				"screenscraper all {} accounts exhausted; waiting for daily reset",
+				self.accounts.len()
+			));
+		}
+		available.sort_by_key(|a| a.last_used_at_unix.load(Ordering::Relaxed));
+		let picked = available[0].clone();
+		picked.last_used_at_unix.store(now, Ordering::Relaxed);
+		Ok(Some(picked))
+	}
+
+	async fn refresh_exhaustion_mirrors(&self) {
+		if self.accounts.is_empty() {
+			return;
+		}
+		let mut conn = self.redis_conn.clone();
+		let now = now_unix_secs();
+		for a in &self.accounts {
+			if a.exhausted_until_unix.load(Ordering::Relaxed) > now {
+				continue;
+			}
+			let val: Result<Option<String>, _> = conn.get(&a.redis_key).await;
+			if let Ok(Some(raw)) = val
+				&& let Ok(ts) = raw.parse::<i64>()
+				&& ts > now
+			{
+				a.exhausted_until_unix.store(ts, Ordering::Relaxed);
+			}
 		}
 	}
 
-	/// Raise the semaphore and concurrency counter when `ssuser.maxthreads`
-	/// exceeds the current value. Monotonic; clamped by `MAX_CONCURRENCY`.
-	fn update_concurrency_from(&self, user: &Option<SsUser>) {
+	async fn mark_account_exhausted(&self, account: &Account, http_code: u16) {
+		let now = now_unix_secs();
+		let reset = next_paris_midnight_unix(now);
+		account.exhausted_until_unix.store(reset, Ordering::Relaxed);
+		crate::metrics::record_screenscraper_quota_exhaustion(&format!("http_{http_code}"));
+		let ttl = (reset - now).max(60) as u64;
+		let mut conn = self.redis_conn.clone();
+		let key = account.redis_key.clone();
+		let value = reset.to_string();
+		tokio::spawn(async move {
+			let _: Result<(), _> = conn.set_ex(&key, value, ttl).await;
+		});
+	}
+
+	fn update_quota_from(&self, account: &Account, user: &Option<SsUser>) {
+		let Some(user) = user else { return };
+		let ok_hit = soft_limit_reached(
+			parsed_u64(user.requeststoday.as_deref()),
+			parsed_u64(user.maxrequestsperday.as_deref()),
+		);
+		let ko_hit = soft_limit_reached(
+			parsed_u64(user.requeststodayko.as_deref()),
+			parsed_u64(user.maxrequestskoperday.as_deref()),
+		);
+		if !ok_hit && !ko_hit {
+			return;
+		}
+		let now = now_unix_secs();
+		if account.exhausted_until_unix.load(Ordering::Relaxed) > now {
+			return;
+		}
+		let reset = next_paris_midnight_unix(now);
+		account.exhausted_until_unix.store(reset, Ordering::Relaxed);
+		crate::metrics::record_screenscraper_quota_exhaustion(if ok_hit {
+			"ok_soft_limit"
+		} else {
+			"ko_soft_limit"
+		});
+		warn!("screenscraper quota near limit; short-circuiting cycle for one account");
+		let ttl = (reset - now).max(60) as u64;
+		let mut conn = self.redis_conn.clone();
+		let key = account.redis_key.clone();
+		let value = reset.to_string();
+		tokio::spawn(async move {
+			let _: Result<(), _> = conn.set_ex(&key, value, ttl).await;
+		});
+	}
+
+	fn update_concurrency_from(&self, account: &Account, user: &Option<SsUser>) {
 		let Some(user) = user else { return };
 		let Some(target) = parse_maxthreads(user) else {
 			return;
 		};
-		let current = self.concurrency.load(Ordering::Relaxed);
+		let current = account.concurrency.load(Ordering::Relaxed);
 		if target > current {
-			self.permits.add_permits(target - current);
-			self.concurrency.store(target, Ordering::Relaxed);
-			crate::metrics::set_screenscraper_concurrency(target as i64);
+			account.permits.add_permits(target - current);
+			account.concurrency.store(target, Ordering::Relaxed);
+			let total: usize = self
+				.accounts
+				.iter()
+				.map(|a| a.concurrency.load(Ordering::Relaxed))
+				.sum();
+			crate::metrics::set_screenscraper_concurrency(total as i64);
 			info!(
 				"screenscraper concurrency raised to {target} from ssuser.maxthreads (was {current})"
 			);
@@ -464,9 +636,14 @@ impl ScreenScraperClient {
 	}
 }
 
-/// Returns the clamped concurrency target, or `None` if the field is
-/// missing or unparseable. We default to 1 in those cases by leaving the
-/// existing value untouched.
+enum Outcome {
+	Done(StatusCode, Option<String>, String),
+	Backoff429,
+	Outage,
+	Blacklist,
+	Rotate(u16),
+}
+
 fn parse_maxthreads(user: &SsUser) -> Option<usize> {
 	let raw = user.maxthreads.as_deref()?;
 	let parsed = raw.parse::<usize>().ok()?;
@@ -476,28 +653,18 @@ fn parse_maxthreads(user: &SsUser) -> Option<usize> {
 	Some(parsed.min(MAX_CONCURRENCY))
 }
 
-fn parsed_quota(user: &SsUser) -> Option<(u64, u64)> {
-	let today = user
-		.requeststoday
-		.as_deref()
-		.and_then(|s| s.parse::<u64>().ok())?;
-	let max = user
-		.maxrequestsperday
-		.as_deref()
-		.and_then(|s| s.parse::<u64>().ok())?;
-	if max == 0 {
-		return None;
-	}
-	Some((today, max))
+fn parsed_u64(value: Option<&str>) -> Option<u64> {
+	value?.parse::<u64>().ok()
 }
 
-fn quota_should_mark_exhausted(user: &SsUser) -> bool {
-	match parsed_quota(user) {
-		Some((today, max)) => {
-			today * QUOTA_SOFT_LIMIT_DENOMINATOR >= max * QUOTA_SOFT_LIMIT_NUMERATOR
-		}
-		None => false,
+fn soft_limit_reached(today: Option<u64>, max: Option<u64>) -> bool {
+	let (Some(today), Some(max)) = (today, max) else {
+		return false;
+	};
+	if max == 0 {
+		return false;
 	}
+	today * QUOTA_SOFT_LIMIT_DENOMINATOR >= max * QUOTA_SOFT_LIMIT_NUMERATOR
 }
 
 /// Builds a logging-safe URL by stripping password query parameters. Never
@@ -526,10 +693,31 @@ fn now_unix_secs() -> i64 {
 		.unwrap_or(0)
 }
 
-/// True while a non-zero `stamp` is younger than [`QUOTA_BLOCK_TTL_SECS`].
-/// Older stamps are treated as cleared so the next match cycle retries.
-fn is_within_quota_block(stamp: i64, now: i64) -> bool {
-	stamp != 0 && now.saturating_sub(stamp) < QUOTA_BLOCK_TTL_SECS
+fn next_paris_midnight_unix(now_unix: i64) -> i64 {
+	let now_utc = Utc
+		.timestamp_opt(now_unix, 0)
+		.single()
+		.unwrap_or_else(Utc::now);
+	let now_paris = now_utc.with_timezone(&Paris);
+	let tomorrow = (now_paris + ChronoDuration::days(1)).date_naive();
+	if let Some(midnight) = tomorrow.and_hms_opt(0, 0, 0) {
+		match Paris.from_local_datetime(&midnight) {
+			chrono::LocalResult::Single(dt) => return dt.timestamp(),
+			chrono::LocalResult::Ambiguous(_, dt) => return dt.timestamp(),
+			chrono::LocalResult::None => {
+				if let Some(fallback) = tomorrow.and_hms_opt(1, 0, 0)
+					&& let chrono::LocalResult::Single(dt) = Paris.from_local_datetime(&fallback)
+				{
+					return dt.timestamp();
+				}
+			}
+		}
+	}
+	now_unix + 86400
+}
+
+fn sha256_hex(value: &str) -> String {
+	hex::encode(Sha256::digest(value.as_bytes()))
 }
 
 /// ScreenScraper's PHP backend reports `systemeid=0` as missing because
@@ -594,9 +782,17 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 	}
 
 	fn chunk_size(&self) -> usize {
-		self.concurrency
-			.load(Ordering::Relaxed)
-			.clamp(1, MAX_CONCURRENCY)
+		if self.accounts.is_empty() {
+			return 1;
+		}
+		let now = now_unix_secs();
+		let total: usize = self
+			.accounts
+			.iter()
+			.filter(|a| a.exhausted_until_unix.load(Ordering::Relaxed) <= now)
+			.map(|a| a.concurrency.load(Ordering::Relaxed))
+			.sum();
+		total.clamp(1, MAX_CONCURRENCY)
 	}
 
 	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
@@ -653,38 +849,6 @@ mod tests {
 	}
 
 	#[test]
-	fn quota_block_is_active_during_first_24h_and_clears_after() {
-		let set_at = 1_000_000;
-		assert!(is_within_quota_block(set_at, set_at));
-		assert!(is_within_quota_block(set_at, set_at + 1));
-		assert!(is_within_quota_block(
-			set_at,
-			set_at + QUOTA_BLOCK_TTL_SECS - 1
-		));
-		assert!(!is_within_quota_block(
-			set_at,
-			set_at + QUOTA_BLOCK_TTL_SECS
-		));
-		assert!(!is_within_quota_block(
-			set_at,
-			set_at + QUOTA_BLOCK_TTL_SECS + 60
-		));
-	}
-
-	#[test]
-	fn quota_block_unset_stamp_is_never_active() {
-		assert!(!is_within_quota_block(0, 0));
-		assert!(!is_within_quota_block(0, 1_000_000));
-	}
-
-	#[test]
-	fn quota_block_tolerates_clock_skew() {
-		let set_at = 2_000_000;
-		assert!(is_within_quota_block(set_at, set_at - 5));
-		assert!(is_within_quota_block(set_at, 0));
-	}
-
-	#[test]
 	fn valid_system_id_rejects_zero_and_negative() {
 		assert!(!valid_system_id(0));
 		assert!(!valid_system_id(-1));
@@ -736,54 +900,73 @@ mod tests {
 		assert!(logged.contains("gameid=42"));
 	}
 
-	#[test]
-	fn quota_marks_exhausted_at_or_above_95_percent() {
-		let user = SsUser {
-			requeststoday: Some("950".into()),
-			maxrequestsperday: Some("1000".into()),
+	fn user_with(
+		today: Option<&str>,
+		max: Option<&str>,
+		ko: Option<&str>,
+		kmax: Option<&str>,
+	) -> SsUser {
+		SsUser {
+			requeststoday: today.map(str::to_string),
+			maxrequestsperday: max.map(str::to_string),
+			requeststodayko: ko.map(str::to_string),
+			maxrequestskoperday: kmax.map(str::to_string),
 			maxrequestspermin: None,
 			maxthreads: None,
-		};
-		assert!(quota_should_mark_exhausted(&user));
+		}
 	}
 
 	#[test]
-	fn quota_does_not_mark_exhausted_below_95_percent() {
-		let user = SsUser {
-			requeststoday: Some("900".into()),
-			maxrequestsperday: Some("1000".into()),
-			maxrequestspermin: None,
-			maxthreads: None,
-		};
-		assert!(!quota_should_mark_exhausted(&user));
+	fn soft_limit_triggers_on_ok_quota_above_threshold() {
+		let u = user_with(Some("950"), Some("1000"), None, None);
+		assert!(soft_limit_reached(
+			parsed_u64(u.requeststoday.as_deref()),
+			parsed_u64(u.maxrequestsperday.as_deref())
+		));
 	}
 
 	#[test]
-	fn quota_does_not_mark_exhausted_with_unparseable_max() {
-		let user = SsUser {
-			requeststoday: Some("950".into()),
-			maxrequestsperday: None,
-			maxrequestspermin: None,
-			maxthreads: None,
-		};
-		assert!(!quota_should_mark_exhausted(&user));
+	fn soft_limit_does_not_trigger_below_threshold() {
+		let u = user_with(Some("900"), Some("1000"), None, None);
+		assert!(!soft_limit_reached(
+			parsed_u64(u.requeststoday.as_deref()),
+			parsed_u64(u.maxrequestsperday.as_deref())
+		));
 	}
 
 	#[test]
-	fn quota_does_not_mark_exhausted_with_zero_max() {
-		let user = SsUser {
-			requeststoday: Some("0".into()),
-			maxrequestsperday: Some("0".into()),
-			maxrequestspermin: None,
-			maxthreads: None,
-		};
-		assert!(!quota_should_mark_exhausted(&user));
+	fn soft_limit_safe_when_max_unknown_or_zero() {
+		let u = user_with(Some("950"), None, None, None);
+		assert!(!soft_limit_reached(
+			parsed_u64(u.requeststoday.as_deref()),
+			parsed_u64(u.maxrequestsperday.as_deref())
+		));
+		let u = user_with(Some("0"), Some("0"), None, None);
+		assert!(!soft_limit_reached(
+			parsed_u64(u.requeststoday.as_deref()),
+			parsed_u64(u.maxrequestsperday.as_deref())
+		));
+	}
+
+	#[test]
+	fn soft_limit_triggers_on_ko_quota_independently() {
+		let u = user_with(Some("0"), Some("1000"), Some("96"), Some("100"));
+		assert!(!soft_limit_reached(
+			parsed_u64(u.requeststoday.as_deref()),
+			parsed_u64(u.maxrequestsperday.as_deref())
+		));
+		assert!(soft_limit_reached(
+			parsed_u64(u.requeststodayko.as_deref()),
+			parsed_u64(u.maxrequestskoperday.as_deref())
+		));
 	}
 
 	fn user_with_maxthreads(value: Option<&str>) -> SsUser {
 		SsUser {
 			requeststoday: None,
 			maxrequestsperday: None,
+			requeststodayko: None,
+			maxrequestskoperday: None,
 			maxrequestspermin: None,
 			maxthreads: value.map(str::to_string),
 		}
@@ -818,5 +1001,59 @@ mod tests {
 		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("abc"))), None);
 		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("0"))), None);
 		assert_eq!(parse_maxthreads(&user_with_maxthreads(Some("-1"))), None);
+	}
+
+	#[test]
+	fn next_paris_midnight_is_future_and_within_two_days() {
+		let now = now_unix_secs();
+		let reset = next_paris_midnight_unix(now);
+		assert!(reset > now);
+		assert!(reset - now < 2 * 86400);
+	}
+
+	#[test]
+	fn sha256_hex_is_64_chars_lowercase() {
+		let hex = sha256_hex("hello");
+		assert_eq!(hex.len(), 64);
+		assert!(
+			hex.chars()
+				.all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+		);
+	}
+
+	fn fresh_account(id: &str) -> Arc<Account> {
+		Arc::new(Account::new(id.to_string(), "pw".to_string()))
+	}
+
+	#[test]
+	fn account_exhaustion_filter_skips_marked_accounts() {
+		let now = now_unix_secs();
+		let a = fresh_account("u1");
+		let b = fresh_account("u2");
+		let c = fresh_account("u3");
+		a.exhausted_until_unix.store(now + 3600, Ordering::Relaxed);
+		c.exhausted_until_unix.store(now + 7200, Ordering::Relaxed);
+		let pool = vec![a.clone(), b.clone(), c.clone()];
+		let available: Vec<&Arc<Account>> = pool
+			.iter()
+			.filter(|x| x.exhausted_until_unix.load(Ordering::Relaxed) <= now)
+			.collect();
+		assert_eq!(available.len(), 1);
+		assert!(Arc::ptr_eq(available[0], &b));
+	}
+
+	#[test]
+	fn account_lru_ordering_picks_least_recently_used() {
+		let now = now_unix_secs();
+		let a = fresh_account("u1");
+		let b = fresh_account("u2");
+		let c = fresh_account("u3");
+		a.last_used_at_unix.store(now - 10, Ordering::Relaxed);
+		b.last_used_at_unix.store(now - 100, Ordering::Relaxed);
+		c.last_used_at_unix.store(now - 50, Ordering::Relaxed);
+		let pool = vec![a.clone(), b.clone(), c.clone()];
+		let mut available: Vec<&Arc<Account>> = pool.iter().collect();
+		available.sort_by_key(|x| x.last_used_at_unix.load(Ordering::Relaxed));
+		assert!(Arc::ptr_eq(available[0], &b));
 	}
 }

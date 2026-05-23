@@ -42,6 +42,10 @@ pub struct SsUser {
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxrequestsperday: Option<String>,
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
+	pub requeststodayko: Option<String>,
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
+	pub maxrequestskoperday: Option<String>,
+	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxrequestspermin: Option<String>,
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxthreads: Option<String>,

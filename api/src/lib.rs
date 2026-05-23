@@ -497,6 +497,52 @@ pub fn main() {
 	}
 }
 
+fn collect_screenscraper_users() -> Vec<(String, String)> {
+	if let Ok(raw) = env::var("SCREENSCRAPER_USERS")
+		&& !raw.trim().is_empty()
+	{
+		let parsed: Vec<(String, String)> = raw
+			.split(',')
+			.map(str::trim)
+			.filter(|s| !s.is_empty())
+			.filter_map(|entry| match entry.split_once(':') {
+				Some((id, pw)) if !id.trim().is_empty() && !pw.trim().is_empty() => {
+					Some((id.trim().to_string(), pw.trim().to_string()))
+				}
+				_ => {
+					warn!("SCREENSCRAPER_USERS contains a malformed entry; skipping");
+					None
+				}
+			})
+			.collect();
+		if !parsed.is_empty() {
+			return parsed;
+		}
+	}
+
+	let user_id = env::var("SCREENSCRAPER_USER_ID")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	let user_password = env::var("SCREENSCRAPER_USER_PASSWORD")
+		.ok()
+		.filter(|v| !v.trim().is_empty());
+	match (user_id, user_password) {
+		(Some(id), Some(pw)) => vec![(id, pw)],
+		(None, None) => {
+			warn!(
+				"SCREENSCRAPER_USER_ID/SCREENSCRAPER_USER_PASSWORD not set; ScreenScraper will run anonymously and is heavily throttled"
+			);
+			Vec::new()
+		}
+		_ => {
+			warn!(
+				"SCREENSCRAPER_USER_ID and SCREENSCRAPER_USER_PASSWORD must be set together; treating as anonymous"
+			);
+			Vec::new()
+		}
+	}
+}
+
 /// Returns `None` when developer credentials are absent so self-hosters can
 /// run without the ScreenScraper integration. User credentials are optional;
 /// without them ScreenScraper heavily throttles and frequently rejects
@@ -519,28 +565,8 @@ fn build_screenscraper_client(
 			return None;
 		}
 	};
-	let user_id = env::var("SCREENSCRAPER_USER_ID")
-		.ok()
-		.filter(|v| !v.trim().is_empty());
-	let user_password = env::var("SCREENSCRAPER_USER_PASSWORD")
-		.ok()
-		.filter(|v| !v.trim().is_empty());
-	let user = match (user_id, user_password) {
-		(Some(id), Some(pw)) => Some((id, pw)),
-		(None, None) => {
-			warn!(
-				"SCREENSCRAPER_USER_ID/SCREENSCRAPER_USER_PASSWORD not set; ScreenScraper will run anonymously and is heavily throttled"
-			);
-			None
-		}
-		_ => {
-			warn!(
-				"SCREENSCRAPER_USER_ID and SCREENSCRAPER_USER_PASSWORD must be set together; treating as anonymous"
-			);
-			None
-		}
-	};
-	match ScreenScraperClient::new(dev_id, dev_password, user, http, redis_conn) {
+	let users = collect_screenscraper_users();
+	match ScreenScraperClient::new(dev_id, dev_password, users, http, redis_conn) {
 		Ok(c) => {
 			info!("ScreenScraper provider enabled");
 			Some(Arc::new(c))
