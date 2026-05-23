@@ -315,7 +315,7 @@ async fn start() -> anyhow::Result<()> {
 				.wrap(from_fn(user_agent_metric))
 				.wrap(
 					Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
-						.log_level(Level::Info),
+						.log_level(Level::Debug),
 				)
 				.wrap(
 					DefaultHeaders::new()
