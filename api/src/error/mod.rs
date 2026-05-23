@@ -27,6 +27,12 @@ pub enum Error {
 
 	#[error("{0}")]
 	RedisError(anyhow::Error),
+
+	#[error("{message}")]
+	UpstreamUnavailable {
+		message: String,
+		retry_after_secs: Option<u64>,
+	},
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -51,6 +57,9 @@ impl Error {
 			Self::UserNotFound => (StatusCode::NOT_FOUND, "user_not_found"),
 			Self::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
 			Self::RedisError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "redis_error"),
+			Self::UpstreamUnavailable { .. } => {
+				(StatusCode::SERVICE_UNAVAILABLE, "upstream_unavailable")
+			}
 			Self::ServiceError(err) => match err {
 				ServiceError::GameNotFound => (StatusCode::NOT_FOUND, "game_not_found"),
 				ServiceError::PlatformNotFound => (StatusCode::NOT_FOUND, "platform_not_found"),
@@ -92,11 +101,19 @@ impl ResponseError for Error {
 		let (status, label) = self.status_and_metric();
 		service::metrics::record_service_error(label);
 
-		if status.is_server_error() {
+		if status.is_server_error() && !matches!(self, Self::UpstreamUnavailable { .. }) {
 			log::error!("HTTP {} ({label}): {self:?}", status.as_u16());
 		}
 
-		HttpResponse::build(status).body(self.to_string())
+		let mut builder = HttpResponse::build(status);
+		if let Self::UpstreamUnavailable {
+			retry_after_secs: Some(s),
+			..
+		} = self
+		{
+			builder.insert_header(("Retry-After", s.to_string()));
+		}
+		builder.body(self.to_string())
 	}
 }
 

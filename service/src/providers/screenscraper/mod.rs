@@ -147,6 +147,20 @@ impl ScreenScraperClient {
 		})
 	}
 
+	pub fn secs_until_recovery(&self) -> Option<u64> {
+		let pool_earliest = self
+			.accounts
+			.iter()
+			.map(|a| a.exhausted_until_unix.load(Ordering::Relaxed))
+			.collect::<Vec<_>>();
+		compute_secs_until_recovery(
+			self.blacklisted.load(Ordering::Relaxed),
+			self.outage_until_unix.load(Ordering::Relaxed),
+			&pool_earliest,
+			now_unix_secs(),
+		)
+	}
+
 	pub fn is_quota_exhausted(&self) -> bool {
 		if self.blacklisted.load(Ordering::Relaxed) {
 			return true;
@@ -686,6 +700,29 @@ fn url_for_log(url: &Url) -> String {
 	sanitised.to_string()
 }
 
+fn compute_secs_until_recovery(
+	blacklisted: bool,
+	outage_until_unix: i64,
+	pool_exhaustion_unix: &[i64],
+	now: i64,
+) -> Option<u64> {
+	if blacklisted {
+		return None;
+	}
+	let pool_earliest = pool_exhaustion_unix
+		.iter()
+		.copied()
+		.filter(|t| *t > now)
+		.min()
+		.unwrap_or(0);
+	let target = outage_until_unix.max(pool_earliest);
+	if target > now {
+		Some((target - now) as u64)
+	} else {
+		None
+	}
+}
+
 fn now_unix_secs() -> i64 {
 	SystemTime::now()
 		.duration_since(UNIX_EPOCH)
@@ -1040,6 +1077,48 @@ mod tests {
 			.collect();
 		assert_eq!(available.len(), 1);
 		assert!(Arc::ptr_eq(available[0], &b));
+	}
+
+	#[test]
+	fn secs_until_recovery_returns_none_when_nothing_exhausted() {
+		let now = 1_000_000;
+		assert_eq!(compute_secs_until_recovery(false, 0, &[0, 0], now), None);
+	}
+
+	#[test]
+	fn secs_until_recovery_returns_none_when_blacklisted() {
+		let now = 1_000_000;
+		assert_eq!(
+			compute_secs_until_recovery(true, now + 600, &[now + 3600], now),
+			None
+		);
+	}
+
+	#[test]
+	fn secs_until_recovery_uses_outage_when_pool_clean() {
+		let now = 1_000_000;
+		assert_eq!(
+			compute_secs_until_recovery(false, now + 120, &[0], now),
+			Some(120)
+		);
+	}
+
+	#[test]
+	fn secs_until_recovery_uses_pool_earliest_when_outage_clean() {
+		let now = 1_000_000;
+		assert_eq!(
+			compute_secs_until_recovery(false, 0, &[now + 600, now + 300], now),
+			Some(300)
+		);
+	}
+
+	#[test]
+	fn secs_until_recovery_takes_max_of_outage_and_pool() {
+		let now = 1_000_000;
+		assert_eq!(
+			compute_secs_until_recovery(false, now + 600, &[now + 120], now),
+			Some(600)
+		);
 	}
 
 	#[test]
