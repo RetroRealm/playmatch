@@ -1,11 +1,10 @@
 use entity::user::{ActiveModel, Model};
 use hmac::{Hmac, KeyInit, Mac};
-use log::warn;
 use sea_orm::prelude::Uuid;
 use sea_orm::{ActiveModelTrait, ColumnTrait, IntoActiveModel, Set, TryIntoModel};
 use sea_orm::{DatabaseConnection, QueryFilter};
 use sea_orm::{DbConn, DbErr, EntityTrait};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::sync::OnceLock;
 use subtle::ConstantTimeEq;
 
@@ -45,10 +44,6 @@ fn pepper() -> &'static [u8] {
 		.as_slice()
 }
 
-fn hash_api_key_legacy(token: &str) -> String {
-	hex::encode(Sha256::digest(token.as_bytes()))
-}
-
 fn hash_api_key_hmac(token: &str) -> String {
 	let mut mac = HmacSha256::new_from_slice(pepper()).expect("HMAC-SHA256 accepts any key length");
 	mac.update(token.as_bytes());
@@ -76,21 +71,6 @@ pub async fn get_user_by_api_key(token: String, db_conn: &DbConn) -> Result<Opti
 		.one(db_conn)
 		.await?
 	{
-		return Ok(Some(user));
-	}
-
-	// Legacy SHA-256 fallback; promote-on-read so the next auth hits the HMAC fast path.
-	let legacy_hash = hash_api_key_legacy(&token);
-	if let Some(user) = entity::user::Entity::find()
-		.filter(entity::user::Column::ApiKeyHash.eq(&legacy_hash))
-		.one(db_conn)
-		.await?
-	{
-		let mut active = user.clone().into_active_model();
-		active.api_key_hash_hmac = Set(Some(hmac_hash));
-		if let Err(e) = active.update(db_conn).await {
-			warn!("api key hmac backfill failed for user {}: {e}", user.id);
-		}
 		return Ok(Some(user));
 	}
 
