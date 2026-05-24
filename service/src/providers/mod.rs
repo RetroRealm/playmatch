@@ -27,6 +27,7 @@ use sea_orm::DbConn;
 use sea_orm::prelude::Uuid;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 /// Tuned for IGDB's 4 req/s rate limit. Providers with a different rate
@@ -234,25 +235,52 @@ where
 	let mut cursor: Option<Uuid> = None;
 	while let Some(page) = fetch_fn(provider, DEFAULT_PAGE_SIZE, cursor, db_conn.clone()).await? {
 		let next_cursor = page.last().map(PageCursor::page_cursor);
-		for chunk in page.chunks(chunk_size) {
-			let mut handles = Vec::with_capacity(chunk.len());
-			for entity in chunk.iter().cloned() {
-				let client = client.clone();
-				let conn = db_conn.clone();
-				handles.push(tokio::spawn(match_fn(entity, client, conn)));
-			}
-			for handle in handles {
-				if let Err(e) = handle.await? {
+		let client = client.clone();
+		let db_conn = db_conn.clone();
+		run_throttled(page, chunk_size, move |entity| {
+			let client = client.clone();
+			let conn = db_conn.clone();
+			async move {
+				if let Err(e) = match_fn(entity, client, conn).await {
 					error!("Error while matching {label} to provider: {e:#}");
 				}
 			}
-		}
+		})
+		.await;
 		cursor = match next_cursor {
 			Some(c) => Some(c),
 			None => break,
 		};
 	}
 	Ok(())
+}
+
+/// Run `cap` tasks at a time over `items`. A finished task immediately frees a
+/// slot for the next, so in-flight count holds at `cap` for the duration of
+/// `items`. The closure handles its own errors and metrics; this helper
+/// returns nothing.
+async fn run_throttled<T, F, Fut>(items: Vec<T>, cap: usize, run: F)
+where
+	T: Send + 'static,
+	F: Fn(T) -> Fut + Send + Sync + 'static,
+	Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+	let cap = cap.max(1);
+	let sem = Arc::new(Semaphore::new(cap));
+	let run = Arc::new(run);
+	let mut set: JoinSet<()> = JoinSet::new();
+	for item in items {
+		while set.try_join_next().is_some() {}
+		let Ok(permit) = sem.clone().acquire_owned().await else {
+			return;
+		};
+		let run = run.clone();
+		set.spawn(async move {
+			let _permit = permit;
+			run(item).await;
+		});
+	}
+	while set.join_next().await.is_some() {}
 }
 
 /// Drive the clone-of-game propagation pattern shared by every provider's
@@ -383,12 +411,14 @@ where
 	.await?
 	{
 		let next_cursor = page.last().map(PageCursor::page_cursor);
-		for chunk in page.chunks(chunk_size) {
-			let mut handles = Vec::with_capacity(chunk.len());
-			for game in chunk.iter().cloned() {
-				let client = client.clone();
-				let conn = db_conn.clone();
-				handles.push(tokio::spawn(async move {
+		let page_ids: Vec<Uuid> = page.iter().map(|g| g.id).collect();
+		let client = client.clone();
+		let db_conn_owned = db_conn.clone();
+		run_throttled(page, chunk_size, move |game| {
+			let client = client.clone();
+			let conn = db_conn_owned.clone();
+			async move {
+				let outcome = async {
 					let siblings =
 						crate::db::signature_metadata_mapping::find_sibling_matched_names(
 							game.id, provider, &conn,
@@ -399,31 +429,28 @@ where
 					}
 					let names: Vec<String> = siblings.into_iter().map(|(_, n)| n).collect();
 					match_fn(game, names, client, conn).await?;
-					Ok::<&'static str, anyhow::Error>("attempted")
-				}));
-			}
-			for handle in handles {
-				match handle.await? {
-					Ok(outcome) => {
-						crate::metrics::record_cross_match_attempt(provider_label, outcome);
-					}
+					Ok("attempted")
+				}
+				.await;
+				match outcome {
+					Ok(tag) => crate::metrics::record_cross_match_attempt(provider_label, tag),
 					Err(e) => {
 						error!("Error while cross-matching {label} to provider: {e:#}");
 						crate::metrics::record_cross_match_attempt(provider_label, "error");
 					}
 				}
 			}
-			let chunk_ids: Vec<Uuid> = chunk.iter().map(|g| g.id).collect();
-			if let Err(e) = crate::db::signature_metadata_mapping::bulk_stamp_cross_match_attempt(
-				provider, &chunk_ids, db_conn,
-			)
-			.await
-			{
-				error!(
-					"Failed to stamp cross_match_last_tried_at for {} {label} mappings: {e}",
-					chunk_ids.len()
-				);
-			}
+		})
+		.await;
+		if let Err(e) = crate::db::signature_metadata_mapping::bulk_stamp_cross_match_attempt(
+			provider, &page_ids, db_conn,
+		)
+		.await
+		{
+			error!(
+				"Failed to stamp cross_match_last_tried_at for {} {label} mappings: {e}",
+				page_ids.len()
+			);
 		}
 		cursor = match next_cursor {
 			Some(c) => Some(c),
@@ -670,4 +697,88 @@ pub async fn match_db_to_all_providers(
 		aggregate_started.elapsed().as_secs_f64(),
 	);
 	Ok(())
+}
+
+#[cfg(test)]
+mod throttler_tests {
+	use super::run_throttled;
+	use std::sync::Arc;
+	use std::sync::atomic::{AtomicUsize, Ordering};
+	use std::time::Duration;
+
+	#[tokio::test]
+	async fn processes_every_item_with_small_cap() {
+		let counter = Arc::new(AtomicUsize::new(0));
+		let counter_for_run = counter.clone();
+		let items: Vec<usize> = (0..20).collect();
+		run_throttled(items, 3, move |_| {
+			let counter = counter_for_run.clone();
+			async move {
+				counter.fetch_add(1, Ordering::Relaxed);
+			}
+		})
+		.await;
+		assert_eq!(counter.load(Ordering::Relaxed), 20);
+	}
+
+	#[tokio::test]
+	async fn never_exceeds_cap_in_flight() {
+		let in_flight = Arc::new(AtomicUsize::new(0));
+		let max_seen = Arc::new(AtomicUsize::new(0));
+		let in_flight_run = in_flight.clone();
+		let max_seen_run = max_seen.clone();
+		let items: Vec<usize> = (0..30).collect();
+		run_throttled(items, 4, move |_| {
+			let in_flight = in_flight_run.clone();
+			let max_seen = max_seen_run.clone();
+			async move {
+				let cur = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+				max_seen.fetch_max(cur, Ordering::SeqCst);
+				tokio::time::sleep(Duration::from_millis(20)).await;
+				in_flight.fetch_sub(1, Ordering::SeqCst);
+			}
+		})
+		.await;
+		let observed_peak = max_seen.load(Ordering::SeqCst);
+		assert!(
+			observed_peak <= 4,
+			"observed peak in-flight {observed_peak} exceeded cap 4"
+		);
+		assert!(
+			observed_peak >= 2,
+			"observed peak in-flight {observed_peak} suggests the throttler serialised work"
+		);
+	}
+
+	#[tokio::test]
+	async fn cap_of_zero_still_processes_items() {
+		let counter = Arc::new(AtomicUsize::new(0));
+		let counter_for_run = counter.clone();
+		let items: Vec<usize> = (0..5).collect();
+		run_throttled(items, 0, move |_| {
+			let counter = counter_for_run.clone();
+			async move {
+				counter.fetch_add(1, Ordering::Relaxed);
+			}
+		})
+		.await;
+		assert_eq!(counter.load(Ordering::Relaxed), 5);
+	}
+
+	#[tokio::test]
+	async fn observes_errors_signalled_via_closure() {
+		let errors = Arc::new(AtomicUsize::new(0));
+		let errors_for_run = errors.clone();
+		let items: Vec<usize> = (0..10).collect();
+		run_throttled(items, 3, move |i| {
+			let errors = errors_for_run.clone();
+			async move {
+				if i % 2 == 0 {
+					errors.fetch_add(1, Ordering::Relaxed);
+				}
+			}
+		})
+		.await;
+		assert_eq!(errors.load(Ordering::Relaxed), 5);
+	}
 }
