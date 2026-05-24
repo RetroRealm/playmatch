@@ -110,8 +110,8 @@ impl Account {
 struct QuotaSnapshot {
 	requests_today: u64,
 	max_requests_per_day: u64,
-	requests_today_ko: u64,
-	max_requests_per_day_ko: u64,
+	requests_ko_today: u64,
+	max_requests_ko_per_day: u64,
 }
 
 pub struct ScreenScraperClient {
@@ -585,8 +585,8 @@ impl ScreenScraperClient {
 					Some(snapshot.max_requests_per_day),
 				);
 				let ko_hit = soft_limit_reached(
-					Some(snapshot.requests_today_ko),
-					Some(snapshot.max_requests_per_day_ko),
+					Some(snapshot.requests_ko_today),
+					Some(snapshot.max_requests_ko_per_day),
 				);
 				if ok_hit || ko_hit {
 					let reset = next_paris_midnight_unix(now);
@@ -604,7 +604,7 @@ impl ScreenScraperClient {
 					} else {
 						format!(
 							"KO quota soft limit (restored from snapshot, {}/{})",
-							snapshot.requests_today_ko, snapshot.max_requests_per_day_ko
+							snapshot.requests_ko_today, snapshot.max_requests_ko_per_day
 						)
 					};
 					info!(
@@ -651,8 +651,8 @@ impl ScreenScraperClient {
 		let snapshot = QuotaSnapshot {
 			requests_today: parsed_u64(user.requeststoday.as_deref()).unwrap_or(0),
 			max_requests_per_day: parsed_u64(user.maxrequestsperday.as_deref()).unwrap_or(0),
-			requests_today_ko: parsed_u64(user.requeststodayko.as_deref()).unwrap_or(0),
-			max_requests_per_day_ko: parsed_u64(user.maxrequestskoperday.as_deref()).unwrap_or(0),
+			requests_ko_today: parsed_u64(user.requestskotoday.as_deref()).unwrap_or(0),
+			max_requests_ko_per_day: parsed_u64(user.maxrequestskoperday.as_deref()).unwrap_or(0),
 		};
 		self.persist_quota_snapshot(account, &snapshot);
 
@@ -661,8 +661,8 @@ impl ScreenScraperClient {
 			Some(snapshot.max_requests_per_day),
 		);
 		let ko_hit = soft_limit_reached(
-			Some(snapshot.requests_today_ko),
-			Some(snapshot.max_requests_per_day_ko),
+			Some(snapshot.requests_ko_today),
+			Some(snapshot.max_requests_ko_per_day),
 		);
 		if !ok_hit && !ko_hit {
 			return;
@@ -686,7 +686,7 @@ impl ScreenScraperClient {
 		} else {
 			format!(
 				"KO quota soft limit ({}/{})",
-				snapshot.requests_today_ko, snapshot.max_requests_per_day_ko
+				snapshot.requests_ko_today, snapshot.max_requests_ko_per_day
 			)
 		};
 		info!(
@@ -1025,7 +1025,7 @@ mod tests {
 		SsUser {
 			requeststoday: today.map(str::to_string),
 			maxrequestsperday: max.map(str::to_string),
-			requeststodayko: ko.map(str::to_string),
+			requestskotoday: ko.map(str::to_string),
 			maxrequestskoperday: kmax.map(str::to_string),
 			maxrequestspermin: None,
 			maxthreads: None,
@@ -1072,7 +1072,7 @@ mod tests {
 			parsed_u64(u.maxrequestsperday.as_deref())
 		));
 		assert!(soft_limit_reached(
-			parsed_u64(u.requeststodayko.as_deref()),
+			parsed_u64(u.requestskotoday.as_deref()),
 			parsed_u64(u.maxrequestskoperday.as_deref())
 		));
 	}
@@ -1081,7 +1081,7 @@ mod tests {
 		SsUser {
 			requeststoday: None,
 			maxrequestsperday: None,
-			requeststodayko: None,
+			requestskotoday: None,
 			maxrequestskoperday: None,
 			maxrequestspermin: None,
 			maxthreads: value.map(str::to_string),
@@ -1194,8 +1194,8 @@ mod tests {
 		let snap = QuotaSnapshot {
 			requests_today: 19_000,
 			max_requests_per_day: 20_000,
-			requests_today_ko: 630,
-			max_requests_per_day_ko: 2_000,
+			requests_ko_today: 630,
+			max_requests_ko_per_day: 2_000,
 		};
 		let raw = serde_json::to_string(&snap).expect("serialize");
 		let back: QuotaSnapshot = serde_json::from_str(&raw).expect("deserialize");
@@ -1208,8 +1208,8 @@ mod tests {
 			let snap = QuotaSnapshot {
 				requests_today: today,
 				max_requests_per_day: max,
-				requests_today_ko: 0,
-				max_requests_per_day_ko: 0,
+				requests_ko_today: 0,
+				max_requests_ko_per_day: 0,
 			};
 			let from_snapshot =
 				soft_limit_reached(Some(snap.requests_today), Some(snap.max_requests_per_day));

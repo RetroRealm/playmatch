@@ -42,7 +42,7 @@ pub struct SsUser {
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxrequestsperday: Option<String>,
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
-	pub requeststodayko: Option<String>,
+	pub requestskotoday: Option<String>,
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
 	pub maxrequestskoperday: Option<String>,
 	#[serde(default, deserialize_with = "de_opt_flexible_string")]
@@ -310,6 +310,23 @@ mod tests {
 			.parse()
 			.unwrap();
 		assert_eq!(v, 12345);
+	}
+
+	#[test]
+	fn ss_user_quota_fields_match_screenscraper_json_keys() {
+		let body = r#"{
+			"requeststoday": "1460",
+			"maxrequestsperday": "20000",
+			"requestskotoday": "630",
+			"maxrequestskoperday": "2000",
+			"maxrequestspermin": "5",
+			"maxthreads": "1"
+		}"#;
+		let u: SsUser = serde_json::from_str(body).unwrap();
+		assert_eq!(u.requeststoday.as_deref(), Some("1460"));
+		assert_eq!(u.maxrequestsperday.as_deref(), Some("20000"));
+		assert_eq!(u.requestskotoday.as_deref(), Some("630"));
+		assert_eq!(u.maxrequestskoperday.as_deref(), Some("2000"));
 	}
 
 	#[test]
