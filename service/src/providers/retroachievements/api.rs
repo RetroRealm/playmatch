@@ -57,7 +57,8 @@ async fn fetch_text(
 	url: Url,
 	endpoint_label: &'static str,
 ) -> anyhow::Result<String> {
-	let response = client.http().get(url).send().await?;
+	let req = client.http().get(url).build()?;
+	let response = client.execute(req).await?;
 	let status = response.status();
 	let body = response.text().await?;
 	match status {

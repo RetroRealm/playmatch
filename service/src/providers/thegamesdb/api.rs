@@ -177,7 +177,7 @@ impl TheGamesDbClient {
 
 		let started = Instant::now();
 		let result: anyhow::Result<T> = async {
-			let res = self.http.execute(req).await?;
+			let res = self.execute(req).await?;
 			let status = res.status();
 			let body = res.text().await?;
 			if !status.is_success() {

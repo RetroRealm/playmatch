@@ -1,8 +1,12 @@
+use crate::http::abstraction::RetryPolicy;
 use entity::sea_orm_active_enums::MetadataProviderEnum;
-use reqwest::Client;
+use reqwest::{Client, Request, Response};
 use sea_orm::DbConn;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
+use tokio::sync::Mutex;
+use tower::retry::Retry;
+use tower::{Service, ServiceBuilder, ServiceExt};
 
 pub mod api;
 pub mod matching;
@@ -17,6 +21,7 @@ const REMAINING_CACHE_KEY_DEFAULT: &str = "playmatch:tgdb:remaining_monthly_allo
 
 pub struct TheGamesDbClient {
 	http: Client,
+	service: Mutex<Retry<RetryPolicy, Client>>,
 	redis_conn: redis::aio::MultiplexedConnection,
 	db_conn: DbConn,
 	api_key: Option<String>,
@@ -37,14 +42,26 @@ impl TheGamesDbClient {
 		db_conn: DbConn,
 		api_key: Option<String>,
 	) -> anyhow::Result<Self> {
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy::new("thegamesdb"));
+		let service = ServiceBuilder::new()
+			.layer(retry_layer)
+			.service(http.clone());
+
 		Ok(Self {
 			http,
+			service: Mutex::new(service),
 			redis_conn,
 			db_conn,
 			api_key,
 			per_cycle_calls: AtomicU32::new(0),
 			remaining_allowance: AtomicI32::new(i32::MIN),
 		})
+	}
+
+	pub(crate) async fn execute(&self, req: Request) -> reqwest::Result<Response> {
+		let mut svc = self.service.lock().await;
+		let svc = svc.ready().await?;
+		svc.call(req).await
 	}
 
 	pub fn db_conn(&self) -> &DbConn {

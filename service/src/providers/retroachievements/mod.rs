@@ -1,7 +1,11 @@
+use crate::http::abstraction::RetryPolicy;
 use entity::sea_orm_active_enums::MetadataProviderEnum;
-use reqwest::Client;
+use reqwest::{Client, Request, Response};
 use sea_orm::DbConn;
 use std::sync::Arc;
+use tokio::sync::Mutex;
+use tower::retry::Retry;
+use tower::{Service, ServiceBuilder, ServiceExt};
 
 pub mod api;
 pub mod cache;
@@ -13,6 +17,7 @@ pub const API_BASE: &str = "https://retroachievements.org/API";
 
 pub struct RetroAchievementsClient {
 	http: Client,
+	service: Mutex<Retry<RetryPolicy, Client>>,
 	redis_conn: redis::aio::MultiplexedConnection,
 	db_conn: DbConn,
 	username: String,
@@ -28,14 +33,26 @@ impl RetroAchievementsClient {
 		redis_conn: redis::aio::MultiplexedConnection,
 		db_conn: DbConn,
 	) -> anyhow::Result<Self> {
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy::new("retroachievements"));
+		let service = ServiceBuilder::new()
+			.layer(retry_layer)
+			.service(http.clone());
+
 		Ok(Self {
 			http,
+			service: Mutex::new(service),
 			redis_conn,
 			db_conn,
 			username,
 			api_key,
 			api_base: API_BASE.to_string(),
 		})
+	}
+
+	pub(crate) async fn execute(&self, req: Request) -> reqwest::Result<Response> {
+		let mut svc = self.service.lock().await;
+		let svc = svc.ready().await?;
+		svc.call(req).await
 	}
 
 	pub async fn ensure_imported(&self) -> anyhow::Result<import::ImportOutcome> {

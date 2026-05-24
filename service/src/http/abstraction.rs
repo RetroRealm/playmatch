@@ -1,36 +1,152 @@
 use crate::config::http::REQWEST_DEFAULT_USER_AGENT;
-use futures_util::future;
+use log::{error, warn};
+use rand::RngExt;
 use reqwest::{IntoUrl, Request, RequestBuilder, Response};
+use std::time::Duration;
 use tower::retry::Policy;
 
+pub const MAX_RETRIES: usize = 3;
+const BACKOFF_MS: &[u64] = &[250, 500, 1000];
+const JITTER_MAX_MS: u64 = 100;
+
 #[derive(Debug, Clone)]
-pub struct RetryPolicy(pub usize);
+pub struct RetryPolicy {
+	provider: &'static str,
+	remaining: usize,
+	max: usize,
+}
 
-impl<E> Policy<Request, Response, E> for RetryPolicy {
-	type Future = future::Ready<()>;
+impl RetryPolicy {
+	pub fn new(provider: &'static str) -> Self {
+		Self::with_max(provider, MAX_RETRIES)
+	}
 
-	fn retry(&mut self, _: &mut Request, result: &mut Result<Response, E>) -> Option<Self::Future> {
-		if self.0 == 0 {
-			return None;
+	pub fn with_max(provider: &'static str, max: usize) -> Self {
+		Self {
+			provider,
+			remaining: max,
+			max,
 		}
+	}
+}
 
-		if result.is_err() {
-			self.0 -= 1;
-			Some(future::ready(()))
-		} else if let Ok(res) = result {
-			if res.status().is_server_error() {
-				self.0 -= 1;
-				Some(future::ready(()))
-			} else {
+#[derive(Debug, PartialEq, Eq)]
+enum RetryDecision {
+	Skip,
+	Retry { delay_ms: u64 },
+	Exhausted,
+}
+
+fn decide_retry(remaining: usize, max: usize, is_retryable: bool) -> RetryDecision {
+	if !is_retryable {
+		return RetryDecision::Skip;
+	}
+	if remaining == 0 {
+		return RetryDecision::Exhausted;
+	}
+	let attempt_done = max - remaining + 1;
+	let base = BACKOFF_MS[(attempt_done - 1).min(BACKOFF_MS.len() - 1)];
+	let jitter: u64 = rand::rng().random_range(0..=JITTER_MAX_MS);
+	RetryDecision::Retry {
+		delay_ms: base + jitter,
+	}
+}
+
+impl<E: std::fmt::Display> Policy<Request, Response, E> for RetryPolicy {
+	type Future = tokio::time::Sleep;
+
+	fn retry(
+		&mut self,
+		req: &mut Request,
+		result: &mut Result<Response, E>,
+	) -> Option<Self::Future> {
+		let is_retryable = match result {
+			Err(_) => true,
+			Ok(res) => res.status().is_server_error(),
+		};
+		let attempt_done = self.max - self.remaining + 1;
+		match decide_retry(self.remaining, self.max, is_retryable) {
+			RetryDecision::Skip => None,
+			RetryDecision::Exhausted => {
+				let cause = match result {
+					Err(e) => format!("network error: {e}"),
+					Ok(res) => format!("HTTP {}", res.status().as_u16()),
+				};
+				error!(
+					"{} request to {} failed after {} retries ({cause})",
+					self.provider,
+					req.url(),
+					self.max
+				);
 				None
 			}
-		} else {
-			None
+			RetryDecision::Retry { delay_ms } => {
+				let cause = match result {
+					Err(e) => format!("network error: {e}"),
+					Ok(res) => format!("HTTP {}", res.status().as_u16()),
+				};
+				warn!(
+					"{} request to {} returned {cause}; retrying ({attempt_done}/{}) after {delay_ms}ms",
+					self.provider,
+					req.url(),
+					self.max
+				);
+				self.remaining -= 1;
+				Some(tokio::time::sleep(Duration::from_millis(delay_ms)))
+			}
 		}
 	}
 
 	fn clone_request(&mut self, req: &Request) -> Option<Request> {
 		req.try_clone()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn skips_when_not_retryable() {
+		assert_eq!(decide_retry(3, 3, false), RetryDecision::Skip);
+	}
+
+	#[test]
+	fn exhausted_when_remaining_is_zero() {
+		assert_eq!(decide_retry(0, 3, true), RetryDecision::Exhausted);
+	}
+
+	#[test]
+	fn retries_when_remaining_and_retryable() {
+		match decide_retry(3, 3, true) {
+			RetryDecision::Retry { delay_ms } => {
+				assert!((BACKOFF_MS[0]..=BACKOFF_MS[0] + JITTER_MAX_MS).contains(&delay_ms));
+			}
+			other => panic!("expected Retry, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn backoff_grows_with_attempts() {
+		fn base_for(remaining: usize, max: usize) -> u64 {
+			let attempt_done = max - remaining + 1;
+			BACKOFF_MS[(attempt_done - 1).min(BACKOFF_MS.len() - 1)]
+		}
+		assert_eq!(base_for(3, 3), 250);
+		assert_eq!(base_for(2, 3), 500);
+		assert_eq!(base_for(1, 3), 1000);
+	}
+
+	#[test]
+	fn backoff_clamps_to_last_step_after_schedule_ends() {
+		fn base_for(remaining: usize, max: usize) -> u64 {
+			let attempt_done = max - remaining + 1;
+			BACKOFF_MS[(attempt_done - 1).min(BACKOFF_MS.len() - 1)]
+		}
+		assert_eq!(base_for(4, 5), 500);
+		assert_eq!(base_for(3, 5), 1000);
+		assert_eq!(base_for(2, 5), 1000);
+		assert_eq!(base_for(1, 5), 1000);
 	}
 }
 

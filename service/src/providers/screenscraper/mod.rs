@@ -37,7 +37,6 @@ const SOFTNAME: &str = "playmatch";
 /// as abusive; we apply it per-permit so concurrent threads each pace
 /// themselves rather than sharing a single global token bucket.
 const POST_REQUEST_DELAY_MS: u64 = 1200;
-const MAX_RETRIES: usize = 3;
 
 /// Hard ceiling on the concurrency probed from `ssuser.maxthreads`.
 const MAX_CONCURRENCY: usize = 16;
@@ -122,7 +121,7 @@ impl ScreenScraperClient {
 		client: Client,
 		redis_conn: redis::aio::MultiplexedConnection,
 	) -> anyhow::Result<Self> {
-		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy(MAX_RETRIES));
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy::new("screenscraper"));
 
 		let service = ServiceBuilder::new()
 			.layer(retry_layer)

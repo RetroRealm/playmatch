@@ -24,7 +24,6 @@ pub const API_URL: &str = "https://www.emuready.com/api/mobile/trpc";
 
 const RATELIMIT_AMOUNT: u64 = 4;
 const RATELIMIT_DURATION_MS: u64 = 1000;
-const MAX_RETRIES: usize = 3;
 const SEARCH_LIMIT: i64 = 50;
 
 pub struct EmuReadyClient {
@@ -43,7 +42,7 @@ impl EmuReadyClient {
 			RATELIMIT_AMOUNT,
 			Duration::from_millis(RATELIMIT_DURATION_MS),
 		);
-		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy(MAX_RETRIES));
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy::new("emuready"));
 
 		let service = ServiceBuilder::new()
 			.layer(rate_limit_layer)

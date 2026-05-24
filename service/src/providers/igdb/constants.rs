@@ -1,7 +1,5 @@
 pub const API_URL: &str = "https://api.igdb.com/v4";
 
-pub const IGDB_MAX_RETRIES: usize = 3;
-
 pub const IGDB_RATELIMIT_AMOUNT: u64 = 4;
 pub const IGDB_RATELIMIT_DURATION_MS: u64 = 1000;
 

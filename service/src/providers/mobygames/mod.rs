@@ -26,7 +26,6 @@ pub const API_URL: &str = "https://api.mobygames.com/v1";
 /// Cheapest MobyGames tier permits one request every five seconds.
 const RATELIMIT_AMOUNT: u64 = 1;
 const RATELIMIT_DURATION_MS: u64 = 5000;
-const MAX_RETRIES: usize = 3;
 
 pub struct MobyGamesClient {
 	client: Client,
@@ -47,7 +46,7 @@ impl MobyGamesClient {
 			RATELIMIT_AMOUNT,
 			Duration::from_millis(RATELIMIT_DURATION_MS),
 		);
-		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy(MAX_RETRIES));
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy::new("mobygames"));
 
 		let service = ServiceBuilder::new()
 			.layer(rate_limit_layer)

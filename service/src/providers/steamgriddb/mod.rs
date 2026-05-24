@@ -24,7 +24,6 @@ pub const API_URL: &str = "https://www.steamgriddb.com/api/v2";
 
 const RATELIMIT_AMOUNT: u64 = 8;
 const RATELIMIT_DURATION_MS: u64 = 1000;
-const MAX_RETRIES: usize = 3;
 
 pub struct SteamGridDbClient {
 	client: Client,
@@ -43,7 +42,7 @@ impl SteamGridDbClient {
 			RATELIMIT_AMOUNT,
 			Duration::from_millis(RATELIMIT_DURATION_MS),
 		);
-		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy(MAX_RETRIES));
+		let retry_layer = tower::retry::RetryLayer::new(RetryPolicy::new("steamgriddb"));
 
 		let service = ServiceBuilder::new()
 			.layer(rate_limit_layer)
