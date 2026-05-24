@@ -1,4 +1,5 @@
 pub mod emuready;
+pub mod hasheous;
 pub mod igdb;
 pub mod launchbox;
 pub mod mobygames;
@@ -445,6 +446,7 @@ fn provider_label_for(provider: MetadataProviderEnum) -> &'static str {
 		MetadataProviderEnum::OpenVGDB => "openvgdb",
 		MetadataProviderEnum::RetroAchievements => "retroachievements",
 		MetadataProviderEnum::TheGamesDB => "thegamesdb",
+		MetadataProviderEnum::Hasheous => "hasheous",
 	}
 }
 

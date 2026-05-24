@@ -131,6 +131,8 @@ pub enum MetadataProvider {
 	RetroAchievements,
 	/// TheGamesDB (https://thegamesdb.net/)
 	TheGamesDB,
+	/// Hasheous (https://hasheous.org/)
+	Hasheous,
 }
 
 /// Match types for a game
@@ -252,6 +254,7 @@ impl From<MetadataProviderEnum> for MetadataProvider {
 			MetadataProviderEnum::OpenVGDB => MetadataProvider::OpenVGDB,
 			MetadataProviderEnum::RetroAchievements => MetadataProvider::RetroAchievements,
 			MetadataProviderEnum::TheGamesDB => MetadataProvider::TheGamesDB,
+			MetadataProviderEnum::Hasheous => MetadataProvider::Hasheous,
 		}
 	}
 }
@@ -268,6 +271,7 @@ impl From<MetadataProvider> for MetadataProviderEnum {
 			MetadataProvider::OpenVGDB => MetadataProviderEnum::OpenVGDB,
 			MetadataProvider::RetroAchievements => MetadataProviderEnum::RetroAchievements,
 			MetadataProvider::TheGamesDB => MetadataProviderEnum::TheGamesDB,
+			MetadataProvider::Hasheous => MetadataProviderEnum::Hasheous,
 		}
 	}
 }

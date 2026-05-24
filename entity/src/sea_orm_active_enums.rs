@@ -122,6 +122,8 @@ pub enum MetadataProviderEnum {
 	#[strum(serialize = "thegamesdb")]
 	#[allow(clippy::upper_case_acronyms)]
 	TheGamesDB,
+	#[sea_orm(string_value = "hasheous")]
+	Hasheous,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

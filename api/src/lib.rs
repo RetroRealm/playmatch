@@ -120,6 +120,7 @@ use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::emuready::EmuReadyClient;
+use service::providers::hasheous::HasheousClient;
 use service::providers::igdb::IgdbClient;
 use service::providers::launchbox::LaunchBoxClient;
 use service::providers::mobygames::MobyGamesClient;
@@ -202,6 +203,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let er_http_client = Client::builder().cookie_store(false).build()?;
 
+	let hasheous_http_client = Client::builder().cookie_store(false).build()?;
+
 	let tgdb_http_client = Client::builder().cookie_store(false).build()?;
 
 	// DAT downloads use a cookieless client so hostile mirrors cannot set cookies that
@@ -223,6 +226,7 @@ async fn start() -> anyhow::Result<()> {
 	let ra_client_opt =
 		build_retroachievements_client(ra_http_client, redis_conn.clone(), conn.clone());
 	let er_client_opt = build_emuready_client(er_http_client, redis_conn.clone());
+	let hasheous_client_opt = build_hasheous_client(hasheous_http_client, redis_conn.clone());
 	let tgdb_client_opt =
 		build_thegamesdb_client(tgdb_http_client, redis_conn.clone(), conn.clone());
 
@@ -263,6 +267,9 @@ async fn start() -> anyhow::Result<()> {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if let Some(c) = er_client_opt.clone() {
+		providers.push(c as Arc<dyn MetadataProvider>);
+	}
+	if let Some(c) = hasheous_client_opt.clone() {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if let Some(c) = tgdb_client_opt.clone() {
@@ -574,6 +581,33 @@ fn build_emuready_client(
 		}
 		Err(e) => {
 			warn!("EmuReady provider construction failed, disabled: {e}");
+			None
+		}
+	}
+}
+
+/// Returns `None` when HASHEOUS_ENABLED is unset or not "true". The Hasheous
+/// hash-lookup endpoints are open and unauthenticated; the flag exists so
+/// existing deployments do not silently start hitting an external service on
+/// next deploy. Matching only. No proxy routes are exposed.
+fn build_hasheous_client(
+	http: Client,
+	redis_conn: redis::aio::MultiplexedConnection,
+) -> Option<Arc<HasheousClient>> {
+	let enabled = env::var("HASHEOUS_ENABLED")
+		.unwrap_or_default()
+		.eq_ignore_ascii_case("true");
+	if !enabled {
+		warn!("HASHEOUS_ENABLED not set to true, Hasheous provider disabled");
+		return None;
+	}
+	match HasheousClient::new(http, redis_conn) {
+		Ok(c) => {
+			info!("Hasheous provider enabled");
+			Some(Arc::new(c))
+		}
+		Err(e) => {
+			warn!("Hasheous provider construction failed, disabled: {e}");
 			None
 		}
 	}

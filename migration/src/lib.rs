@@ -45,6 +45,7 @@ mod m20260518_120100_create_thegamesdb_tables;
 mod m20260518_120200_bootstrap_thegamesdb_seed;
 mod m20260522_120000_add_too_many_files_failed_match_reason;
 mod m20260523_120000_drop_legacy_api_key_hash;
+mod m20260524_120000_add_hasheous_provider_enum_value;
 
 pub struct Migrator;
 
@@ -97,6 +98,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260518_120200_bootstrap_thegamesdb_seed::Migration),
 			Box::new(m20260522_120000_add_too_many_files_failed_match_reason::Migration),
 			Box::new(m20260523_120000_drop_legacy_api_key_hash::Migration),
+			Box::new(m20260524_120000_add_hasheous_provider_enum_value::Migration),
 		]
 	}
 }
