@@ -119,7 +119,7 @@ pub struct ScreenScraperClient {
 	service: Mutex<Retry<RetryPolicy, Client>>,
 	dev_id: String,
 	dev_password: String,
-	accounts: Vec<Arc<Account>>,
+	account: Option<Arc<Account>>,
 	outage_until_unix: AtomicI64,
 	blacklisted: AtomicBool,
 	systems_cache: OnceCell<Arc<Vec<SsSystem>>>,
@@ -130,7 +130,7 @@ impl ScreenScraperClient {
 	pub fn new(
 		dev_id: String,
 		dev_password: String,
-		users: Vec<(String, String)>,
+		user: Option<(String, String)>,
 		client: Client,
 		redis_conn: redis::aio::MultiplexedConnection,
 	) -> anyhow::Result<Self> {
@@ -140,18 +140,15 @@ impl ScreenScraperClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
-		let accounts: Vec<Arc<Account>> = users
-			.into_iter()
-			.map(|(id, pw)| Arc::new(Account::new(id, pw)))
-			.collect();
+		let account = user.map(|(id, pw)| Arc::new(Account::new(id, pw)));
 
-		crate::metrics::set_screenscraper_concurrency(accounts.len().max(1) as i64);
+		crate::metrics::set_screenscraper_concurrency(if account.is_some() { 1 } else { 0 });
 		Ok(Self {
 			client,
 			service: Mutex::new(service),
 			dev_id,
 			dev_password,
-			accounts,
+			account,
 			outage_until_unix: AtomicI64::new(0),
 			blacklisted: AtomicBool::new(false),
 			systems_cache: OnceCell::new(),
@@ -160,11 +157,11 @@ impl ScreenScraperClient {
 	}
 
 	pub fn secs_until_recovery(&self) -> Option<u64> {
-		let pool_earliest = self
-			.accounts
-			.iter()
-			.map(|a| a.exhausted_until_unix.load(Ordering::Relaxed))
-			.collect::<Vec<_>>();
+		let pool_earliest: Vec<i64> = self
+			.account
+			.as_ref()
+			.map(|a| vec![a.exhausted_until_unix.load(Ordering::Relaxed)])
+			.unwrap_or_default();
 		compute_secs_until_recovery(
 			self.blacklisted.load(Ordering::Relaxed),
 			self.outage_until_unix.load(Ordering::Relaxed),
@@ -181,12 +178,10 @@ impl ScreenScraperClient {
 		if self.outage_until_unix.load(Ordering::Relaxed) > now {
 			return true;
 		}
-		if self.accounts.is_empty() {
-			return false;
+		match self.account.as_ref() {
+			Some(a) => a.exhausted_until_unix.load(Ordering::Relaxed) > now,
+			None => false,
 		}
-		self.accounts
-			.iter()
-			.all(|a| a.exhausted_until_unix.load(Ordering::Relaxed) > now)
 	}
 
 	pub async fn list_systems(&self) -> anyhow::Result<Arc<Vec<SsSystem>>> {
@@ -448,79 +443,75 @@ impl ScreenScraperClient {
 			));
 		}
 
-		let max_rotations = self.accounts.len().max(1);
-		for _ in 0..max_rotations {
-			let account = self.pick_account().await?;
+		let account = self.current_account().await?;
 
-			let mut url_for_call = url.clone();
-			if let Some(a) = account.as_ref() {
-				url_for_call
-					.query_pairs_mut()
-					.append_pair("ssid", &a.id)
-					.append_pair("sspassword", &a.password);
-			}
-
-			let _permit = match account.as_ref() {
-				Some(a) => Some(a.permits.clone().acquire_owned().await?),
-				None => None,
-			};
-
-			let mut attempt: usize = 0;
-			let outcome = loop {
-				let (status, content_type, body) = self.send_one(url_for_call.clone()).await?;
-				match status.as_u16() {
-					429 if attempt < MAX_429_RETRIES => {
-						let base = RETRY_BACKOFF_MS[attempt.min(RETRY_BACKOFF_MS.len() - 1)];
-						let jitter: u64 = rand::rng().random_range(0..=100);
-						sleep(Duration::from_millis(base + jitter)).await;
-						attempt += 1;
-						continue;
-					}
-					429 => break Outcome::Backoff429,
-					423 => break Outcome::Outage,
-					426 => break Outcome::Blacklist,
-					430 | 431 => break Outcome::Rotate(status.as_u16()),
-					_ => break Outcome::Done(status, content_type, body),
-				}
-			};
-
-			sleep(Duration::from_millis(POST_REQUEST_DELAY_MS)).await;
-			drop(_permit);
-
-			match outcome {
-				Outcome::Done(status, ct, body) => return Ok((status, ct, body, account)),
-				Outcome::Backoff429 => {
-					return Err(anyhow!(
-						"screenscraper 429 thread-limit; exhausted {MAX_429_RETRIES} retries"
-					));
-				}
-				Outcome::Outage => {
-					self.outage_until_unix
-						.store(now_unix_secs() + OUTAGE_BLOCK_SECS, Ordering::Relaxed);
-					crate::metrics::record_screenscraper_quota_exhaustion("http_423");
-					return Err(anyhow!(
-						"screenscraper api totally closed (HTTP 423), outage block engaged"
-					));
-				}
-				Outcome::Blacklist => {
-					self.blacklisted.store(true, Ordering::Relaxed);
-					crate::metrics::record_screenscraper_quota_exhaustion("http_426");
-					error!(
-						"screenscraper client blacklisted (HTTP 426); the integration is non-compliant or obsolete and requires a code update"
-					);
-					return Err(anyhow!(
-						"screenscraper client blacklisted (HTTP 426), requires update"
-					));
-				}
-				Outcome::Rotate(code) => {
-					if let Some(a) = account.as_ref() {
-						self.mark_account_exhausted(a, code).await;
-					}
-				}
-			}
+		let mut url_for_call = url.clone();
+		if let Some(a) = account.as_ref() {
+			url_for_call
+				.query_pairs_mut()
+				.append_pair("ssid", &a.id)
+				.append_pair("sspassword", &a.password);
 		}
 
-		Err(anyhow!("screenscraper request retries exhausted"))
+		let _permit = match account.as_ref() {
+			Some(a) => Some(a.permits.clone().acquire_owned().await?),
+			None => None,
+		};
+
+		let mut attempt: usize = 0;
+		let outcome = loop {
+			let (status, content_type, body) = self.send_one(url_for_call.clone()).await?;
+			match status.as_u16() {
+				429 if attempt < MAX_429_RETRIES => {
+					let base = RETRY_BACKOFF_MS[attempt.min(RETRY_BACKOFF_MS.len() - 1)];
+					let jitter: u64 = rand::rng().random_range(0..=100);
+					sleep(Duration::from_millis(base + jitter)).await;
+					attempt += 1;
+					continue;
+				}
+				429 => break Outcome::Backoff429,
+				423 => break Outcome::Outage,
+				426 => break Outcome::Blacklist,
+				430 | 431 => break Outcome::AccountExhausted(status.as_u16()),
+				_ => break Outcome::Done(status, content_type, body),
+			}
+		};
+
+		sleep(Duration::from_millis(POST_REQUEST_DELAY_MS)).await;
+		drop(_permit);
+
+		match outcome {
+			Outcome::Done(status, ct, body) => Ok((status, ct, body, account)),
+			Outcome::Backoff429 => Err(anyhow!(
+				"screenscraper 429 thread-limit; exhausted {MAX_429_RETRIES} retries"
+			)),
+			Outcome::Outage => {
+				self.outage_until_unix
+					.store(now_unix_secs() + OUTAGE_BLOCK_SECS, Ordering::Relaxed);
+				crate::metrics::record_screenscraper_quota_exhaustion("http_423");
+				Err(anyhow!(
+					"screenscraper api totally closed (HTTP 423), outage block engaged"
+				))
+			}
+			Outcome::Blacklist => {
+				self.blacklisted.store(true, Ordering::Relaxed);
+				crate::metrics::record_screenscraper_quota_exhaustion("http_426");
+				error!(
+					"screenscraper client blacklisted (HTTP 426); the integration is non-compliant or obsolete and requires a code update"
+				);
+				Err(anyhow!(
+					"screenscraper client blacklisted (HTTP 426), requires update"
+				))
+			}
+			Outcome::AccountExhausted(code) => {
+				if let Some(a) = account.as_ref() {
+					self.mark_account_exhausted(a, code).await;
+				}
+				Err(anyhow!(
+					"screenscraper account exhausted (HTTP {code}); resuming at next paris midnight"
+				))
+			}
+		}
 	}
 
 	async fn send_one(&self, url: Url) -> anyhow::Result<(StatusCode, Option<String>, String)> {
@@ -549,36 +540,28 @@ impl ScreenScraperClient {
 		Ok((status, content_type, body))
 	}
 
-	async fn pick_account(&self) -> anyhow::Result<Option<Arc<Account>>> {
-		if self.accounts.is_empty() {
+	async fn current_account(&self) -> anyhow::Result<Option<Arc<Account>>> {
+		let Some(account) = self.account.as_ref() else {
 			return Ok(None);
-		}
+		};
 		self.refresh_account_state_from_redis().await;
 		let now = now_unix_secs();
-		let mut available: Vec<&Arc<Account>> = self
-			.accounts
-			.iter()
-			.filter(|a| a.exhausted_until_unix.load(Ordering::Relaxed) <= now)
-			.collect();
-		if available.is_empty() {
+		if account.exhausted_until_unix.load(Ordering::Relaxed) > now {
 			return Err(anyhow!(
-				"screenscraper all {} accounts exhausted; waiting for daily reset",
-				self.accounts.len()
+				"screenscraper account exhausted; waiting for daily reset"
 			));
 		}
-		available.sort_by_key(|a| a.last_used_at_unix.load(Ordering::Relaxed));
-		let picked = available[0].clone();
-		picked.last_used_at_unix.store(now, Ordering::Relaxed);
-		Ok(Some(picked))
+		account.last_used_at_unix.store(now, Ordering::Relaxed);
+		Ok(Some(account.clone()))
 	}
 
 	async fn refresh_account_state_from_redis(&self) {
-		if self.accounts.is_empty() {
+		let Some(account) = self.account.as_ref() else {
 			return;
-		}
+		};
 		let mut conn = self.redis_conn.clone();
 		let now = now_unix_secs();
-		for a in &self.accounts {
+		for a in std::iter::once(account) {
 			if a.exhausted_until_unix.load(Ordering::Relaxed) <= now {
 				let val: Result<Option<String>, _> = conn.get(&a.redis_key).await;
 				if let Ok(Some(raw)) = val
@@ -742,12 +725,7 @@ impl ScreenScraperClient {
 		if target > current {
 			account.permits.add_permits(target - current);
 			account.concurrency.store(target, Ordering::Relaxed);
-			let total: usize = self
-				.accounts
-				.iter()
-				.map(|a| a.concurrency.load(Ordering::Relaxed))
-				.sum();
-			crate::metrics::set_screenscraper_concurrency(total as i64);
+			crate::metrics::set_screenscraper_concurrency(target as i64);
 			info!(
 				"screenscraper concurrency raised to {target} from ssuser.maxthreads (was {current})"
 			);
@@ -760,7 +738,7 @@ enum Outcome {
 	Backoff429,
 	Outage,
 	Blacklist,
-	Rotate(u16),
+	AccountExhausted(u16),
 }
 
 fn parse_maxthreads(user: &SsUser) -> Option<usize> {
@@ -924,17 +902,13 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 	}
 
 	fn chunk_size(&self) -> usize {
-		if self.accounts.is_empty() {
-			return 1;
-		}
 		let now = now_unix_secs();
-		let total: usize = self
-			.accounts
-			.iter()
+		self.account
+			.as_ref()
 			.filter(|a| a.exhausted_until_unix.load(Ordering::Relaxed) <= now)
 			.map(|a| a.concurrency.load(Ordering::Relaxed))
-			.sum();
-		total.clamp(1, MAX_CONCURRENCY)
+			.unwrap_or(1)
+			.clamp(1, MAX_CONCURRENCY)
 	}
 
 	fn redis_conn(&self) -> &redis::aio::MultiplexedConnection {
@@ -1163,27 +1137,6 @@ mod tests {
 		);
 	}
 
-	fn fresh_account(id: &str) -> Arc<Account> {
-		Arc::new(Account::new(id.to_string(), "pw".to_string()))
-	}
-
-	#[test]
-	fn account_exhaustion_filter_skips_marked_accounts() {
-		let now = now_unix_secs();
-		let a = fresh_account("u1");
-		let b = fresh_account("u2");
-		let c = fresh_account("u3");
-		a.exhausted_until_unix.store(now + 3600, Ordering::Relaxed);
-		c.exhausted_until_unix.store(now + 7200, Ordering::Relaxed);
-		let pool = vec![a.clone(), b.clone(), c.clone()];
-		let available: Vec<&Arc<Account>> = pool
-			.iter()
-			.filter(|x| x.exhausted_until_unix.load(Ordering::Relaxed) <= now)
-			.collect();
-		assert_eq!(available.len(), 1);
-		assert!(Arc::ptr_eq(available[0], &b));
-	}
-
 	#[test]
 	fn secs_until_recovery_returns_none_when_nothing_exhausted() {
 		let now = 1_000_000;
@@ -1224,21 +1177,6 @@ mod tests {
 			compute_secs_until_recovery(false, now + 600, &[now + 120], now),
 			Some(600)
 		);
-	}
-
-	#[test]
-	fn account_lru_ordering_picks_least_recently_used() {
-		let now = now_unix_secs();
-		let a = fresh_account("u1");
-		let b = fresh_account("u2");
-		let c = fresh_account("u3");
-		a.last_used_at_unix.store(now - 10, Ordering::Relaxed);
-		b.last_used_at_unix.store(now - 100, Ordering::Relaxed);
-		c.last_used_at_unix.store(now - 50, Ordering::Relaxed);
-		let pool = vec![a.clone(), b.clone(), c.clone()];
-		let mut available: Vec<&Arc<Account>> = pool.iter().collect();
-		available.sort_by_key(|x| x.last_used_at_unix.load(Ordering::Relaxed));
-		assert!(Arc::ptr_eq(available[0], &b));
 	}
 
 	#[test]
