@@ -613,12 +613,20 @@ impl ScreenScraperClient {
 					} else {
 						"ko_soft_limit_restored"
 					});
-					warn!(
-						"screenscraper account flagged exhausted from persisted snapshot ({}/{} ok, {}/{} ko)",
-						snapshot.requests_today,
-						snapshot.max_requests_per_day,
-						snapshot.requests_today_ko,
-						snapshot.max_requests_per_day_ko
+					let reason = if ok_hit {
+						format!(
+							"OK quota soft limit (restored from snapshot, {}/{})",
+							snapshot.requests_today, snapshot.max_requests_per_day
+						)
+					} else {
+						format!(
+							"KO quota soft limit (restored from snapshot, {}/{})",
+							snapshot.requests_today_ko, snapshot.max_requests_per_day_ko
+						)
+					};
+					info!(
+						"screenscraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
+						(reset - now).max(0)
 					);
 					let ttl = (reset - now).max(60) as u64;
 					let mut c = conn.clone();
@@ -637,6 +645,15 @@ impl ScreenScraperClient {
 		let reset = next_paris_midnight_unix(now);
 		account.exhausted_until_unix.store(reset, Ordering::Relaxed);
 		crate::metrics::record_screenscraper_quota_exhaustion(&format!("http_{http_code}"));
+		let reason = match http_code {
+			430 => "OK quota hard limit (HTTP 430)",
+			431 => "KO quota hard limit (HTTP 431)",
+			_ => "hard quota limit",
+		};
+		info!(
+			"screenscraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
+			(reset - now).max(0)
+		);
 		let ttl = (reset - now).max(60) as u64;
 		let mut conn = self.redis_conn.clone();
 		let key = account.redis_key.clone();
@@ -678,7 +695,21 @@ impl ScreenScraperClient {
 		} else {
 			"ko_soft_limit"
 		});
-		warn!("screenscraper quota near limit; short-circuiting cycle for one account");
+		let reason = if ok_hit {
+			format!(
+				"OK quota soft limit ({}/{})",
+				snapshot.requests_today, snapshot.max_requests_per_day
+			)
+		} else {
+			format!(
+				"KO quota soft limit ({}/{})",
+				snapshot.requests_today_ko, snapshot.max_requests_per_day_ko
+			)
+		};
+		info!(
+			"screenscraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
+			(reset - now).max(0)
+		);
 		let ttl = (reset - now).max(60) as u64;
 		let mut conn = self.redis_conn.clone();
 		let key = account.redis_key.clone();
