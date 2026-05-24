@@ -242,7 +242,7 @@ where
 			}
 			for handle in handles {
 				if let Err(e) = handle.await? {
-					error!("Error while matching {label} to provider: {e:?}");
+					error!("Error while matching {label} to provider: {e:#}");
 				}
 			}
 		}
@@ -407,7 +407,7 @@ where
 						crate::metrics::record_cross_match_attempt(provider_label, outcome);
 					}
 					Err(e) => {
-						error!("Error while cross-matching {label} to provider: {e:?}");
+						error!("Error while cross-matching {label} to provider: {e:#}");
 						crate::metrics::record_cross_match_attempt(provider_label, "error");
 					}
 				}
@@ -552,7 +552,7 @@ async fn filter_outstanding(
 			}
 			Ok((_, _, Ok(false))) => {}
 			Ok((_, label, Err(e))) => {
-				error!("Outstanding-work check for '{label}' failed: {e:?}; skipping this cycle");
+				error!("Outstanding-work check for '{label}' failed: {e:#}; skipping this cycle");
 			}
 			Err(join_err) => {
 				error!("Outstanding-work check task panicked: {join_err:?}");
@@ -594,7 +594,7 @@ async fn run_primary_wave(registry: &ProviderRegistry, db_conn: &DbConn) {
 					"success"
 				}
 				Err(e) => {
-					error!("Provider '{label}' match cycle failed: {e:?}");
+					error!("Provider '{label}' match cycle failed: {e:#}");
 					"failure"
 				}
 			};
@@ -633,7 +633,7 @@ async fn run_cross_match_wave(registry: &ProviderRegistry, db_conn: &DbConn) {
 					"success"
 				}
 				Err(e) => {
-					error!("Provider '{label}' cross-provider name pass failed: {e:?}");
+					error!("Provider '{label}' cross-provider name pass failed: {e:#}");
 					"failure"
 				}
 			};

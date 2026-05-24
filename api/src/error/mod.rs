@@ -102,7 +102,7 @@ impl ResponseError for Error {
 		service::metrics::record_service_error(label);
 
 		if status.is_server_error() && !matches!(self, Self::UpstreamUnavailable { .. }) {
-			log::error!("HTTP {} ({label}): {self:?}", status.as_u16());
+			log::error!("HTTP {} ({label}): {self}", status.as_u16());
 		}
 
 		let mut builder = HttpResponse::build(status);
