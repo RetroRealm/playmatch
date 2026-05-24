@@ -112,6 +112,8 @@ struct QuotaSnapshot {
 	max_requests_per_day: u64,
 	requests_ko_today: u64,
 	max_requests_ko_per_day: u64,
+	#[serde(default)]
+	concurrency: usize,
 }
 
 pub struct ScreenScraperClient {
@@ -405,8 +407,12 @@ impl ScreenScraperClient {
 					if let Some(resp) = env.response.as_ref()
 						&& let Some(account_ref) = account.as_ref()
 					{
+						if let Some(user) = resp.ssuser.as_ref()
+							&& let Some(target) = parse_maxthreads(user)
+						{
+							apply_concurrency(account_ref, target);
+						}
 						self.update_quota_from(account_ref, &resp.ssuser);
-						self.update_concurrency_from(account_ref, &resp.ssuser);
 					}
 					let header_signals_failure = env
 						.header
@@ -572,14 +578,20 @@ impl ScreenScraperClient {
 				}
 			}
 
+			let snap_raw: Result<Option<String>, _> = conn.get(&a.quota_redis_key).await;
+			let snapshot = match snap_raw {
+				Ok(Some(raw)) => serde_json::from_str::<QuotaSnapshot>(&raw).ok(),
+				_ => None,
+			};
+			if let Some(snapshot) = snapshot.as_ref() {
+				apply_concurrency(a, snapshot.concurrency);
+			}
+
 			if a.exhausted_until_unix.load(Ordering::Relaxed) > now {
 				continue;
 			}
 
-			let snap_raw: Result<Option<String>, _> = conn.get(&a.quota_redis_key).await;
-			if let Ok(Some(raw)) = snap_raw
-				&& let Ok(snapshot) = serde_json::from_str::<QuotaSnapshot>(&raw)
-			{
+			if let Some(snapshot) = snapshot {
 				let ok_hit = soft_limit_reached(
 					Some(snapshot.requests_today),
 					Some(snapshot.max_requests_per_day),
@@ -653,6 +665,7 @@ impl ScreenScraperClient {
 			max_requests_per_day: parsed_u64(user.maxrequestsperday.as_deref()).unwrap_or(0),
 			requests_ko_today: parsed_u64(user.requestskotoday.as_deref()).unwrap_or(0),
 			max_requests_ko_per_day: parsed_u64(user.maxrequestskoperday.as_deref()).unwrap_or(0),
+			concurrency: account.concurrency.load(Ordering::Relaxed),
 		};
 		self.persist_quota_snapshot(account, &snapshot);
 
@@ -715,22 +728,50 @@ impl ScreenScraperClient {
 			let _: Result<(), _> = conn.set_ex(&key, value, ttl).await;
 		});
 	}
+}
 
-	fn update_concurrency_from(&self, account: &Account, user: &Option<SsUser>) {
-		let Some(user) = user else { return };
-		let Some(target) = parse_maxthreads(user) else {
-			return;
-		};
-		let current = account.concurrency.load(Ordering::Relaxed);
-		if target > current {
-			account.permits.add_permits(target - current);
-			account.concurrency.store(target, Ordering::Relaxed);
-			crate::metrics::set_screenscraper_concurrency(target as i64);
+fn apply_concurrency(account: &Account, target: usize) {
+	if target == 0 {
+		return;
+	}
+	let target = target.min(MAX_CONCURRENCY);
+	let current = account.concurrency.load(Ordering::Relaxed);
+	if target > current {
+		account.permits.add_permits(target - current);
+		account.concurrency.store(target, Ordering::Relaxed);
+		crate::metrics::set_screenscraper_concurrency(target as i64);
+		info!("screenscraper concurrency raised to {target} (was {current})");
+	} else if target < current {
+		let asked = current - target;
+		let removed = account.permits.forget_permits(asked);
+		account.concurrency.store(target, Ordering::Relaxed);
+		crate::metrics::set_screenscraper_concurrency(target as i64);
+		if removed < asked {
+			drain_excess_permits(account.permits.clone(), asked - removed);
 			info!(
-				"screenscraper concurrency raised to {target} from ssuser.maxthreads (was {current})"
+				"screenscraper concurrency lowered to {target} (was {current}); forgot {removed} of {asked} immediately, draining remaining {} as in-flight requests finish",
+				asked - removed
+			);
+		} else {
+			info!(
+				"screenscraper concurrency lowered to {target} (was {current}); forgot {asked} permits"
 			);
 		}
 	}
+}
+
+fn drain_excess_permits(permits: Arc<Semaphore>, mut remaining: usize) {
+	tokio::spawn(async move {
+		while remaining > 0 {
+			match permits.clone().acquire_owned().await {
+				Ok(p) => {
+					p.forget();
+					remaining -= 1;
+				}
+				Err(_) => break,
+			}
+		}
+	});
 }
 
 enum Outcome {
@@ -1196,10 +1237,79 @@ mod tests {
 			max_requests_per_day: 20_000,
 			requests_ko_today: 630,
 			max_requests_ko_per_day: 2_000,
+			concurrency: 4,
 		};
 		let raw = serde_json::to_string(&snap).expect("serialize");
 		let back: QuotaSnapshot = serde_json::from_str(&raw).expect("deserialize");
 		assert_eq!(snap, back);
+		assert!(raw.contains("\"concurrency\":4"));
+	}
+
+	#[test]
+	fn quota_snapshot_deserialises_legacy_payload_without_concurrency() {
+		let legacy = r#"{
+			"requests_today": 100,
+			"max_requests_per_day": 1000,
+			"requests_ko_today": 5,
+			"max_requests_ko_per_day": 100
+		}"#;
+		let snap: QuotaSnapshot = serde_json::from_str(legacy).expect("deserialize");
+		assert_eq!(snap.concurrency, 0);
+		assert_eq!(snap.requests_today, 100);
+	}
+
+	#[test]
+	fn apply_concurrency_scales_up_via_add_permits() {
+		let acc = Account::new("u".into(), "p".into());
+		assert_eq!(acc.concurrency.load(Ordering::Relaxed), 1);
+		assert_eq!(acc.permits.available_permits(), 1);
+		apply_concurrency(&acc, 5);
+		assert_eq!(acc.concurrency.load(Ordering::Relaxed), 5);
+		assert_eq!(acc.permits.available_permits(), 5);
+	}
+
+	#[test]
+	fn apply_concurrency_scales_down_via_forget_permits() {
+		let acc = Account::new("u".into(), "p".into());
+		apply_concurrency(&acc, 5);
+		assert_eq!(acc.permits.available_permits(), 5);
+		apply_concurrency(&acc, 2);
+		assert_eq!(acc.concurrency.load(Ordering::Relaxed), 2);
+		assert_eq!(acc.permits.available_permits(), 2);
+	}
+
+	#[test]
+	fn apply_concurrency_no_op_when_target_zero() {
+		let acc = Account::new("u".into(), "p".into());
+		apply_concurrency(&acc, 3);
+		apply_concurrency(&acc, 0);
+		assert_eq!(acc.concurrency.load(Ordering::Relaxed), 3);
+		assert_eq!(acc.permits.available_permits(), 3);
+	}
+
+	#[test]
+	fn apply_concurrency_clamps_to_max() {
+		let acc = Account::new("u".into(), "p".into());
+		apply_concurrency(&acc, MAX_CONCURRENCY + 4);
+		assert_eq!(acc.concurrency.load(Ordering::Relaxed), MAX_CONCURRENCY);
+		assert_eq!(acc.permits.available_permits(), MAX_CONCURRENCY);
+	}
+
+	#[test]
+	fn apply_concurrency_scales_down_while_permit_held_settles_after_drop() {
+		let acc = Account::new("u".into(), "p".into());
+		apply_concurrency(&acc, 4);
+		let held = acc
+			.permits
+			.clone()
+			.try_acquire_owned()
+			.expect("permit available");
+		assert_eq!(acc.permits.available_permits(), 3);
+		apply_concurrency(&acc, 1);
+		assert_eq!(acc.concurrency.load(Ordering::Relaxed), 1);
+		assert_eq!(acc.permits.available_permits(), 0);
+		drop(held);
+		assert_eq!(acc.permits.available_permits(), 1);
 	}
 
 	#[test]
@@ -1210,6 +1320,7 @@ mod tests {
 				max_requests_per_day: max,
 				requests_ko_today: 0,
 				max_requests_ko_per_day: 0,
+				concurrency: 0,
 			};
 			let from_snapshot =
 				soft_limit_reached(Some(snap.requests_today), Some(snap.max_requests_per_day));
