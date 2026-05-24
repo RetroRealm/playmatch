@@ -13,6 +13,7 @@ use redis::AsyncCommands;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering};
@@ -84,11 +85,14 @@ struct Account {
 	concurrency: AtomicUsize,
 	permits: Arc<Semaphore>,
 	redis_key: String,
+	quota_redis_key: String,
 }
 
 impl Account {
 	fn new(id: String, password: String) -> Self {
-		let redis_key = format!("{REDIS_KEY_PREFIX}{}:exhausted_until", sha256_hex(&id));
+		let hashed = sha256_hex(&id);
+		let redis_key = format!("{REDIS_KEY_PREFIX}{hashed}:exhausted_until");
+		let quota_redis_key = format!("{REDIS_KEY_PREFIX}{hashed}:quota");
 		Self {
 			id,
 			password,
@@ -97,8 +101,17 @@ impl Account {
 			concurrency: AtomicUsize::new(1),
 			permits: Arc::new(Semaphore::new(1)),
 			redis_key,
+			quota_redis_key,
 		}
 	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct QuotaSnapshot {
+	requests_today: u64,
+	max_requests_per_day: u64,
+	requests_today_ko: u64,
+	max_requests_per_day_ko: u64,
 }
 
 pub struct ScreenScraperClient {
@@ -540,7 +553,7 @@ impl ScreenScraperClient {
 		if self.accounts.is_empty() {
 			return Ok(None);
 		}
-		self.refresh_exhaustion_mirrors().await;
+		self.refresh_account_state_from_redis().await;
 		let now = now_unix_secs();
 		let mut available: Vec<&Arc<Account>> = self
 			.accounts
@@ -559,22 +572,62 @@ impl ScreenScraperClient {
 		Ok(Some(picked))
 	}
 
-	async fn refresh_exhaustion_mirrors(&self) {
+	async fn refresh_account_state_from_redis(&self) {
 		if self.accounts.is_empty() {
 			return;
 		}
 		let mut conn = self.redis_conn.clone();
 		let now = now_unix_secs();
 		for a in &self.accounts {
+			if a.exhausted_until_unix.load(Ordering::Relaxed) <= now {
+				let val: Result<Option<String>, _> = conn.get(&a.redis_key).await;
+				if let Ok(Some(raw)) = val
+					&& let Ok(ts) = raw.parse::<i64>()
+					&& ts > now
+				{
+					a.exhausted_until_unix.store(ts, Ordering::Relaxed);
+				}
+			}
+
 			if a.exhausted_until_unix.load(Ordering::Relaxed) > now {
 				continue;
 			}
-			let val: Result<Option<String>, _> = conn.get(&a.redis_key).await;
-			if let Ok(Some(raw)) = val
-				&& let Ok(ts) = raw.parse::<i64>()
-				&& ts > now
+
+			let snap_raw: Result<Option<String>, _> = conn.get(&a.quota_redis_key).await;
+			if let Ok(Some(raw)) = snap_raw
+				&& let Ok(snapshot) = serde_json::from_str::<QuotaSnapshot>(&raw)
 			{
-				a.exhausted_until_unix.store(ts, Ordering::Relaxed);
+				let ok_hit = soft_limit_reached(
+					Some(snapshot.requests_today),
+					Some(snapshot.max_requests_per_day),
+				);
+				let ko_hit = soft_limit_reached(
+					Some(snapshot.requests_today_ko),
+					Some(snapshot.max_requests_per_day_ko),
+				);
+				if ok_hit || ko_hit {
+					let reset = next_paris_midnight_unix(now);
+					a.exhausted_until_unix.store(reset, Ordering::Relaxed);
+					crate::metrics::record_screenscraper_quota_exhaustion(if ok_hit {
+						"ok_soft_limit_restored"
+					} else {
+						"ko_soft_limit_restored"
+					});
+					warn!(
+						"screenscraper account flagged exhausted from persisted snapshot ({}/{} ok, {}/{} ko)",
+						snapshot.requests_today,
+						snapshot.max_requests_per_day,
+						snapshot.requests_today_ko,
+						snapshot.max_requests_per_day_ko
+					);
+					let ttl = (reset - now).max(60) as u64;
+					let mut c = conn.clone();
+					let key = a.redis_key.clone();
+					let value = reset.to_string();
+					tokio::spawn(async move {
+						let _: Result<(), _> = c.set_ex(&key, value, ttl).await;
+					});
+				}
 			}
 		}
 	}
@@ -595,13 +648,21 @@ impl ScreenScraperClient {
 
 	fn update_quota_from(&self, account: &Account, user: &Option<SsUser>) {
 		let Some(user) = user else { return };
+		let snapshot = QuotaSnapshot {
+			requests_today: parsed_u64(user.requeststoday.as_deref()).unwrap_or(0),
+			max_requests_per_day: parsed_u64(user.maxrequestsperday.as_deref()).unwrap_or(0),
+			requests_today_ko: parsed_u64(user.requeststodayko.as_deref()).unwrap_or(0),
+			max_requests_per_day_ko: parsed_u64(user.maxrequestskoperday.as_deref()).unwrap_or(0),
+		};
+		self.persist_quota_snapshot(account, &snapshot);
+
 		let ok_hit = soft_limit_reached(
-			parsed_u64(user.requeststoday.as_deref()),
-			parsed_u64(user.maxrequestsperday.as_deref()),
+			Some(snapshot.requests_today),
+			Some(snapshot.max_requests_per_day),
 		);
 		let ko_hit = soft_limit_reached(
-			parsed_u64(user.requeststodayko.as_deref()),
-			parsed_u64(user.maxrequestskoperday.as_deref()),
+			Some(snapshot.requests_today_ko),
+			Some(snapshot.max_requests_per_day_ko),
 		);
 		if !ok_hit && !ko_hit {
 			return;
@@ -622,6 +683,20 @@ impl ScreenScraperClient {
 		let mut conn = self.redis_conn.clone();
 		let key = account.redis_key.clone();
 		let value = reset.to_string();
+		tokio::spawn(async move {
+			let _: Result<(), _> = conn.set_ex(&key, value, ttl).await;
+		});
+	}
+
+	fn persist_quota_snapshot(&self, account: &Account, snapshot: &QuotaSnapshot) {
+		let Ok(value) = serde_json::to_string(snapshot) else {
+			return;
+		};
+		let now = now_unix_secs();
+		let reset = next_paris_midnight_unix(now);
+		let ttl = (reset - now).max(60) as u64;
+		let mut conn = self.redis_conn.clone();
+		let key = account.quota_redis_key.clone();
 		tokio::spawn(async move {
 			let _: Result<(), _> = conn.set_ex(&key, value, ttl).await;
 		});
@@ -1133,5 +1208,52 @@ mod tests {
 		let mut available: Vec<&Arc<Account>> = pool.iter().collect();
 		available.sort_by_key(|x| x.last_used_at_unix.load(Ordering::Relaxed));
 		assert!(Arc::ptr_eq(available[0], &b));
+	}
+
+	#[test]
+	fn account_has_distinct_redis_keys_for_exhaustion_and_quota() {
+		let acc = Account::new("user42".into(), "pw".into());
+		assert!(acc.redis_key.ends_with(":exhausted_until"));
+		assert!(acc.quota_redis_key.ends_with(":quota"));
+		assert_ne!(acc.redis_key, acc.quota_redis_key);
+		assert!(acc.redis_key.starts_with(REDIS_KEY_PREFIX));
+		assert!(acc.quota_redis_key.starts_with(REDIS_KEY_PREFIX));
+	}
+
+	#[test]
+	fn quota_snapshot_round_trips_through_json() {
+		let snap = QuotaSnapshot {
+			requests_today: 19_000,
+			max_requests_per_day: 20_000,
+			requests_today_ko: 630,
+			max_requests_per_day_ko: 2_000,
+		};
+		let raw = serde_json::to_string(&snap).expect("serialize");
+		let back: QuotaSnapshot = serde_json::from_str(&raw).expect("deserialize");
+		assert_eq!(snap, back);
+	}
+
+	#[test]
+	fn quota_snapshot_soft_limit_re_check_matches_runtime_check() {
+		fn check(today: u64, max: u64) -> bool {
+			let snap = QuotaSnapshot {
+				requests_today: today,
+				max_requests_per_day: max,
+				requests_today_ko: 0,
+				max_requests_per_day_ko: 0,
+			};
+			let from_snapshot =
+				soft_limit_reached(Some(snap.requests_today), Some(snap.max_requests_per_day));
+			let u = user_with(Some(&today.to_string()), Some(&max.to_string()), None, None);
+			let from_runtime = soft_limit_reached(
+				parsed_u64(u.requeststoday.as_deref()),
+				parsed_u64(u.maxrequestsperday.as_deref()),
+			);
+			assert_eq!(from_snapshot, from_runtime);
+			from_snapshot
+		}
+		assert!(!check(9_400, 10_000));
+		assert!(check(9_500, 10_000));
+		assert!(check(9_600, 10_000));
 	}
 }
