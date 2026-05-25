@@ -79,6 +79,7 @@ impl TheGamesDbClient {
 
 	pub(crate) fn reset_cycle_counter(&self) {
 		self.per_cycle_calls.store(0, Ordering::Relaxed);
+		crate::metrics::set_thegamesdb_cycle_calls(0);
 	}
 }
 

@@ -1,4 +1,6 @@
-use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry};
+use prometheus::{
+	HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry,
+};
 use std::sync::OnceLock;
 
 static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -25,6 +27,8 @@ static METADATA_REQUEST_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static PROVIDER_CONCURRENCY_CONFIGURED: OnceLock<IntGaugeVec> = OnceLock::new();
 static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static THEGAMESDB_API_CALLS: OnceLock<IntCounterVec> = OnceLock::new();
+static THEGAMESDB_CYCLE_CALLS: OnceLock<IntGauge> = OnceLock::new();
+static THEGAMESDB_REMAINING_ALLOWANCE: OnceLock<IntGauge> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -321,6 +325,26 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(thegamesdb_api_calls)
 		.map_err(|_| anyhow::anyhow!("thegamesdb api metrics already initialised"))?;
 
+	let thegamesdb_cycle_calls = IntGauge::new(
+		"api_thegamesdb_cycle_calls_current",
+		"TheGamesDB outbound calls used in the current daily match cycle (capped at PER_CYCLE_CAP)",
+	)?;
+	registry.register(Box::new(thegamesdb_cycle_calls.clone()))?;
+	THEGAMESDB_CYCLE_CALLS
+		.set(thegamesdb_cycle_calls)
+		.map_err(|_| anyhow::anyhow!("thegamesdb cycle calls metrics already initialised"))?;
+
+	let thegamesdb_remaining_allowance = IntGauge::new(
+		"api_thegamesdb_remaining_allowance",
+		"TheGamesDB remaining monthly API allowance reported by upstream (-1 when unknown)",
+	)?;
+	registry.register(Box::new(thegamesdb_remaining_allowance.clone()))?;
+	THEGAMESDB_REMAINING_ALLOWANCE
+		.set(thegamesdb_remaining_allowance)
+		.map_err(|_| {
+			anyhow::anyhow!("thegamesdb remaining allowance metrics already initialised")
+		})?;
+
 	Ok(())
 }
 
@@ -488,6 +512,18 @@ pub fn set_provider_concurrency_configured(provider: &str, value: i64) {
 pub fn record_cross_match_attempt(provider: &str, outcome: &str) {
 	if let Some(counter) = CROSS_MATCH_ATTEMPTS.get() {
 		counter.with_label_values(&[provider, outcome]).inc();
+	}
+}
+
+pub fn set_thegamesdb_cycle_calls(value: u32) {
+	if let Some(gauge) = THEGAMESDB_CYCLE_CALLS.get() {
+		gauge.set(value as i64);
+	}
+}
+
+pub fn set_thegamesdb_remaining_allowance(value: i32) {
+	if let Some(gauge) = THEGAMESDB_REMAINING_ALLOWANCE.get() {
+		gauge.set(value as i64);
 	}
 }
 

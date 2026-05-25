@@ -112,6 +112,7 @@ impl TheGamesDbClient {
 			Ok(Some(raw)) => match raw.parse::<i32>() {
 				Ok(v) => {
 					self.remaining_allowance.store(v, Ordering::Relaxed);
+					crate::metrics::set_thegamesdb_remaining_allowance(v);
 					Ok(v)
 				}
 				Err(_) => self.probe_remaining_allowance(api_key).await,
@@ -133,6 +134,7 @@ impl TheGamesDbClient {
 
 	async fn write_remaining_allowance(&self, value: i32) {
 		self.remaining_allowance.store(value, Ordering::Relaxed);
+		crate::metrics::set_thegamesdb_remaining_allowance(value);
 		let mut redis_conn = self.redis_conn.clone();
 		if let Err(e) = redis_conn
 			.set_ex(
@@ -151,8 +153,10 @@ impl TheGamesDbClient {
 		if prev >= Self::PER_CYCLE_CAP {
 			self.per_cycle_calls
 				.store(Self::PER_CYCLE_CAP, Ordering::Relaxed);
+			crate::metrics::set_thegamesdb_cycle_calls(Self::PER_CYCLE_CAP);
 			false
 		} else {
+			crate::metrics::set_thegamesdb_cycle_calls(prev + 1);
 			true
 		}
 	}
