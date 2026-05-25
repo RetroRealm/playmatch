@@ -141,9 +141,9 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let metadata_requests = IntCounterVec::new(
 		Opts::new(
 			"api_metadata_request_total",
-			"Metadata-provider outbound requests by provider, endpoint and result",
+			"Metadata-provider outbound requests by provider, endpoint, HTTP status class and numeric status code",
 		),
-		&["provider", "endpoint", "result"],
+		&["provider", "endpoint", "status_class", "status_code"],
 	)?;
 	registry.register(Box::new(metadata_requests.clone()))?;
 	METADATA_REQUESTS
@@ -153,12 +153,12 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let metadata_request_duration = HistogramVec::new(
 		HistogramOpts::new(
 			"api_metadata_request_duration_seconds",
-			"Metadata-provider outbound request duration in seconds, by provider and endpoint",
+			"Metadata-provider outbound request duration in seconds, by provider, endpoint, HTTP status class and numeric status code",
 		)
 		.buckets(vec![
 			0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0,
 		]),
-		&["provider", "endpoint"],
+		&["provider", "endpoint", "status_class", "status_code"],
 	)?;
 	registry.register(Box::new(metadata_request_duration.clone()))?;
 	METADATA_REQUEST_DURATION
@@ -370,17 +370,18 @@ pub fn record_background_job(job: &str, result: &str, duration_seconds: f64) {
 pub fn record_metadata_request(
 	provider: &str,
 	endpoint: &str,
-	result: &str,
+	status_class: &str,
+	status_code: &str,
 	duration_seconds: f64,
 ) {
 	if let Some(counter) = METADATA_REQUESTS.get() {
 		counter
-			.with_label_values(&[provider, endpoint, result])
+			.with_label_values(&[provider, endpoint, status_class, status_code])
 			.inc();
 	}
 	if let Some(histogram) = METADATA_REQUEST_DURATION.get() {
 		histogram
-			.with_label_values(&[provider, endpoint])
+			.with_label_values(&[provider, endpoint, status_class, status_code])
 			.observe(duration_seconds);
 	}
 }

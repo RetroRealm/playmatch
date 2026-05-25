@@ -1211,14 +1211,29 @@ impl IgdbClient {
 		limit_clause: Option<&str>,
 	) -> anyhow::Result<T> {
 		let started = std::time::Instant::now();
+		let mut observed_code: Option<u16> = None;
 		let result = self
-			.do_request_parsed_inner::<T>(method, path, fields_clause, where_clause, limit_clause)
+			.do_request_parsed_inner::<T>(
+				method,
+				path,
+				fields_clause,
+				where_clause,
+				limit_clause,
+				&mut observed_code,
+			)
 			.await;
-		let outcome = if result.is_ok() { "success" } else { "error" };
+		let (status_class, status_code) = match observed_code {
+			Some(code) => (
+				crate::http::abstraction::classify_status(code),
+				code.to_string(),
+			),
+			None => ("network_error", "none".to_string()),
+		};
 		crate::metrics::record_metadata_request(
 			"igdb",
 			path,
-			outcome,
+			status_class,
+			&status_code,
 			started.elapsed().as_secs_f64(),
 		);
 		result
@@ -1231,6 +1246,7 @@ impl IgdbClient {
 		fields_clause: Option<&str>,
 		where_clause: Option<&str>,
 		limit_clause: Option<&str>,
+		observed_code: &mut Option<u16>,
 	) -> anyhow::Result<T> {
 		self.refresh_token_if_needed().await?;
 
@@ -1270,6 +1286,7 @@ impl IgdbClient {
 		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
 		// Bind the future to a local so the MutexGuard drops before .await.
 		let res = rate_limited_future.await?;
+		*observed_code = Some(res.status().as_u16());
 
 		let body = res.text().await?;
 		if log::log_enabled!(log::Level::Debug) {

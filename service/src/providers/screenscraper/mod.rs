@@ -377,16 +377,21 @@ impl ScreenScraperClient {
 		let started = std::time::Instant::now();
 		let sanitised_url = url_for_log(&url);
 		let result = self.execute_get(url).await;
-		let outcome = match &result {
-			Ok((status, _, _, _)) if status.is_success() => "success",
-			Ok((status, _, _, _)) if *status == StatusCode::NOT_FOUND => "not_found",
-			Ok(_) => "error",
-			Err(_) => "error",
+		let (status_class, status_code) = match &result {
+			Ok((status, _, _, _)) => {
+				let code = status.as_u16();
+				(
+					crate::http::abstraction::classify_status(code),
+					code.to_string(),
+				)
+			}
+			Err(_) => ("network_error", "none".to_string()),
 		};
 		crate::metrics::record_metadata_request(
 			"screenscraper",
 			endpoint_label,
-			outcome,
+			status_class,
+			&status_code,
 			started.elapsed().as_secs_f64(),
 		);
 

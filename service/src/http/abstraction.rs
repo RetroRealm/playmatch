@@ -9,6 +9,32 @@ pub const MAX_RETRIES: usize = 3;
 const BACKOFF_MS: &[u64] = &[250, 500, 1000];
 const JITTER_MAX_MS: u64 = 100;
 
+/// Maps a numeric HTTP status code to a coarse class label suitable for a
+/// Prometheus label value.
+pub fn classify_status(code: u16) -> &'static str {
+	match code {
+		100..=199 => "1xx",
+		200..=299 => "2xx",
+		300..=399 => "3xx",
+		400..=499 => "4xx",
+		_ => "5xx",
+	}
+}
+
+/// Maps an outbound HTTP outcome to a Prometheus-friendly `(status_class,
+/// status_code)` pair. Status code is "none" when no response landed (the
+/// request errored before a server reply).
+pub fn classify_http_outcome(result: &Result<Response, reqwest::Error>) -> (&'static str, String) {
+	match result {
+		Ok(res) => {
+			let code = res.status().as_u16();
+			(classify_status(code), code.to_string())
+		}
+		Err(e) if e.is_timeout() => ("timeout", "none".to_string()),
+		Err(_) => ("network_error", "none".to_string()),
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
 	provider: &'static str,
@@ -147,6 +173,24 @@ mod tests {
 		assert_eq!(base_for(3, 5), 1000);
 		assert_eq!(base_for(2, 5), 1000);
 		assert_eq!(base_for(1, 5), 1000);
+	}
+
+	#[test]
+	fn classify_status_buckets_known_codes() {
+		assert_eq!(classify_status(100), "1xx");
+		assert_eq!(classify_status(200), "2xx");
+		assert_eq!(classify_status(204), "2xx");
+		assert_eq!(classify_status(301), "3xx");
+		assert_eq!(classify_status(404), "4xx");
+		assert_eq!(classify_status(429), "4xx");
+		assert_eq!(classify_status(500), "5xx");
+		assert_eq!(classify_status(503), "5xx");
+	}
+
+	#[test]
+	fn classify_status_treats_unknown_high_codes_as_server_error() {
+		assert_eq!(classify_status(600), "5xx");
+		assert_eq!(classify_status(999), "5xx");
 	}
 }
 

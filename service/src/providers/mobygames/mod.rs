@@ -163,20 +163,30 @@ impl MobyGamesClient {
 		url: Url,
 	) -> anyhow::Result<T> {
 		let started = std::time::Instant::now();
-		let result = self.execute_get::<T>(url).await.and_then(|(status, body)| {
+		let raw = self.execute_get::<T>(url).await;
+		let (status_class, status_code) = match &raw {
+			Ok((status, _)) => {
+				let code = status.as_u16();
+				(
+					crate::http::abstraction::classify_status(code),
+					code.to_string(),
+				)
+			}
+			Err(_) => ("network_error", "none".to_string()),
+		};
+		crate::metrics::record_metadata_request(
+			"mobygames",
+			endpoint_label,
+			status_class,
+			&status_code,
+			started.elapsed().as_secs_f64(),
+		);
+		raw.and_then(|(status, body)| {
 			if !status.is_success() {
 				return Err(anyhow!("mobygames returned non-success status: {status}"));
 			}
 			body.ok_or_else(|| anyhow!("mobygames returned empty body on success"))
-		});
-		let outcome = if result.is_ok() { "success" } else { "error" };
-		crate::metrics::record_metadata_request(
-			"mobygames",
-			endpoint_label,
-			outcome,
-			started.elapsed().as_secs_f64(),
-		);
-		result
+		})
 	}
 
 	/// 404 maps to `Ok(None)`. Other non-success statuses are errors.
@@ -187,16 +197,21 @@ impl MobyGamesClient {
 	) -> anyhow::Result<Option<T>> {
 		let started = std::time::Instant::now();
 		let result = self.execute_get::<T>(url).await;
-		let outcome = match &result {
-			Ok((status, _)) if status.is_success() => "success",
-			Ok((status, _)) if *status == StatusCode::NOT_FOUND => "not_found",
-			Ok(_) => "error",
-			Err(_) => "error",
+		let (status_class, status_code) = match &result {
+			Ok((status, _)) => {
+				let code = status.as_u16();
+				(
+					crate::http::abstraction::classify_status(code),
+					code.to_string(),
+				)
+			}
+			Err(_) => ("network_error", "none".to_string()),
 		};
 		crate::metrics::record_metadata_request(
 			"mobygames",
 			endpoint_label,
-			outcome,
+			status_class,
+			&status_code,
 			started.elapsed().as_secs_f64(),
 		);
 		match result? {

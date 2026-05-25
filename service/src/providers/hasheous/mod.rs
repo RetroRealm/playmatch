@@ -87,10 +87,12 @@ impl HasheousClient {
 		debug!("hasheous request: {} {}", req.method(), url_for_log.path());
 
 		let started = std::time::Instant::now();
+		let mut observed_code: Option<u16> = None;
 		let result: anyhow::Result<HashLookupOutcome> = async {
 			let inflight = self.service.lock().await.ready().await?.call(req);
 			let res = inflight.await?;
 			let status = res.status();
+			observed_code = Some(status.as_u16());
 			if status == StatusCode::NOT_FOUND {
 				return Ok(HashLookupOutcome::NotFound);
 			}
@@ -109,15 +111,18 @@ impl HasheousClient {
 		}
 		.await;
 
-		let outcome = match &result {
-			Ok(HashLookupOutcome::Hit(_)) => "success",
-			Ok(HashLookupOutcome::NotFound) => "not_found",
-			Err(_) => "error",
+		let (status_class, status_code) = match observed_code {
+			Some(code) => (
+				crate::http::abstraction::classify_status(code),
+				code.to_string(),
+			),
+			None => ("network_error", "none".to_string()),
 		};
 		crate::metrics::record_metadata_request(
 			"hasheous",
 			endpoint_label,
-			outcome,
+			status_class,
+			&status_code,
 			started.elapsed().as_secs_f64(),
 		);
 		result

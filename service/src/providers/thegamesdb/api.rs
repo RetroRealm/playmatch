@@ -176,9 +176,11 @@ impl TheGamesDbClient {
 		debug!("tgdb request: {} {}", req.method(), url_for_log.path());
 
 		let started = Instant::now();
+		let mut observed_code: Option<u16> = None;
 		let result: anyhow::Result<T> = async {
 			let res = self.execute(req).await?;
 			let status = res.status();
+			observed_code = Some(status.as_u16());
 			let body = res.text().await?;
 			if !status.is_success() {
 				return Err(anyhow!(
@@ -195,11 +197,18 @@ impl TheGamesDbClient {
 		}
 		.await;
 
-		let outcome = if result.is_ok() { "success" } else { "error" };
+		let (status_class, status_code) = match observed_code {
+			Some(code) => (
+				crate::http::abstraction::classify_status(code),
+				code.to_string(),
+			),
+			None => ("network_error", "none".to_string()),
+		};
 		crate::metrics::record_metadata_request(
 			"thegamesdb",
 			endpoint_label,
-			outcome,
+			status_class,
+			&status_code,
 			started.elapsed().as_secs_f64(),
 		);
 		result
