@@ -16,6 +16,7 @@ use service::providers::screenscraper::model::{SsGame, SsSystem};
 fn bail_if_ss_quota_exhausted(client: &ScreenScraperClient) -> error::Result<()> {
 	if client.is_quota_exhausted() {
 		return Err(error::Error::UpstreamUnavailable {
+			provider: "screenscraper",
 			message: "screenscraper quota exhausted".into(),
 			retry_after_secs: client.secs_until_recovery(),
 		});

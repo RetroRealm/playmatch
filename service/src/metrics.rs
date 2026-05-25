@@ -38,6 +38,8 @@ static IDENTIFY_LATENCY: OnceLock<HistogramVec> = OnceLock::new();
 static IDENTIFY_HIT_POSITION: OnceLock<IntCounterVec> = OnceLock::new();
 static AUTH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static AUTH_LATENCY: OnceLock<HistogramVec> = OnceLock::new();
+static UPSTREAM_UNAVAILABLE: OnceLock<IntCounterVec> = OnceLock::new();
+static BUILDER_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -465,6 +467,30 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(auth_latency)
 		.map_err(|_| anyhow::anyhow!("auth latency metrics already initialised"))?;
 
+	let upstream_unavailable = IntCounterVec::new(
+		Opts::new(
+			"api_upstream_unavailable_total",
+			"503 responses caused by an unavailable upstream provider, by provider",
+		),
+		&["provider"],
+	)?;
+	registry.register(Box::new(upstream_unavailable.clone()))?;
+	UPSTREAM_UNAVAILABLE
+		.set(upstream_unavailable)
+		.map_err(|_| anyhow::anyhow!("upstream unavailable metrics already initialised"))?;
+
+	let builder_errors = IntCounterVec::new(
+		Opts::new(
+			"api_builder_errors_total",
+			"Builder validation errors labelled by builder and failing field",
+		),
+		&["builder", "field"],
+	)?;
+	registry.register(Box::new(builder_errors.clone()))?;
+	BUILDER_ERRORS
+		.set(builder_errors)
+		.map_err(|_| anyhow::anyhow!("builder errors metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -708,6 +734,18 @@ pub fn observe_auth_latency(outcome: &str, duration_seconds: f64) {
 		histogram
 			.with_label_values(&[outcome])
 			.observe(duration_seconds);
+	}
+}
+
+pub fn record_upstream_unavailable(provider: &str) {
+	if let Some(counter) = UPSTREAM_UNAVAILABLE.get() {
+		counter.with_label_values(&[provider]).inc();
+	}
+}
+
+pub fn record_builder_error(builder: &str, field: &str) {
+	if let Some(counter) = BUILDER_ERRORS.get() {
+		counter.with_label_values(&[builder, field]).inc();
 	}
 }
 

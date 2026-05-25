@@ -30,6 +30,7 @@ pub enum Error {
 
 	#[error("{message}")]
 	UpstreamUnavailable {
+		provider: &'static str,
 		message: String,
 		retry_after_secs: Option<u64>,
 	},
@@ -100,6 +101,7 @@ impl ResponseError for Error {
 	fn error_response(&self) -> HttpResponse {
 		let (status, label) = self.status_and_metric();
 		service::metrics::record_service_error(label);
+		self.record_extra_metrics();
 
 		if status.is_server_error() && !matches!(self, Self::UpstreamUnavailable { .. }) {
 			log::error!("HTTP {} ({label}): {self}", status.as_u16());
@@ -115,6 +117,43 @@ impl ResponseError for Error {
 		}
 		builder.body(self.to_string())
 	}
+}
+
+impl Error {
+	fn record_extra_metrics(&self) {
+		match self {
+			Self::UpstreamUnavailable { provider, .. } => {
+				service::metrics::record_upstream_unavailable(provider);
+			}
+			Self::ServiceError(ServiceError::SignatureMetadataMappingInputBuilderError(e)) => {
+				service::metrics::record_builder_error("mapping", &builder_failed_field(e));
+			}
+			Self::ServiceError(ServiceError::UpdatedMatchResultBuilderError(e)) => {
+				service::metrics::record_builder_error("updated_match", &builder_failed_field(e));
+			}
+			Self::ServiceError(ServiceError::GameAndRelationsResultBuilderError(e)) => {
+				service::metrics::record_builder_error(
+					"game_and_relations",
+					&builder_failed_field(e),
+				);
+			}
+			_ => {}
+		}
+	}
+}
+
+/// derive_builder's UninitializedField Display is `Field not initialized: foo`.
+/// Extract `foo` for the Prometheus label; fall back to `unknown` for any other
+/// builder error shape so cardinality stays bounded.
+fn builder_failed_field(err: &dyn std::fmt::Display) -> String {
+	let msg = err.to_string();
+	if let Some(rest) = msg.strip_prefix("Field not initialized: ") {
+		return rest.trim().to_string();
+	}
+	if let Some((_, after)) = msg.split_once(':') {
+		return after.trim().to_string();
+	}
+	"unknown".to_string()
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
