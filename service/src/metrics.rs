@@ -33,6 +33,7 @@ static THEGAMESDB_REMAINING_ALLOWANCE: OnceLock<IntGauge> = OnceLock::new();
 static EXTERNAL_SUGGESTION_QUEUE_DEPTH: OnceLock<IntGauge> = OnceLock::new();
 static HTTP_RATE_LIMIT_REJECTED: OnceLock<IntCounterVec> = OnceLock::new();
 static HTTP_REQUESTS_INFLIGHT: OnceLock<IntGaugeVec> = OnceLock::new();
+static DB_POOL_CONNECTIONS: OnceLock<IntGaugeVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -394,6 +395,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(http_requests_inflight)
 		.map_err(|_| anyhow::anyhow!("http requests inflight metrics already initialised"))?;
 
+	let db_pool_connections = IntGaugeVec::new(
+		Opts::new(
+			"api_db_pool_connections",
+			"Postgres connection pool size by state (total, idle, active, max)",
+		),
+		&["state"],
+	)?;
+	registry.register(Box::new(db_pool_connections.clone()))?;
+	DB_POOL_CONNECTIONS
+		.set(db_pool_connections)
+		.map_err(|_| anyhow::anyhow!("db pool metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -603,6 +616,12 @@ pub fn http_requests_inflight_inc(route: &str, method: &str) {
 pub fn http_requests_inflight_dec(route: &str, method: &str) {
 	if let Some(gauge) = HTTP_REQUESTS_INFLIGHT.get() {
 		gauge.with_label_values(&[route, method]).dec();
+	}
+}
+
+pub fn set_db_pool_connections(state: &str, value: i64) {
+	if let Some(gauge) = DB_POOL_CONNECTIONS.get() {
+		gauge.with_label_values(&[state]).set(value);
 	}
 }
 

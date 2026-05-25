@@ -178,6 +178,8 @@ async fn start() -> anyhow::Result<()> {
 	let conn = Database::connect(opt).await?;
 	Migrator::up(&conn, None).await?;
 
+	spawn_db_pool_metrics(conn.clone());
+
 	let sched = JobScheduler::new().await?;
 
 	// Install the API key pepper before the server accepts requests. Missing or
@@ -502,6 +504,28 @@ pub fn main() {
 	if let Some(err) = result.err() {
 		println!("Error: {err}");
 	}
+}
+
+/// Background task that samples the sqlx pool every 10 seconds and updates the
+/// `api_db_pool_connections{state=...}` gauge. Lets dashboards alert on pool
+/// saturation without external probing.
+fn spawn_db_pool_metrics(conn: sea_orm::DatabaseConnection) {
+	tokio::spawn(async move {
+		let pool = conn.get_postgres_connection_pool().clone();
+		let max = pool.options().get_max_connections() as i64;
+		service::metrics::set_db_pool_connections("max", max);
+		let mut ticker = tokio::time::interval(Duration::from_secs(10));
+		ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+		loop {
+			ticker.tick().await;
+			let total = pool.size() as i64;
+			let idle = pool.num_idle() as i64;
+			let active = (total - idle).max(0);
+			service::metrics::set_db_pool_connections("total", total);
+			service::metrics::set_db_pool_connections("idle", idle);
+			service::metrics::set_db_pool_connections("active", active);
+		}
+	});
 }
 
 /// Returns `None` when developer credentials are absent so self-hosters can
