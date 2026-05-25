@@ -36,6 +36,8 @@ static HTTP_REQUESTS_INFLIGHT: OnceLock<IntGaugeVec> = OnceLock::new();
 static DB_POOL_CONNECTIONS: OnceLock<IntGaugeVec> = OnceLock::new();
 static IDENTIFY_LATENCY: OnceLock<HistogramVec> = OnceLock::new();
 static IDENTIFY_HIT_POSITION: OnceLock<IntCounterVec> = OnceLock::new();
+static AUTH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
+static AUTH_LATENCY: OnceLock<HistogramVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -436,6 +438,33 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(identify_hit_position)
 		.map_err(|_| anyhow::anyhow!("identify hit position metrics already initialised"))?;
 
+	let auth_attempts = IntCounterVec::new(
+		Opts::new(
+			"api_auth_attempts_total",
+			"Authentication outcomes labelled by reason (success, missing_header, unknown_token, permission_denied)",
+		),
+		&["outcome"],
+	)?;
+	registry.register(Box::new(auth_attempts.clone()))?;
+	AUTH_ATTEMPTS
+		.set(auth_attempts)
+		.map_err(|_| anyhow::anyhow!("auth attempts metrics already initialised"))?;
+
+	let auth_latency = HistogramVec::new(
+		HistogramOpts::new(
+			"api_auth_latency_seconds",
+			"Authentication call latency labelled by outcome",
+		)
+		.buckets(vec![
+			0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5,
+		]),
+		&["outcome"],
+	)?;
+	registry.register(Box::new(auth_latency.clone()))?;
+	AUTH_LATENCY
+		.set(auth_latency)
+		.map_err(|_| anyhow::anyhow!("auth latency metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -665,6 +694,20 @@ pub fn observe_identify_latency(result: &str, duration_seconds: f64) {
 pub fn record_identify_hit_position(hash_type: &str) {
 	if let Some(counter) = IDENTIFY_HIT_POSITION.get() {
 		counter.with_label_values(&[hash_type]).inc();
+	}
+}
+
+pub fn record_auth_attempt(outcome: &str) {
+	if let Some(counter) = AUTH_ATTEMPTS.get() {
+		counter.with_label_values(&[outcome]).inc();
+	}
+}
+
+pub fn observe_auth_latency(outcome: &str, duration_seconds: f64) {
+	if let Some(histogram) = AUTH_LATENCY.get() {
+		histogram
+			.with_label_values(&[outcome])
+			.observe(duration_seconds);
 	}
 }
 

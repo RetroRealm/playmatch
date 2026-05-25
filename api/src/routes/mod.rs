@@ -32,39 +32,55 @@ async fn handle_auth_and_permissions(
 ) -> error::Result<entity::user::Model> {
 	// One message for every auth failure path; distinct bodies would leak whether a token exists.
 	const INVALID_AUTH_BODY: &str = "Invalid or missing credentials.";
+	let started = std::time::Instant::now();
+	let finish = |outcome: &'static str| {
+		service::metrics::record_auth_attempt(outcome);
+		service::metrics::observe_auth_latency(outcome, started.elapsed().as_secs_f64());
+	};
 
-	let token = req
+	let token = match req
 		.headers()
 		.get("Authorization")
 		.and_then(|h| h.to_str().ok())
 		.and_then(|h| h.strip_prefix("Bearer "))
 		.filter(|t| !t.is_empty())
-		.ok_or_else(|| InvalidAuth(INVALID_AUTH_BODY.to_string()))?;
-
-	let user = get_user_by_api_key(token.to_string(), db_conn.get_ref())
-		.await?
-		.ok_or_else(|| InvalidAuth(INVALID_AUTH_BODY.to_string()))?;
-
-	match required_user_perms {
-		UserPermissionsEnum::User => Ok(user),
-		UserPermissionsEnum::Trusted
-			if [
-				UserPermissionsEnum::Trusted,
-				UserPermissionsEnum::Automation,
-				UserPermissionsEnum::Admin,
-			]
-			.contains(&user.permissions) =>
-		{
-			Ok(user)
+	{
+		Some(t) => t,
+		None => {
+			finish("missing_header");
+			return Err(InvalidAuth(INVALID_AUTH_BODY.to_string()));
 		}
-		UserPermissionsEnum::Automation
-			if user.permissions == UserPermissionsEnum::Automation
-				|| user.permissions == UserPermissionsEnum::Admin =>
-		{
-			Ok(user)
+	};
+
+	let user = match get_user_by_api_key(token.to_string(), db_conn.get_ref()).await? {
+		Some(u) => u,
+		None => {
+			finish("unknown_token");
+			return Err(InvalidAuth(INVALID_AUTH_BODY.to_string()));
 		}
-		UserPermissionsEnum::Admin if user.permissions == UserPermissionsEnum::Admin => Ok(user),
-		_ => Err(InvalidAuthPermission),
+	};
+
+	let permitted = match required_user_perms {
+		UserPermissionsEnum::User => true,
+		UserPermissionsEnum::Trusted => [
+			UserPermissionsEnum::Trusted,
+			UserPermissionsEnum::Automation,
+			UserPermissionsEnum::Admin,
+		]
+		.contains(&user.permissions),
+		UserPermissionsEnum::Automation => {
+			user.permissions == UserPermissionsEnum::Automation
+				|| user.permissions == UserPermissionsEnum::Admin
+		}
+		UserPermissionsEnum::Admin => user.permissions == UserPermissionsEnum::Admin,
+	};
+
+	if permitted {
+		finish("success");
+		Ok(user)
+	} else {
+		finish("permission_denied");
+		Err(InvalidAuthPermission)
 	}
 }
 
