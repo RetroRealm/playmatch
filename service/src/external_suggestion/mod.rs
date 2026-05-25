@@ -102,6 +102,7 @@ pub async fn enqueue_external_suggestion(
 	user_agent: Option<String>,
 ) -> ServiceResult<EnqueueOutcome> {
 	let len = redis_conn.llen(QUEUE_KEY).await.unwrap_or(0);
+	crate::metrics::set_external_suggestion_queue_depth(len as i64);
 	if len >= QUEUE_SOFT_CAP {
 		warn!("external suggestion queue soft cap reached at {len}, dropping payload");
 		return Ok(EnqueueOutcome::QueueFull);
@@ -114,6 +115,7 @@ pub async fn enqueue_external_suggestion(
 	};
 	let encoded = serde_json::to_string(&envelope)?;
 	redis_conn.rpush(QUEUE_KEY, encoded).await?;
+	crate::metrics::set_external_suggestion_queue_depth((len + 1) as i64);
 	Ok(EnqueueOutcome::Accepted)
 }
 
@@ -150,6 +152,9 @@ pub async fn drain_external_suggestions(
 	redis_conn: &mut MultiplexedConnection,
 ) -> ServiceResult<DrainStats> {
 	let mut stats = DrainStats::default();
+
+	let len_at_start = redis_conn.llen(QUEUE_KEY).await.unwrap_or(0);
+	crate::metrics::set_external_suggestion_queue_depth(len_at_start as i64);
 
 	// Typed AsyncTypedCommands::lpop with a count returns Value; drop to the cmd
 	// builder for a clean Vec<String>.
@@ -199,6 +204,9 @@ pub async fn drain_external_suggestions(
 			stats.record(outcome);
 		}
 	}
+
+	let remaining = redis_conn.llen(QUEUE_KEY).await.unwrap_or(0);
+	crate::metrics::set_external_suggestion_queue_depth(remaining as i64);
 
 	Ok(stats)
 }

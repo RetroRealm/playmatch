@@ -30,6 +30,7 @@ static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static THEGAMESDB_API_CALLS: OnceLock<IntCounterVec> = OnceLock::new();
 static THEGAMESDB_CYCLE_CALLS: OnceLock<IntGauge> = OnceLock::new();
 static THEGAMESDB_REMAINING_ALLOWANCE: OnceLock<IntGauge> = OnceLock::new();
+static EXTERNAL_SUGGESTION_QUEUE_DEPTH: OnceLock<IntGauge> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -358,6 +359,15 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 			anyhow::anyhow!("thegamesdb remaining allowance metrics already initialised")
 		})?;
 
+	let external_suggestion_queue_depth = IntGauge::new(
+		"api_external_suggestion_queue_depth",
+		"Current depth of the Redis-backed external suggestion queue (LLEN)",
+	)?;
+	registry.register(Box::new(external_suggestion_queue_depth.clone()))?;
+	EXTERNAL_SUGGESTION_QUEUE_DEPTH
+		.set(external_suggestion_queue_depth)
+		.map_err(|_| anyhow::anyhow!("external suggestion queue metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -543,6 +553,12 @@ pub fn set_thegamesdb_cycle_calls(value: u32) {
 pub fn set_thegamesdb_remaining_allowance(value: i32) {
 	if let Some(gauge) = THEGAMESDB_REMAINING_ALLOWANCE.get() {
 		gauge.set(value as i64);
+	}
+}
+
+pub fn set_external_suggestion_queue_depth(depth: i64) {
+	if let Some(gauge) = EXTERNAL_SUGGESTION_QUEUE_DEPTH.get() {
+		gauge.set(depth);
 	}
 }
 
