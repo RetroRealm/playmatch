@@ -144,7 +144,10 @@ impl ScreenScraperClient {
 
 		let account = user.map(|(id, pw)| Arc::new(Account::new(id, pw)));
 
-		crate::metrics::set_screenscraper_concurrency(if account.is_some() { 1 } else { 0 });
+		crate::metrics::set_provider_concurrency_configured(
+			"screenscraper",
+			if account.is_some() { 1 } else { 0 },
+		);
 		Ok(Self {
 			client,
 			service: Mutex::new(service),
@@ -376,6 +379,7 @@ impl ScreenScraperClient {
 	) -> anyhow::Result<Option<SsEnvelope<T>>> {
 		let started = std::time::Instant::now();
 		let sanitised_url = url_for_log(&url);
+		let _inflight = crate::http::abstraction::InflightGuard::new("screenscraper");
 		let result = self.execute_get(url).await;
 		let (status_class, status_code) = match &result {
 			Ok((status, _, _, _)) => {
@@ -744,13 +748,13 @@ fn apply_concurrency(account: &Account, target: usize) {
 	if target > current {
 		account.permits.add_permits(target - current);
 		account.concurrency.store(target, Ordering::Relaxed);
-		crate::metrics::set_screenscraper_concurrency(target as i64);
+		crate::metrics::set_provider_concurrency_configured("screenscraper", target as i64);
 		info!("screenscraper concurrency raised to {target} (was {current})");
 	} else if target < current {
 		let asked = current - target;
 		let removed = account.permits.forget_permits(asked);
 		account.concurrency.store(target, Ordering::Relaxed);
-		crate::metrics::set_screenscraper_concurrency(target as i64);
+		crate::metrics::set_provider_concurrency_configured("screenscraper", target as i64);
 		if removed < asked {
 			drain_excess_permits(account.permits.clone(), asked - removed);
 			info!(

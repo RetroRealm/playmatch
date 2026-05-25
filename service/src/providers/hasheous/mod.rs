@@ -48,6 +48,11 @@ impl HasheousClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
+		crate::metrics::set_provider_concurrency_configured(
+			"hasheous",
+			crate::providers::DEFAULT_CHUNK_SIZE as i64,
+		);
+
 		Ok(Self {
 			client,
 			service: Mutex::new(service),
@@ -87,6 +92,7 @@ impl HasheousClient {
 		debug!("hasheous request: {} {}", req.method(), url_for_log.path());
 
 		let started = std::time::Instant::now();
+		let _inflight = crate::http::abstraction::InflightGuard::new("hasheous");
 		let mut observed_code: Option<u16> = None;
 		let result: anyhow::Result<HashLookupOutcome> = async {
 			let inflight = self.service.lock().await.ready().await?.call(req);

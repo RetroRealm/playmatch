@@ -47,6 +47,11 @@ impl TheGamesDbClient {
 			.layer(retry_layer)
 			.service(http.clone());
 
+		crate::metrics::set_provider_concurrency_configured(
+			"thegamesdb",
+			crate::providers::DEFAULT_CHUNK_SIZE as i64,
+		);
+
 		Ok(Self {
 			http,
 			service: Mutex::new(service),

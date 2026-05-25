@@ -49,6 +49,11 @@ impl EmuReadyClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
+		crate::metrics::set_provider_concurrency_configured(
+			"emuready",
+			crate::providers::DEFAULT_CHUNK_SIZE as i64,
+		);
+
 		Ok(Self {
 			client,
 			service: Mutex::new(service),
@@ -116,6 +121,7 @@ impl EmuReadyClient {
 		debug!("emuready request: {} {}", req.method(), url_for_log.path());
 
 		let started = std::time::Instant::now();
+		let _inflight = crate::http::abstraction::InflightGuard::new("emuready");
 		let mut observed_code: Option<u16> = None;
 		let result: anyhow::Result<T> = async {
 			let rate_limited_future = self.service.lock().await.ready().await?.call(req);

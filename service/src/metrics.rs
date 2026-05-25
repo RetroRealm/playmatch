@@ -1,6 +1,4 @@
-use prometheus::{
-	HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts, Registry,
-};
+use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry};
 use std::sync::OnceLock;
 
 static CACHE_EVENTS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -22,7 +20,8 @@ static LAUNCHBOX_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static OPENVGDB_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static RETROACHIEVEMENTS_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_QUOTA_EXHAUSTION: OnceLock<IntCounterVec> = OnceLock::new();
-static SCREENSCRAPER_CONCURRENCY: OnceLock<IntGauge> = OnceLock::new();
+static METADATA_REQUEST_INFLIGHT: OnceLock<IntGaugeVec> = OnceLock::new();
+static PROVIDER_CONCURRENCY_CONFIGURED: OnceLock<IntGaugeVec> = OnceLock::new();
 static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static THEGAMESDB_API_CALLS: OnceLock<IntCounterVec> = OnceLock::new();
 
@@ -261,14 +260,29 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(screenscraper_quota_exhaustion)
 		.map_err(|_| anyhow::anyhow!("screenscraper quota metrics already initialised"))?;
 
-	let screenscraper_concurrency = IntGauge::new(
-		"api_screenscraper_concurrency_permits",
-		"Current ScreenScraper adaptive concurrency permit count",
+	let metadata_request_inflight = IntGaugeVec::new(
+		Opts::new(
+			"api_metadata_request_inflight",
+			"Current outbound metadata-provider HTTP requests in flight per provider",
+		),
+		&["provider"],
 	)?;
-	registry.register(Box::new(screenscraper_concurrency.clone()))?;
-	SCREENSCRAPER_CONCURRENCY
-		.set(screenscraper_concurrency)
-		.map_err(|_| anyhow::anyhow!("screenscraper concurrency metrics already initialised"))?;
+	registry.register(Box::new(metadata_request_inflight.clone()))?;
+	METADATA_REQUEST_INFLIGHT
+		.set(metadata_request_inflight)
+		.map_err(|_| anyhow::anyhow!("metadata request inflight metrics already initialised"))?;
+
+	let provider_concurrency_configured = IntGaugeVec::new(
+		Opts::new(
+			"api_provider_concurrency_configured",
+			"Configured concurrency cap per metadata provider (static or last-known dynamic value)",
+		),
+		&["provider"],
+	)?;
+	registry.register(Box::new(provider_concurrency_configured.clone()))?;
+	PROVIDER_CONCURRENCY_CONFIGURED
+		.set(provider_concurrency_configured)
+		.map_err(|_| anyhow::anyhow!("provider concurrency metrics already initialised"))?;
 
 	let cross_match_attempts = IntCounterVec::new(
 		Opts::new(
@@ -434,9 +448,21 @@ pub fn record_screenscraper_quota_exhaustion(trigger: &str) {
 	}
 }
 
-pub fn set_screenscraper_concurrency(permits: i64) {
-	if let Some(gauge) = SCREENSCRAPER_CONCURRENCY.get() {
-		gauge.set(permits);
+pub fn metadata_request_inflight_inc(provider: &str) {
+	if let Some(gauge) = METADATA_REQUEST_INFLIGHT.get() {
+		gauge.with_label_values(&[provider]).inc();
+	}
+}
+
+pub fn metadata_request_inflight_dec(provider: &str) {
+	if let Some(gauge) = METADATA_REQUEST_INFLIGHT.get() {
+		gauge.with_label_values(&[provider]).dec();
+	}
+}
+
+pub fn set_provider_concurrency_configured(provider: &str, value: i64) {
+	if let Some(gauge) = PROVIDER_CONCURRENCY_CONFIGURED.get() {
+		gauge.with_label_values(&[provider]).set(value);
 	}
 }
 

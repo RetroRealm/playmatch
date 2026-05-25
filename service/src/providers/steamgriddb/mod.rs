@@ -49,6 +49,11 @@ impl SteamGridDbClient {
 			.layer(retry_layer)
 			.service(client.clone());
 
+		crate::metrics::set_provider_concurrency_configured(
+			"steamgriddb",
+			crate::providers::DEFAULT_CHUNK_SIZE as i64,
+		);
+
 		Ok(Self {
 			client,
 			bearer,
@@ -231,6 +236,7 @@ impl SteamGridDbClient {
 		url: Url,
 	) -> anyhow::Result<T> {
 		let started = std::time::Instant::now();
+		let _inflight = crate::http::abstraction::InflightGuard::new("steamgriddb");
 		let raw = self.execute_get::<T>(url).await;
 		let (status_class, status_code) = match &raw {
 			Ok((status, _)) => {
@@ -264,6 +270,7 @@ impl SteamGridDbClient {
 		url: Url,
 	) -> anyhow::Result<Option<T>> {
 		let started = std::time::Instant::now();
+		let _inflight = crate::http::abstraction::InflightGuard::new("steamgriddb");
 		let result = self.execute_get::<T>(url).await;
 		let (status_class, status_code) = match &result {
 			Ok((status, _)) => {

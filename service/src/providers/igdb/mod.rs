@@ -125,6 +125,11 @@ impl IgdbClient {
 
 		oauth2_client = oauth2_client.set_auth_type(RequestBody);
 
+		crate::metrics::set_provider_concurrency_configured(
+			"igdb",
+			crate::providers::DEFAULT_CHUNK_SIZE as i64,
+		);
+
 		Ok(Self {
 			client,
 			client_id,
@@ -1211,6 +1216,7 @@ impl IgdbClient {
 		limit_clause: Option<&str>,
 	) -> anyhow::Result<T> {
 		let started = std::time::Instant::now();
+		let _inflight = crate::http::abstraction::InflightGuard::new("igdb");
 		let mut observed_code: Option<u16> = None;
 		let result = self
 			.do_request_parsed_inner::<T>(

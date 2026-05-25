@@ -9,6 +9,24 @@ pub const MAX_RETRIES: usize = 3;
 const BACKOFF_MS: &[u64] = &[250, 500, 1000];
 const JITTER_MAX_MS: u64 = 100;
 
+/// RAII handle that increments the per-provider in-flight gauge on creation
+/// and decrements it on drop. Use it so the gauge is restored on early return
+/// or panic.
+pub struct InflightGuard(&'static str);
+
+impl InflightGuard {
+	pub fn new(provider: &'static str) -> Self {
+		crate::metrics::metadata_request_inflight_inc(provider);
+		Self(provider)
+	}
+}
+
+impl Drop for InflightGuard {
+	fn drop(&mut self) {
+		crate::metrics::metadata_request_inflight_dec(self.0);
+	}
+}
+
 /// Maps a numeric HTTP status code to a coarse class label suitable for a
 /// Prometheus label value.
 pub fn classify_status(code: u16) -> &'static str {

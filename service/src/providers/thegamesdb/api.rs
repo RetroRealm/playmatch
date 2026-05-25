@@ -176,6 +176,7 @@ impl TheGamesDbClient {
 		debug!("tgdb request: {} {}", req.method(), url_for_log.path());
 
 		let started = Instant::now();
+		let _inflight = crate::http::abstraction::InflightGuard::new("thegamesdb");
 		let mut observed_code: Option<u16> = None;
 		let result: anyhow::Result<T> = async {
 			let res = self.execute(req).await?;
