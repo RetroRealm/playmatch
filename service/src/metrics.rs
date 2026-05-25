@@ -34,6 +34,8 @@ static EXTERNAL_SUGGESTION_QUEUE_DEPTH: OnceLock<IntGauge> = OnceLock::new();
 static HTTP_RATE_LIMIT_REJECTED: OnceLock<IntCounterVec> = OnceLock::new();
 static HTTP_REQUESTS_INFLIGHT: OnceLock<IntGaugeVec> = OnceLock::new();
 static DB_POOL_CONNECTIONS: OnceLock<IntGaugeVec> = OnceLock::new();
+static IDENTIFY_LATENCY: OnceLock<HistogramVec> = OnceLock::new();
+static IDENTIFY_HIT_POSITION: OnceLock<IntCounterVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -407,6 +409,33 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(db_pool_connections)
 		.map_err(|_| anyhow::anyhow!("db pool metrics already initialised"))?;
 
+	let identify_latency = HistogramVec::new(
+		HistogramOpts::new(
+			"api_identify_latency_seconds",
+			"End-to-end latency of the identify pipeline, by overall result (hit or no_match)",
+		)
+		.buckets(vec![
+			0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0,
+		]),
+		&["result"],
+	)?;
+	registry.register(Box::new(identify_latency.clone()))?;
+	IDENTIFY_LATENCY
+		.set(identify_latency)
+		.map_err(|_| anyhow::anyhow!("identify latency metrics already initialised"))?;
+
+	let identify_hit_position = IntCounterVec::new(
+		Opts::new(
+			"api_identify_hit_position_total",
+			"Identify hits labelled by the hash type that produced the hit",
+		),
+		&["hash_type"],
+	)?;
+	registry.register(Box::new(identify_hit_position.clone()))?;
+	IDENTIFY_HIT_POSITION
+		.set(identify_hit_position)
+		.map_err(|_| anyhow::anyhow!("identify hit position metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -622,6 +651,20 @@ pub fn http_requests_inflight_dec(route: &str, method: &str) {
 pub fn set_db_pool_connections(state: &str, value: i64) {
 	if let Some(gauge) = DB_POOL_CONNECTIONS.get() {
 		gauge.with_label_values(&[state]).set(value);
+	}
+}
+
+pub fn observe_identify_latency(result: &str, duration_seconds: f64) {
+	if let Some(histogram) = IDENTIFY_LATENCY.get() {
+		histogram
+			.with_label_values(&[result])
+			.observe(duration_seconds);
+	}
+}
+
+pub fn record_identify_hit_position(hash_type: &str) {
+	if let Some(counter) = IDENTIFY_HIT_POSITION.get() {
+		counter.with_label_values(&[hash_type]).inc();
 	}
 }
 

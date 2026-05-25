@@ -122,6 +122,7 @@ async fn identify_game(
 	redis_conn: &mut MultiplexedConnection,
 	db_conn: &DbConn,
 ) -> anyhow::Result<CacheStatus<Option<(GameMatchType, IdentifyEntry)>>> {
+	let started = std::time::Instant::now();
 	let expected_count = [
 		search.sha256.as_ref(),
 		search.sha1.as_ref(),
@@ -188,6 +189,8 @@ async fn identify_game(
 
 		if let ControlFlow::Break(result) = agg.observe(match_type, outcome) {
 			debug!("Identify resolved on match type {match_type:?}");
+			crate::metrics::record_identify_hit_position(match_type.metric_label());
+			crate::metrics::observe_identify_latency("hit", started.elapsed().as_secs_f64());
 			return Ok(result);
 		}
 	}
@@ -196,6 +199,7 @@ async fn identify_game(
 	if matches!(result, Cached(None)) {
 		debug!("All possible game matches were cached as empty, returning cached no-match");
 	}
+	crate::metrics::observe_identify_latency("no_match", started.elapsed().as_secs_f64());
 	Ok(result)
 }
 
