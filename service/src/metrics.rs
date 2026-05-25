@@ -12,6 +12,7 @@ static MATCH_RUNG_OUTCOMES: OnceLock<IntCounterVec> = OnceLock::new();
 static METADATA_TOKEN_REFRESHES: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_RUNS: OnceLock<IntCounterVec> = OnceLock::new();
 static BACKGROUND_JOB_DURATION: OnceLock<HistogramVec> = OnceLock::new();
+static BACKGROUND_JOB_LAST_SUCCESS: OnceLock<IntGaugeVec> = OnceLock::new();
 static METADATA_REQUESTS: OnceLock<IntCounterVec> = OnceLock::new();
 static METADATA_REQUEST_DURATION: OnceLock<HistogramVec> = OnceLock::new();
 static DAT_INGESTION_FILES: OnceLock<IntCounterVec> = OnceLock::new();
@@ -141,6 +142,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	BACKGROUND_JOB_DURATION
 		.set(background_job_duration)
 		.map_err(|_| anyhow::anyhow!("background job duration metrics already initialised"))?;
+
+	let background_job_last_success = IntGaugeVec::new(
+		Opts::new(
+			"api_background_job_last_success_unixtime",
+			"Unix timestamp of the last successful completion of each background job",
+		),
+		&["job"],
+	)?;
+	registry.register(Box::new(background_job_last_success.clone()))?;
+	BACKGROUND_JOB_LAST_SUCCESS
+		.set(background_job_last_success)
+		.map_err(|_| anyhow::anyhow!("background job last success metrics already initialised"))?;
 
 	let metadata_requests = IntCounterVec::new(
 		Opts::new(
@@ -415,6 +428,12 @@ pub fn record_background_job(job: &str, result: &str, duration_seconds: f64) {
 		histogram
 			.with_label_values(&[job])
 			.observe(duration_seconds);
+	}
+	if result == "success"
+		&& let Some(gauge) = BACKGROUND_JOB_LAST_SUCCESS.get()
+		&& let Ok(now) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+	{
+		gauge.with_label_values(&[job]).set(now.as_secs() as i64);
 	}
 }
 
