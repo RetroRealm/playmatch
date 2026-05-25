@@ -21,6 +21,7 @@ static OPENVGDB_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static RETROACHIEVEMENTS_IMPORT_RECORDS: OnceLock<IntCounterVec> = OnceLock::new();
 static SCREENSCRAPER_QUOTA_EXHAUSTION: OnceLock<IntCounterVec> = OnceLock::new();
 static METADATA_REQUEST_INFLIGHT: OnceLock<IntGaugeVec> = OnceLock::new();
+static METADATA_REQUEST_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static PROVIDER_CONCURRENCY_CONFIGURED: OnceLock<IntGaugeVec> = OnceLock::new();
 static CROSS_MATCH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static THEGAMESDB_API_CALLS: OnceLock<IntCounterVec> = OnceLock::new();
@@ -272,6 +273,18 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(metadata_request_inflight)
 		.map_err(|_| anyhow::anyhow!("metadata request inflight metrics already initialised"))?;
 
+	let metadata_request_attempts = IntCounterVec::new(
+		Opts::new(
+			"api_metadata_request_attempts_total",
+			"HTTP attempts per metadata request labeled by per-attempt outcome (initial, retry, giveup)",
+		),
+		&["provider", "outcome"],
+	)?;
+	registry.register(Box::new(metadata_request_attempts.clone()))?;
+	METADATA_REQUEST_ATTEMPTS
+		.set(metadata_request_attempts)
+		.map_err(|_| anyhow::anyhow!("metadata request attempts metrics already initialised"))?;
+
 	let provider_concurrency_configured = IntGaugeVec::new(
 		Opts::new(
 			"api_provider_concurrency_configured",
@@ -457,6 +470,12 @@ pub fn metadata_request_inflight_inc(provider: &str) {
 pub fn metadata_request_inflight_dec(provider: &str) {
 	if let Some(gauge) = METADATA_REQUEST_INFLIGHT.get() {
 		gauge.with_label_values(&[provider]).dec();
+	}
+}
+
+pub fn record_metadata_request_attempt(provider: &str, outcome: &str) {
+	if let Some(counter) = METADATA_REQUEST_ATTEMPTS.get() {
+		counter.with_label_values(&[provider, outcome]).inc();
 	}
 }
 

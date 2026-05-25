@@ -109,9 +109,18 @@ impl<E: std::fmt::Display> Policy<Request, Response, E> for RetryPolicy {
 			Ok(res) => res.status().is_server_error(),
 		};
 		let attempt_done = self.max - self.remaining + 1;
+		let attempt_kind = if self.remaining == self.max {
+			"initial"
+		} else {
+			"retry"
+		};
 		match decide_retry(self.remaining, self.max, is_retryable) {
-			RetryDecision::Skip => None,
+			RetryDecision::Skip => {
+				crate::metrics::record_metadata_request_attempt(self.provider, attempt_kind);
+				None
+			}
 			RetryDecision::Exhausted => {
+				crate::metrics::record_metadata_request_attempt(self.provider, "giveup");
 				let cause = match result {
 					Err(e) => format!("network error: {e}"),
 					Ok(res) => format!("HTTP {}", res.status().as_u16()),
@@ -125,6 +134,7 @@ impl<E: std::fmt::Display> Policy<Request, Response, E> for RetryPolicy {
 				None
 			}
 			RetryDecision::Retry { delay_ms } => {
+				crate::metrics::record_metadata_request_attempt(self.provider, attempt_kind);
 				let cause = match result {
 					Err(e) => format!("network error: {e}"),
 					Ok(res) => format!("HTTP {}", res.status().as_u16()),
