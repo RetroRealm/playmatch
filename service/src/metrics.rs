@@ -31,6 +31,8 @@ static THEGAMESDB_API_CALLS: OnceLock<IntCounterVec> = OnceLock::new();
 static THEGAMESDB_CYCLE_CALLS: OnceLock<IntGauge> = OnceLock::new();
 static THEGAMESDB_REMAINING_ALLOWANCE: OnceLock<IntGauge> = OnceLock::new();
 static EXTERNAL_SUGGESTION_QUEUE_DEPTH: OnceLock<IntGauge> = OnceLock::new();
+static HTTP_RATE_LIMIT_REJECTED: OnceLock<IntCounterVec> = OnceLock::new();
+static HTTP_REQUESTS_INFLIGHT: OnceLock<IntGaugeVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -368,6 +370,30 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(external_suggestion_queue_depth)
 		.map_err(|_| anyhow::anyhow!("external suggestion queue metrics already initialised"))?;
 
+	let http_rate_limit_rejected = IntCounterVec::new(
+		Opts::new(
+			"api_http_rate_limit_rejected_total",
+			"Incoming HTTP requests rejected by the rate limiter, labelled by client classification",
+		),
+		&["client_classification"],
+	)?;
+	registry.register(Box::new(http_rate_limit_rejected.clone()))?;
+	HTTP_RATE_LIMIT_REJECTED
+		.set(http_rate_limit_rejected)
+		.map_err(|_| anyhow::anyhow!("http rate limit rejected metrics already initialised"))?;
+
+	let http_requests_inflight = IntGaugeVec::new(
+		Opts::new(
+			"api_http_requests_inflight",
+			"Current in-flight inbound HTTP requests, labelled by matched route template and method",
+		),
+		&["route", "method"],
+	)?;
+	registry.register(Box::new(http_requests_inflight.clone()))?;
+	HTTP_REQUESTS_INFLIGHT
+		.set(http_requests_inflight)
+		.map_err(|_| anyhow::anyhow!("http requests inflight metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -559,6 +585,24 @@ pub fn set_thegamesdb_remaining_allowance(value: i32) {
 pub fn set_external_suggestion_queue_depth(depth: i64) {
 	if let Some(gauge) = EXTERNAL_SUGGESTION_QUEUE_DEPTH.get() {
 		gauge.set(depth);
+	}
+}
+
+pub fn record_http_rate_limit_rejected(client_classification: &str) {
+	if let Some(counter) = HTTP_RATE_LIMIT_REJECTED.get() {
+		counter.with_label_values(&[client_classification]).inc();
+	}
+}
+
+pub fn http_requests_inflight_inc(route: &str, method: &str) {
+	if let Some(gauge) = HTTP_REQUESTS_INFLIGHT.get() {
+		gauge.with_label_values(&[route, method]).inc();
+	}
+}
+
+pub fn http_requests_inflight_dec(route: &str, method: &str) {
+	if let Some(gauge) = HTTP_REQUESTS_INFLIGHT.get() {
+		gauge.with_label_values(&[route, method]).dec();
 	}
 }
 

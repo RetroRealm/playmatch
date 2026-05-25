@@ -1,4 +1,4 @@
-use crate::middleware::user_agent_metric;
+use crate::middleware::http_request_metrics;
 use crate::openapi::create_openapi;
 use crate::routes::company::{get_all_companies, get_company_by_id};
 use crate::routes::game::{get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id};
@@ -319,7 +319,7 @@ async fn start() -> anyhow::Result<()> {
 		app.service(
 			scope("/api")
 				.wrap(Governor::new(&governor_conf))
-				.wrap(from_fn(user_agent_metric))
+				.wrap(from_fn(http_request_metrics))
 				.wrap(
 					Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
 						.log_level(Level::Debug),

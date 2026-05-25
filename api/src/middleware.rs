@@ -1,10 +1,14 @@
 use actix_web::Error;
 use actix_web::body::MessageBody;
 use actix_web::dev::{ServiceRequest, ServiceResponse};
+use actix_web::http::StatusCode;
 use actix_web::middleware::Next;
-use service::metrics::record_user_agent;
+use service::metrics::{
+	http_requests_inflight_dec, http_requests_inflight_inc, record_http_rate_limit_rejected,
+	record_user_agent,
+};
 
-pub async fn user_agent_metric<B: MessageBody>(
+pub async fn http_request_metrics<B: MessageBody>(
 	req: ServiceRequest,
 	next: Next<B>,
 ) -> Result<ServiceResponse<B>, Error> {
@@ -16,7 +20,33 @@ pub async fn user_agent_metric<B: MessageBody>(
 	let (product, version) = classify_user_agent(ua);
 	record_user_agent(product, &version);
 
-	next.call(req).await
+	let route = req.match_pattern().unwrap_or_else(|| "UNKNOWN".to_string());
+	let method = req.method().as_str().to_string();
+	let _guard = InflightGuard::new(route, method);
+
+	let res = next.call(req).await?;
+	if res.status() == StatusCode::TOO_MANY_REQUESTS {
+		record_http_rate_limit_rejected(product);
+	}
+	Ok(res)
+}
+
+struct InflightGuard {
+	route: String,
+	method: String,
+}
+
+impl InflightGuard {
+	fn new(route: String, method: String) -> Self {
+		http_requests_inflight_inc(&route, &method);
+		Self { route, method }
+	}
+}
+
+impl Drop for InflightGuard {
+	fn drop(&mut self) {
+		http_requests_inflight_dec(&self.route, &self.method);
+	}
 }
 
 fn classify_user_agent(ua: &str) -> (&'static str, String) {
