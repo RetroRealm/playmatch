@@ -10,6 +10,10 @@ ignore = [
 	# -> utoipa-gen. No safe upgrade path until utoipa 5 lands across our
 	# dependent crates.
 	"RUSTSEC-2024-0370",
+	# proc-macro-error2 unmaintained. Pulled in transitively via sea-orm
+	# -> sea-orm-macros -> sea-bae. No replacement until sea-orm moves off
+	# it upstream.
+	"RUSTSEC-2026-0173",
 ]
 
 [licenses]
