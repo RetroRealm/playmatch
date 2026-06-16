@@ -22,6 +22,7 @@ pub mod platform;
 pub mod retroachievements;
 pub mod screenscraper;
 pub mod sgdb;
+pub mod signature_group;
 pub mod suggestion;
 pub mod user;
 

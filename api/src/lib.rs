@@ -5,6 +5,7 @@ use crate::routes::game::{
 	get_game_file_history_by_id, get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id,
 };
 use crate::routes::health::{health, ready};
+use crate::routes::signature_group::{get_all_signature_groups, get_signature_group_by_id};
 use crate::routes::identify::{identify_game_and_relations, identify_game_with_metadata_ids};
 use crate::routes::igdb::{
 	get_igdb_age_rating_by_id, get_igdb_age_rating_categories_by_ids,
@@ -872,6 +873,8 @@ fn configure_public_api_routes(
 		.service(get_company_by_id)
 		.service(get_all_platforms)
 		.service(get_platform_by_id)
+		.service(get_all_signature_groups)
+		.service(get_signature_group_by_id)
 		.service(identify_game_with_metadata_ids)
 		.service(identify_game_and_relations)
 		.service(get_playmatch_game_by_id)

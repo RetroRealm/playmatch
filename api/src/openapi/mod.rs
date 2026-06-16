@@ -104,6 +104,9 @@ use crate::routes::mobygames::{
 };
 use crate::routes::openvgdb::{__path_get_ovgdb_release_by_id, __path_get_ovgdb_rom_by_hash};
 use crate::routes::platform::{__path_get_all_platforms, __path_get_platform_by_id};
+use crate::routes::signature_group::{
+	__path_get_all_signature_groups, __path_get_signature_group_by_id,
+};
 use crate::routes::retroachievements::{
 	__path_get_ra_game_by_hash, __path_get_ra_game_by_id, __path_list_ra_systems,
 	__path_search_ra_games,
@@ -377,6 +380,8 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		get_company_by_id,
 		get_all_platforms,
 		get_platform_by_id,
+		get_all_signature_groups,
+		get_signature_group_by_id,
 		get_sgdb_game_by_id,
 		get_sgdb_game_by_platform,
 		search_sgdb_games,
