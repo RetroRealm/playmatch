@@ -5,6 +5,7 @@ pub use super::dat_file::Entity as DatFile;
 pub use super::dat_file_import::Entity as DatFileImport;
 pub use super::game::Entity as Game;
 pub use super::game_file::Entity as GameFile;
+pub use super::game_file_presence::Entity as GameFilePresence;
 pub use super::launchbox_game::Entity as LaunchboxGame;
 pub use super::launchbox_game_alternate_name::Entity as LaunchboxGameAlternateName;
 pub use super::launchbox_game_image::Entity as LaunchboxGameImage;

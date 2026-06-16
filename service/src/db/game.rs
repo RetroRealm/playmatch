@@ -6,7 +6,7 @@ use ::entity::{
 };
 use chrono::{Duration, NaiveDateTime, Utc};
 use entity::sea_orm_active_enums::{FailedMatchReasonEnum, MatchTypeEnum, MetadataProviderEnum};
-use entity::{company, dat_file, dat_file_import, platform, signature_group};
+use entity::{company, dat_file, dat_file_import, game_file_presence, platform, signature_group};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Alias, Expr};
@@ -79,6 +79,23 @@ pub async fn find_all_relations_of_game(
 		company,
 		game_files,
 	))
+}
+
+/// The dat file imports this hash was observed in, newest first.
+pub async fn get_game_file_presence_history(
+	game_file_id: Uuid,
+	conn: &DbConn,
+) -> Result<Vec<dat_file_import::Model>, DbErr> {
+	let rows = game_file_presence::Entity::find()
+		.filter(game_file_presence::Column::GameFileId.eq(game_file_id))
+		.find_also_related(dat_file_import::Entity)
+		.all(conn)
+		.await?;
+
+	let mut imports: Vec<dat_file_import::Model> =
+		rows.into_iter().filter_map(|(_, import)| import).collect();
+	imports.sort_by_key(|import| std::cmp::Reverse(import.imported_at));
+	Ok(imports)
 }
 
 /// Insert a new game parsed from a dat file under the given import id.
@@ -253,8 +270,14 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 	input: SimpleExpr,
 	conn: &DbConn,
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	// A hash can match several rows (for example after a No-Intro rename leaves
+	// the old retired entry alongside the new current one). Prefer the row that
+	// is still current, with a stable id tiebreaker, so the answer is
+	// deterministic across identical requests.
 	let game_file = GameFile::find()
 		.filter(input)
+		.order_by_desc(game_file::Column::IsCurrent)
+		.order_by_asc(game_file::Column::Id)
 		.find_also_related(Game)
 		.one(conn)
 		.await?;

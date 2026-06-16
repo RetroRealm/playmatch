@@ -83,6 +83,8 @@ mod tests {
 				created_at: chrono::Utc::now().fixed_offset(),
 				updated_at: chrono::Utc::now().fixed_offset(),
 				signature_group_internal_clone_of_id: None,
+				last_seen_dat_file_import_id: None,
+				is_current: true,
 			},
 			metadata_mappings: Vec::new(),
 		}

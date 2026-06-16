@@ -3,6 +3,7 @@ use crate::db::dat_file::{DatFileCreateOrUpdateInput, create_or_update_dat_file}
 use crate::db::dat_file_import::create_dat_file_import;
 use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
 use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
+use crate::db::lifecycle::reconcile_dat_file_lifecycle;
 use crate::db::platform::create_or_find_platform_by_name;
 use crate::ingestion::parser::model::{Datafile, Game};
 use crate::ingestion::parser::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
@@ -20,6 +21,13 @@ use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::task;
 use tokio::task::JoinHandle;
+
+/// What a single game contributed to an import: its id and the ids of files
+/// that already existed and are still present in this version.
+struct GamePresence {
+	game_id: Uuid,
+	present_existing_file_ids: Vec<Uuid>,
+}
 
 pub async fn parse_and_import_dat_file(
 	path: &Path,
@@ -66,6 +74,9 @@ pub async fn parse_and_import_dat_file(
 	)
 	.await?;
 
+	let mut all_game_ids: Vec<Uuid> = Vec::new();
+	let mut present_existing_file_ids: Vec<Uuid> = Vec::new();
+
 	if let Some(games) = dat.game {
 		let games_chunked = games
 			.chunks(*PARALLELISM)
@@ -73,7 +84,7 @@ pub async fn parse_and_import_dat_file(
 			.collect::<Vec<Vec<Game>>>();
 
 		for game_chunk in games_chunked {
-			let mut futures: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
+			let mut futures: Vec<JoinHandle<anyhow::Result<GamePresence>>> = vec![];
 
 			for game in game_chunk {
 				let conn = conn.clone();
@@ -117,6 +128,10 @@ pub async fn parse_and_import_dat_file(
 							})
 							.collect();
 
+						// Files still present in this import. Vanished files are no
+						// longer deleted; the reconciliation pass retires them so the
+						// hash is never lost.
+						let mut present_file_ids = Vec::new();
 						for file in existing_files.iter() {
 							let identifier = (
 								&file.file_name,
@@ -126,8 +141,8 @@ pub async fn parse_and_import_dat_file(
 								&file.sha1,
 								&file.sha256,
 							);
-							if !new_files_set.contains(&identifier) {
-								file.clone().into_active_model().delete(&conn).await?;
+							if new_files_set.contains(&identifier) {
+								present_file_ids.push(file.id);
 							}
 						}
 
@@ -149,28 +164,47 @@ pub async fn parse_and_import_dat_file(
 
 						// When we insert too many sqlx-postgres panics, so we chunk the inserts
 						for chunk in to_insert.chunks(*PARALLELISM) {
-							insert_game_file_bulk(chunk.to_vec(), existing_game.id, &conn).await?;
+							insert_game_file_bulk(chunk.to_vec(), existing_game.id, import.id, &conn)
+								.await?;
 						}
 
-						return Ok(());
+						return Ok(GamePresence {
+							game_id: existing_game.id,
+							present_existing_file_ids: present_file_ids,
+						});
 					}
 
 					let game_release = insert_game(import.id, game.clone(), &conn).await?;
 
 					// When we insert too many sqlx-postgres panics, so we chunk the inserts
 					for chunk in game.rom.chunks(*PARALLELISM) {
-						insert_game_file_bulk(chunk.to_vec(), game_release.id, &conn).await?;
+						insert_game_file_bulk(chunk.to_vec(), game_release.id, import.id, &conn)
+							.await?;
 					}
 
-					Ok(())
+					Ok(GamePresence {
+						game_id: game_release.id,
+						present_existing_file_ids: Vec::new(),
+					})
 				}));
 			}
 
 			for future in futures {
-				future.await??;
+				let presence = future.await??;
+				all_game_ids.push(presence.game_id);
+				present_existing_file_ids.extend(presence.present_existing_file_ids);
 			}
 		}
 	}
+
+	reconcile_dat_file_lifecycle(
+		import.dat_file_id,
+		import.id,
+		&present_existing_file_ids,
+		&all_game_ids,
+		conn,
+	)
+	.await?;
 
 	Ok(())
 }

@@ -7,6 +7,7 @@ pub mod dat_file;
 pub mod dat_file_import;
 pub mod game;
 pub mod game_file;
+pub mod game_file_presence;
 pub mod launchbox_game;
 pub mod launchbox_game_alternate_name;
 pub mod launchbox_game_image;

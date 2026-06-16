@@ -15,6 +15,8 @@ pub struct Model {
 	pub signature_group_id: Uuid,
 	pub tags: Option<Vec<String>>,
 	pub subset: Option<String>,
+	#[serde(default)]
+	pub latest_dat_file_import_id: Option<Uuid>,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 }

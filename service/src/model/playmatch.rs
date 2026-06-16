@@ -150,6 +150,17 @@ pub struct PlaymatchGame {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub clone_of: Option<Uuid>,
 
+	/// Whether this game is still present in the current version of its dat file.
+	pub current_in_latest_dat: bool,
+
+	/// Version string of the last dat file release this game was seen in.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub last_seen_dat_version: Option<String>,
+
+	/// Id of the last dat file import this game was seen in.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub last_seen_dat_file_import_id: Option<Uuid>,
+
 	/// When the game was created inside playmatch.
 	pub created_at: DateTime<Utc>,
 
@@ -196,6 +207,17 @@ pub struct PlaymatchGameFile {
 	/// Optional serial number of the rom file, if applicable.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub serial: Option<String>,
+
+	/// Whether this hash is still present in the current version of its dat file.
+	pub current_in_latest_dat: bool,
+
+	/// Version string of the last dat file release this hash was seen in.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub last_seen_dat_version: Option<String>,
+
+	/// Id of the last dat file import this hash was seen in.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub last_seen_dat_file_import_id: Option<Uuid>,
 
 	/// When the game file was created inside playmatch.
 	pub created_at: DateTime<Utc>,
@@ -257,6 +279,9 @@ impl From<entity::game::Model> for PlaymatchGame {
 			description: value.description,
 			categories: value.categories,
 			clone_of: value.clone_of,
+			current_in_latest_dat: value.is_current,
+			last_seen_dat_version: None,
+			last_seen_dat_file_import_id: value.last_seen_dat_file_import_id,
 			created_at: value.created_at.into(),
 			updated_at: value.updated_at.into(),
 		}
@@ -299,6 +324,9 @@ impl From<entity::game_file::Model> for PlaymatchGameFile {
 			sha256: value.sha256,
 			status: value.status,
 			serial: value.serial,
+			current_in_latest_dat: value.is_current,
+			last_seen_dat_version: None,
+			last_seen_dat_file_import_id: value.last_seen_dat_file_import_id,
 			created_at: value.created_at.into(),
 			updated_at: value.updated_at.into(),
 		}

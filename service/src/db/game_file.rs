@@ -9,12 +9,13 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, QueryFi
 pub async fn insert_game_file_bulk(
 	game_files: Vec<RomElement>,
 	game_id: Uuid,
+	import_id: Uuid,
 	conn: &DbConn,
 ) -> anyhow::Result<()> {
 	let mut to_insert = Vec::new();
 
 	for game_file in game_files {
-		let game_file = get_active_model_from_rom_element(game_id, game_file)?;
+		let game_file = get_active_model_from_rom_element(game_id, import_id, game_file)?;
 
 		to_insert.push(game_file);
 	}
@@ -28,9 +29,10 @@ pub async fn insert_game_file_bulk(
 pub async fn insert_game_file(
 	game_file: RomElement,
 	game_id: Uuid,
+	import_id: Uuid,
 	conn: &DbConn,
 ) -> anyhow::Result<ActiveModel> {
-	let game_file = get_active_model_from_rom_element(game_id, game_file)?;
+	let game_file = get_active_model_from_rom_element(game_id, import_id, game_file)?;
 
 	game_file.save(conn).await.map_err(|e| e.into())
 }
@@ -63,6 +65,7 @@ pub async fn get_game_files_from_game_ids(
 
 fn get_active_model_from_rom_element(
 	game_id: Uuid,
+	import_id: Uuid,
 	game_file: RomElement,
 ) -> anyhow::Result<ActiveModel> {
 	let file_size = match game_file.size {
@@ -86,6 +89,7 @@ fn get_active_model_from_rom_element(
 		status: Set(game_file.status.map(|s| s.to_string())),
 		serial: Set(game_file.serial),
 		game_id: Set(game_id),
+		last_seen_dat_file_import_id: Set(Some(import_id)),
 		..Default::default()
 	};
 	Ok(game_file)

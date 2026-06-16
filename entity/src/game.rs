@@ -18,6 +18,10 @@ pub struct Model {
 	pub updated_at: DateTimeWithTimeZone,
 	#[sea_orm(column_type = "Text", nullable)]
 	pub signature_group_internal_clone_of_id: Option<String>,
+	#[serde(default)]
+	pub last_seen_dat_file_import_id: Option<Uuid>,
+	#[serde(default)]
+	pub is_current: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

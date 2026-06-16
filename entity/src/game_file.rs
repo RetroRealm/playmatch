@@ -17,6 +17,10 @@ pub struct Model {
 	pub sha256: Option<String>,
 	pub status: Option<String>,
 	pub serial: Option<String>,
+	#[serde(default)]
+	pub last_seen_dat_file_import_id: Option<Uuid>,
+	#[serde(default)]
+	pub is_current: bool,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 }
