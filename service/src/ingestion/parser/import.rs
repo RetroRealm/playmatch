@@ -164,8 +164,13 @@ pub async fn parse_and_import_dat_file(
 
 						// When we insert too many sqlx-postgres panics, so we chunk the inserts
 						for chunk in to_insert.chunks(*PARALLELISM) {
-							insert_game_file_bulk(chunk.to_vec(), existing_game.id, import.id, &conn)
-								.await?;
+							insert_game_file_bulk(
+								chunk.to_vec(),
+								existing_game.id,
+								import.id,
+								&conn,
+							)
+							.await?;
 						}
 
 						return Ok(GamePresence {

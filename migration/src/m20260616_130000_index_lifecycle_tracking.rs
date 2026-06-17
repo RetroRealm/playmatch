@@ -38,8 +38,11 @@ impl MigrationTrait for Migration {
 }
 
 async fn run_unmanaged(statements: &[&str]) -> Result<(), DbErr> {
-	let url = std::env::var("DATABASE_URL")
-		.map_err(|e| DbErr::Custom(format!("DATABASE_URL not set for concurrent index build: {e}")))?;
+	let url = std::env::var("DATABASE_URL").map_err(|e| {
+		DbErr::Custom(format!(
+			"DATABASE_URL not set for concurrent index build: {e}"
+		))
+	})?;
 	let conn = Database::connect(&url).await?;
 	for statement in statements {
 		conn.execute_unprepared(statement).await?;

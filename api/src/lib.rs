@@ -5,7 +5,6 @@ use crate::routes::game::{
 	get_game_file_history_by_id, get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id,
 };
 use crate::routes::health::{health, ready};
-use crate::routes::signature_group::{get_all_signature_groups, get_signature_group_by_id};
 use crate::routes::identify::{identify_game_and_relations, identify_game_with_metadata_ids};
 use crate::routes::igdb::{
 	get_igdb_age_rating_by_id, get_igdb_age_rating_categories_by_ids,
@@ -96,6 +95,7 @@ use crate::routes::sgdb::{
 	get_sgdb_icons_by_game, get_sgdb_icons_by_platform, get_sgdb_logos_by_game,
 	get_sgdb_logos_by_platform, search_sgdb_games,
 };
+use crate::routes::signature_group::{get_all_signature_groups, get_signature_group_by_id};
 use crate::routes::suggestion::{
 	approve_suggestion, create_company_suggestion, create_game_suggestion,
 	create_platform_suggestion, delete_suggestion, get_all_suggestions, get_suggestion_by_id,
