@@ -7,7 +7,7 @@ authors = ["DevYukine <devyukine@gmx.de>"]
 description = "A simple matchmaking service"
 
 [workspace]
-members = [".", "api", "service", "entity", "migration"]
+members = [".", "api", "service", "entity", "migration", "mcp"]
 
 [workspace.package]
 version = "0.2.0"
@@ -29,6 +29,7 @@ utoipa = "~4"
 derive_builder = "^0.20"
 redis = "^1"
 prometheus = "^0.14"
+rmcp = { version = "1.7", features = ["server", "macros", "transport-streamable-http-server-session"] }
 
 [dependencies]
 api = { path = "api" }

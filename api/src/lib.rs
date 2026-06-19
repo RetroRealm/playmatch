@@ -289,6 +289,7 @@ async fn start() -> anyhow::Result<()> {
 	let redis_conn_for_cron = redis_conn.clone();
 	let redis_conn_for_dat_cron = redis_conn.clone();
 	let redis_conn_for_init = redis_conn.clone();
+	let redis_conn_for_mcp = redis_conn.clone();
 	let redis_conn_data = Data::new(redis_conn);
 	let conn_data = Data::from(conn_arc.clone());
 	let igdb_data = igdb_client_opt.clone().map(Data::from);
@@ -302,6 +303,13 @@ async fn start() -> anyhow::Result<()> {
 	let lb_enabled = lb_client_opt.is_some();
 	let ovgdb_enabled = ovgdb_client_opt.is_some();
 	let ra_enabled = ra_client_opt.is_some();
+
+	let mcp_enabled = env::var("MCP_ENABLED")
+		.unwrap_or_else(|_| "true".to_string())
+		.eq_ignore_ascii_case("true");
+	// Built once and cloned into each worker so the MCP session manager is shared.
+	let mcp_service =
+		mcp_enabled.then(|| mcp::build_mcp_service(conn_arc.clone(), redis_conn_for_mcp));
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -323,7 +331,7 @@ async fn start() -> anyhow::Result<()> {
 		if let Some(d) = &mg_data {
 			app = app.app_data(d.clone());
 		}
-		app.service(
+		app = app.service(
 			scope("/api")
 				.wrap(Governor::new(&governor_conf))
 				.wrap(from_fn(http_request_metrics))
@@ -365,8 +373,15 @@ async fn start() -> anyhow::Result<()> {
 						)
 						.configure(configure_authenticated_api_routes),
 				),
-		)
-		.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
+		);
+		if let Some(svc) = &mcp_service {
+			app = app.service(
+				scope("/mcp")
+					.wrap(Governor::new(&governor_conf))
+					.service(svc.clone().scope()),
+			);
+		}
+		app.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 			Url::new("playmatch API", "/api-docs/openapi.json"),
 			create_openapi(),
 		)]))
@@ -494,6 +509,11 @@ async fn start() -> anyhow::Result<()> {
 
 	info!("Starting server on port {port}");
 	info!("Starting metrics server on port {metrics_port}");
+	if mcp_enabled {
+		info!("MCP server mounted at /mcp on port {port}");
+	} else {
+		info!("MCP server disabled (set MCP_ENABLED=true to enable)");
+	}
 	tokio::try_join!(serv, metrics_serv)?;
 
 	Ok(())

@@ -52,6 +52,33 @@ The public API is available at [playmatch.retrorealm.dev](https://playmatch.retr
 2. Rename .env.example to .env and fill in the required environment variables
 3. Run `cargo run --package playmatch --bin playmatch` to start the server
 
+## MCP server
+
+Playmatch ships a Model Context Protocol server so AI agents can identify ROMs
+and browse the catalogue with the same data the public API serves. It is mounted
+on the main API listener and speaks MCP over Streamable HTTP at `/mcp` (so the
+endpoint is `http://<host>:<PORT>/mcp`). It shares the public API per-IP rate
+limit.
+
+It is controlled by one environment variable:
+
+* `MCP_ENABLED` - set to `false` to disable the server. Defaults to `true`.
+
+The server exposes these tools:
+
+* `playmatch_identify_rom_by_hash` - identify a ROM and return its game id and
+  external metadata provider ids.
+* `playmatch_identify_rom_with_relations` - identify a ROM and return the game
+  with its platform, company, signature group, dat file and files.
+* `playmatch_get_game` - fetch a single game and its external metadata by id.
+* `playmatch_get_game_with_relations` - fetch a game with its full relations by id.
+* `playmatch_get_game_file_history` - list the dat file imports a game file was
+  seen in by game file id.
+* `playmatch_list_companies` / `playmatch_get_company` - browse or fetch companies.
+* `playmatch_list_platforms` / `playmatch_get_platform` - browse or fetch platforms.
+* `playmatch_list_signature_groups` / `playmatch_get_signature_group` - browse or
+  fetch signature groups (dat publishers such as No-Intro and Redump).
+
 ## Deployment
 
 Docker images are available [Here](https://github.com/RetroRealm/playmatch/pkgs/container/playmatch)

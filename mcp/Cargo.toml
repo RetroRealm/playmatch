@@ -1,0 +1,22 @@
+[package]
+name = "mcp"
+version.workspace = true
+edition.workspace = true
+license = "MIT"
+
+[dependencies]
+service = { path = "../service" }
+rmcp = { workspace = true }
+rmcp-actix-web = "^0.12"
+actix-web = "~4.13"
+sea-orm = { workspace = true, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
+redis = { workspace = true, features = ["tokio-rustls-comp"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schemars = "^1"
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+migration = { path = "../migration" }
+testcontainers-modules = { version = "^0.12", features = ["postgres", "redis"] }
