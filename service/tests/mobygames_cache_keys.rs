@@ -9,7 +9,7 @@ use service::cache::provider_cache_key;
 fn mg_platforms_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("mobygames", "platforms", "all"),
-		"playmatch:cache:v1:mobygames:platforms:all",
+		"playmatch:cache:v2:mobygames:platforms:all",
 	);
 }
 
@@ -17,7 +17,7 @@ fn mg_platforms_layout_is_stable() {
 fn mg_genres_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("mobygames", "genres", "all"),
-		"playmatch:cache:v1:mobygames:genres:all",
+		"playmatch:cache:v2:mobygames:genres:all",
 	);
 }
 
@@ -25,7 +25,7 @@ fn mg_genres_layout_is_stable() {
 fn mg_game_by_id_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("mobygames", "game", "12345"),
-		"playmatch:cache:v1:mobygames:game:12345",
+		"playmatch:cache:v2:mobygames:game:12345",
 	);
 }
 
@@ -35,7 +35,7 @@ fn mg_game_search_layout_is_stable() {
 	// surrounding shape only.
 	assert!(
 		provider_cache_key("mobygames", "game:search", "deadbeef")
-			.starts_with("playmatch:cache:v1:mobygames:game:search:")
+			.starts_with("playmatch:cache:v2:mobygames:game:search:")
 	);
 }
 
@@ -43,7 +43,7 @@ fn mg_game_search_layout_is_stable() {
 fn mg_game_search_with_platform_layout_is_stable() {
 	assert!(
 		provider_cache_key("mobygames", "game:search", "platform:5:deadbeef")
-			.starts_with("playmatch:cache:v1:mobygames:game:search:platform:")
+			.starts_with("playmatch:cache:v2:mobygames:game:search:platform:")
 	);
 }
 
@@ -51,7 +51,7 @@ fn mg_game_search_with_platform_layout_is_stable() {
 fn mg_game_covers_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("mobygames", "game:covers", "12345:5"),
-		"playmatch:cache:v1:mobygames:game:covers:12345:5",
+		"playmatch:cache:v2:mobygames:game:covers:12345:5",
 	);
 }
 
@@ -59,6 +59,6 @@ fn mg_game_covers_layout_is_stable() {
 fn mg_game_screenshots_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("mobygames", "game:screenshots", "12345:5"),
-		"playmatch:cache:v1:mobygames:game:screenshots:12345:5",
+		"playmatch:cache:v2:mobygames:game:screenshots:12345:5",
 	);
 }

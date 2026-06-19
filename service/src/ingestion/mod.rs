@@ -11,6 +11,7 @@ use crate::matching::clone::populate_all_clone_of_ids;
 use anyhow::anyhow;
 use fs::read_files_recursive;
 use log::{debug, error, info};
+use redis::aio::MultiplexedConnection;
 use reqwest::Client;
 use sea_orm::DbConn;
 use std::path::PathBuf;
@@ -27,6 +28,7 @@ pub(crate) const TMP_PATH: &str = "tmp";
 pub async fn download_and_parse_dats(
 	client: &Client,
 	conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
 	force_import: bool,
 ) -> anyhow::Result<()> {
 	let current_dir = std::env::current_dir()?;
@@ -133,7 +135,9 @@ pub async fn download_and_parse_dats(
 		};
 
 		debug!("Importing DAT file: {file:?}");
-		match parse_and_import_dat_file(&file, signature_group_entity.id, &hash, conn).await {
+		match parse_and_import_dat_file(&file, signature_group_entity.id, &hash, conn, redis_conn)
+			.await
+		{
 			Ok(_) => {
 				info!("Imported DAT file: {}", file.display());
 				crate::metrics::record_dat_ingestion_file(source_label, "imported");

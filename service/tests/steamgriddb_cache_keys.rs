@@ -10,7 +10,7 @@ use service::providers::steamgriddb::model::AssetFilters;
 fn sgdb_game_by_id_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("steamgriddb", "game", "12345"),
-		"playmatch:cache:v1:steamgriddb:game:12345",
+		"playmatch:cache:v2:steamgriddb:game:12345",
 	);
 }
 
@@ -18,7 +18,7 @@ fn sgdb_game_by_id_layout_is_stable() {
 fn sgdb_game_by_platform_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("steamgriddb", "game:platform", "steam:730"),
-		"playmatch:cache:v1:steamgriddb:game:platform:steam:730",
+		"playmatch:cache:v2:steamgriddb:game:platform:steam:730",
 	);
 }
 
@@ -28,7 +28,7 @@ fn sgdb_game_search_layout_is_stable() {
 	// surrounding shape only so we can change the term without churning here.
 	assert!(
 		provider_cache_key("steamgriddb", "game:search", "deadbeef")
-			.starts_with("playmatch:cache:v1:steamgriddb:game:search:")
+			.starts_with("playmatch:cache:v2:steamgriddb:game:search:")
 	);
 }
 
@@ -46,7 +46,7 @@ fn sgdb_asset_segments_are_stable() {
 	] {
 		assert!(
 			provider_cache_key("steamgriddb", segment, "x")
-				.starts_with(&format!("playmatch:cache:v1:steamgriddb:{segment}:")),
+				.starts_with(&format!("playmatch:cache:v2:steamgriddb:{segment}:")),
 			"unexpected layout for segment {segment}"
 		);
 	}

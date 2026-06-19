@@ -131,7 +131,9 @@ pub async fn find_game_by_signature_group_internal_id_and_dat_file_id(
 		.await
 }
 
-/// Look up a game by exact name, scoped to a single dat file.
+/// Look up a game by exact name, scoped to a single dat file. A merged dat file
+/// can hold a live and a retired same-name row, so prefer the current one with a
+/// stable id tiebreaker to keep repeated imports matching the same game.
 pub async fn find_game_by_name_and_dat_file_id(
 	name: &str,
 	dat_file_id: Uuid,
@@ -141,6 +143,8 @@ pub async fn find_game_by_name_and_dat_file_id(
 		.filter(game::Column::Name.eq(name))
 		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
 		.filter(dat_file_import::Column::DatFileId.eq(dat_file_id))
+		.order_by_desc(game::Column::IsCurrent)
+		.order_by_asc(game::Column::Id)
 		.one(conn)
 		.await
 }
@@ -271,12 +275,13 @@ async fn find_signature_metadata_mapping_if_exists_by_filter(
 	conn: &DbConn,
 ) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
 	// A hash can match several rows (for example after a No-Intro rename leaves
-	// the old retired entry alongside the new current one). Prefer the row that
-	// is still current, with a stable id tiebreaker, so the answer is
-	// deterministic across identical requests.
+	// the old retired entry alongside the new current one). Prefer the current
+	// row, then a reconciled one (non-null last_seen) so a never-reconciled
+	// orphan cannot win, then a stable id tiebreaker for determinism.
 	let game_file = GameFile::find()
 		.filter(input)
 		.order_by_desc(game_file::Column::IsCurrent)
+		.order_by_desc(game_file::Column::LastSeenDatFileImportId.is_not_null())
 		.order_by_asc(game_file::Column::Id)
 		.find_also_related(Game)
 		.one(conn)

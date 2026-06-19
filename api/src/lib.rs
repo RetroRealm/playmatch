@@ -287,6 +287,8 @@ async fn start() -> anyhow::Result<()> {
 
 	let redis_client_data = Data::new(redis_client);
 	let redis_conn_for_cron = redis_conn.clone();
+	let redis_conn_for_dat_cron = redis_conn.clone();
+	let redis_conn_for_init = redis_conn.clone();
 	let redis_conn_data = Data::new(redis_conn);
 	let conn_data = Data::from(conn_arc.clone());
 	let igdb_data = igdb_client_opt.clone().map(Data::from);
@@ -390,6 +392,7 @@ async fn start() -> anyhow::Result<()> {
 		.add(Job::new_async("0 0 12 * * *", move |_, _| {
 			let conn = conn.clone();
 			let dat_client = dat_client.clone();
+			let dat_redis = redis_conn_for_dat_cron.clone();
 			let providers = providers_for_cron.clone();
 			let lb = lb_for_cron.clone();
 			let ovgdb = ovgdb_for_cron.clone();
@@ -397,7 +400,7 @@ async fn start() -> anyhow::Result<()> {
 			let lock = maintenance_lock_cron.clone();
 			Box::pin(async move {
 				let _guard = lock.lock().await;
-				wrap_download_and_parse_dats(dat_client, conn.clone(), false).await;
+				wrap_download_and_parse_dats(dat_client, conn.clone(), dat_redis, false).await;
 				wrap_launchbox_import(lb).await;
 				wrap_openvgdb_import(ovgdb).await;
 				wrap_retroachievements_import(ra).await;
@@ -459,7 +462,13 @@ async fn start() -> anyhow::Result<()> {
 		let maintenance_lock_init = maintenance_lock.clone();
 		tokio::spawn(async move {
 			let _guard = maintenance_lock_init.lock().await;
-			wrap_download_and_parse_dats(http_client, conn.clone(), force_initial_data_init).await;
+			wrap_download_and_parse_dats(
+				http_client,
+				conn.clone(),
+				redis_conn_for_init,
+				force_initial_data_init,
+			)
+			.await;
 			wrap_launchbox_import(lb_for_init).await;
 			wrap_openvgdb_import(ovgdb_for_init).await;
 			wrap_retroachievements_import(ra_for_init).await;

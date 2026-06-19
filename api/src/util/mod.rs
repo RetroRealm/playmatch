@@ -2,6 +2,7 @@ pub mod http;
 
 use crate::error::{Error as ApiError, Result as ApiResult};
 use log::{error, info};
+use redis::aio::MultiplexedConnection;
 use reqwest::Client;
 use sea_orm::DbConn;
 use serde::de::DeserializeOwned;
@@ -20,10 +21,18 @@ pub const MAX_IDS_PER_REQUEST: usize = 50;
 pub async fn wrap_download_and_parse_dats(
 	client: Arc<Client>,
 	conn: Arc<DbConn>,
+	mut redis_conn: MultiplexedConnection,
 	force_import: bool,
 ) {
 	let started = Instant::now();
-	let result = match download_and_parse_dats(client.as_ref(), conn.as_ref(), force_import).await {
+	let result = match download_and_parse_dats(
+		client.as_ref(),
+		conn.as_ref(),
+		&mut redis_conn,
+		force_import,
+	)
+	.await
+	{
 		Ok(_) => {
 			info!("Successfully downloaded and imported latest DATs");
 			"success"

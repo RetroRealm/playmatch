@@ -14,7 +14,7 @@ pub const CACHE_PREFIX: &str = "playmatch";
 /// cache keys carry this segment so a version change naturally invalidates
 /// legacy entries as they age out via TTL; the new code reads and writes the
 /// bumped namespace immediately.
-pub const CACHE_KEY_VERSION: &str = "v1";
+pub const CACHE_KEY_VERSION: &str = "v2";
 
 #[derive(Debug, Clone)]
 pub enum CacheStatus<T> {
@@ -27,7 +27,7 @@ pub trait CacheKey {
 }
 
 /// Format the canonical provider cache key. Layout:
-/// `playmatch:cache:v1:<provider>:<segment>:<identifier>`.
+/// `playmatch:cache:v2:<provider>:<segment>:<identifier>`.
 pub fn provider_cache_key(provider: &str, segment: &str, identifier: &str) -> String {
 	format!("{CACHE_PREFIX}:cache:{CACHE_KEY_VERSION}:{provider}:{segment}:{identifier}")
 }

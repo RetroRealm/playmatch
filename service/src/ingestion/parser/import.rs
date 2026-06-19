@@ -5,8 +5,9 @@ use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
 use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
 use crate::db::lifecycle::reconcile_dat_file_lifecycle;
 use crate::db::platform::create_or_find_platform_by_name;
+use crate::identification::cache::bust_identify_cache_for_game;
 use crate::ingestion::parser::model::{Datafile, Game};
-use crate::ingestion::parser::regex::{DAT_NUMBER_REGEX, DAT_TAG_REGEX};
+use crate::ingestion::parser::regex::{DAT_PAREN_GROUP_REGEX, DAT_TAG_REGEX};
 use entity::{company, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
@@ -14,6 +15,8 @@ use std::collections::HashSet;
 use crate::config::PARALLELISM;
 use entity::game::Model;
 use lazy_static::lazy_static;
+use log::warn;
+use redis::aio::MultiplexedConnection;
 use regex::Regex;
 use sea_orm::{ActiveModelTrait, DbConn, DbErr, IntoActiveModel, Set};
 use std::path::Path;
@@ -34,6 +37,7 @@ pub async fn parse_and_import_dat_file(
 	signature_group_id: Uuid,
 	md5_hash: &str,
 	conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
 ) -> anyhow::Result<()> {
 	let dat = parse_dat_file(path).await?;
 
@@ -202,7 +206,7 @@ pub async fn parse_and_import_dat_file(
 		}
 	}
 
-	reconcile_dat_file_lifecycle(
+	let retired_game_ids = reconcile_dat_file_lifecycle(
 		import.dat_file_id,
 		import.id,
 		&present_existing_file_ids,
@@ -210,6 +214,14 @@ pub async fn parse_and_import_dat_file(
 		conn,
 	)
 	.await?;
+
+	// A retired hash leaves a stale identify cache entry; a bust failure must
+	// not fail the import.
+	for game_id in retired_game_ids {
+		if let Err(e) = bust_identify_cache_for_game(redis_conn, conn, game_id).await {
+			warn!("failed to bust identify cache for retired game {game_id}: {e}");
+		}
+	}
 
 	Ok(())
 }
@@ -373,14 +385,29 @@ fn parse_company_and_platform(
 pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version: &str) -> String {
 	file_name = file_name.replace(format!(" ({version})").as_str(), "");
 
-	for tag in DAT_NUMBER_REGEX.captures_iter(&file_name.clone()) {
-		let tag = tag.get(0).map(|x| x.as_str()).unwrap_or_default();
-		file_name = file_name.replace(&format!(" {tag}"), "");
-	}
+	file_name = DAT_PAREN_GROUP_REGEX
+		.replace_all(&file_name, |caps: &regex::Captures| {
+			if is_build_stamp(&caps[1]) {
+				String::new()
+			} else {
+				caps[0].to_string()
+			}
+		})
+		.into_owned();
 
 	file_name = file_name.replace(format!(".{file_extension}").as_str(), "");
 
 	file_name
+}
+
+/// True for build stamps and release counts (digits and separators only, e.g.
+/// "(20260605-234217)" or "(100)"); they change per build and would otherwise
+/// fork a new dat file row each time. Letter-bearing tags like (Decrypted) stay.
+fn is_build_stamp(inner: &str) -> bool {
+	inner.chars().any(|c| c.is_ascii_digit())
+		&& inner
+			.chars()
+			.all(|c| c.is_ascii_digit() || matches!(c, '-' | '_' | ' ' | ':'))
 }
 
 /// Maximum DAT file size accepted by `parse_dat_file`. Largest observed real
@@ -656,5 +683,111 @@ mod tests {
 		assert_eq!(result.0, Some("Nintendo".to_string()));
 		assert_eq!(result.1, "Game Boy Color".to_string());
 		assert_eq!(result.2, Vec::<String>::new());
+	}
+
+	#[test]
+	fn sanitize_strips_matching_version_stamp() {
+		let result = sanitize_dat_string(
+			"Nintendo - Nintendo DS (Decrypted) (20260617-122122).dat".to_string(),
+			"dat",
+			"20260617-122122",
+		);
+		assert_eq!(result, "Nintendo - Nintendo DS (Decrypted)");
+	}
+
+	#[test]
+	fn sanitize_strips_mismatching_version_stamp() {
+		// Filename stamp differs from the header version.
+		let result = sanitize_dat_string(
+			"Nintendo - Nintendo DS (Decrypted) (20260605-234217).dat".to_string(),
+			"dat",
+			"20260605-170618",
+		);
+		assert_eq!(result, "Nintendo - Nintendo DS (Decrypted)");
+	}
+
+	#[test]
+	fn sanitize_strips_pure_count_tag() {
+		let spaced = sanitize_dat_string(
+			"Sony - PlayStation - Discs (100).dat".to_string(),
+			"dat",
+			"2026-01-01",
+		);
+		assert_eq!(spaced, "Sony - PlayStation - Discs");
+
+		let with_count_and_stamp = sanitize_dat_string(
+			"Nintendo - Wii U - WUX (511) (20220906-192735).dat".to_string(),
+			"dat",
+			"2022-09-06 19:27:35",
+		);
+		assert_eq!(with_count_and_stamp, "Nintendo - Wii U - WUX");
+	}
+
+	#[test]
+	fn sanitize_strips_colon_and_space_timestamp() {
+		let result = sanitize_dat_string(
+			"Nintendo - GameCube (2023-01-09 15:43:45).dat".to_string(),
+			"dat",
+			"20230109-154345",
+		);
+		assert_eq!(result, "Nintendo - GameCube");
+	}
+
+	#[test]
+	fn sanitize_collapses_doubled_stamp() {
+		let result = sanitize_dat_string(
+			"Nintendo - Nintendo DS (Decrypted) (20260605-234217) (20260605-234217).dat"
+				.to_string(),
+			"dat",
+			"20260605-170618",
+		);
+		assert_eq!(result, "Nintendo - Nintendo DS (Decrypted)");
+	}
+
+	#[test]
+	fn sanitize_preserves_decrypted_and_encrypted_distinct() {
+		let decrypted = sanitize_dat_string(
+			"Nintendo - Nintendo DS (Decrypted) (20260605-234217).dat".to_string(),
+			"dat",
+			"20260605-170618",
+		);
+		let encrypted = sanitize_dat_string(
+			"Nintendo - Nintendo DS (Encrypted) (20260605-234217).dat".to_string(),
+			"dat",
+			"20260605-170618",
+		);
+		assert_eq!(decrypted, "Nintendo - Nintendo DS (Decrypted)");
+		assert_eq!(encrypted, "Nintendo - Nintendo DS (Encrypted)");
+		assert_ne!(decrypted, encrypted);
+	}
+
+	#[test]
+	fn sanitize_preserves_headered_headerless_and_letter_digit_tags() {
+		let headered = sanitize_dat_string(
+			"Nintendo - Nintendo Entertainment System (Headered) (20260422-002744).dat".to_string(),
+			"dat",
+			"20260421-122918",
+		);
+		let headerless = sanitize_dat_string(
+			"Nintendo - Nintendo Entertainment System (Headerless) (20260422-002744).dat"
+				.to_string(),
+			"dat",
+			"20260421-122918",
+		);
+		assert_eq!(
+			headered,
+			"Nintendo - Nintendo Entertainment System (Headered)"
+		);
+		assert_eq!(
+			headerless,
+			"Nintendo - Nintendo Entertainment System (Headerless)"
+		);
+		assert_ne!(headered, headerless);
+
+		for tag in ["(A2R)", "(A78)", "(J64)", "(PSX2PSP)"] {
+			let name = format!("Acme - Platform {tag}");
+			let sanitized = sanitize_dat_string(format!("{name}.dat"), "dat", "2026-01-01");
+			assert_eq!(sanitized, name, "tag {tag} must be preserved");
+		}
 	}
 }

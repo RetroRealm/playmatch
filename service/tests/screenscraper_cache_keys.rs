@@ -9,7 +9,7 @@ use service::cache::provider_cache_key;
 fn ss_systems_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("screenscraper", "systems", "all"),
-		"playmatch:cache:v1:screenscraper:systems:all",
+		"playmatch:cache:v2:screenscraper:systems:all",
 	);
 }
 
@@ -17,7 +17,7 @@ fn ss_systems_layout_is_stable() {
 fn ss_game_by_id_layout_is_stable() {
 	assert_eq!(
 		provider_cache_key("screenscraper", "game", "12345"),
-		"playmatch:cache:v1:screenscraper:game:12345",
+		"playmatch:cache:v2:screenscraper:game:12345",
 	);
 }
 
@@ -27,7 +27,7 @@ fn ss_game_by_rom_layout_is_stable() {
 	// the surrounding shape only.
 	assert!(
 		provider_cache_key("screenscraper", "game:rom", "1:deadbeef")
-			.starts_with("playmatch:cache:v1:screenscraper:game:rom:")
+			.starts_with("playmatch:cache:v2:screenscraper:game:rom:")
 	);
 }
 
@@ -35,7 +35,7 @@ fn ss_game_by_rom_layout_is_stable() {
 fn ss_game_search_layout_is_stable() {
 	assert!(
 		provider_cache_key("screenscraper", "game:search", "1:deadbeef")
-			.starts_with("playmatch:cache:v1:screenscraper:game:search:")
+			.starts_with("playmatch:cache:v2:screenscraper:game:search:")
 	);
 }
 
@@ -44,7 +44,7 @@ fn ss_hash_segments_are_stable() {
 	for segment in ["game:md5", "game:sha1", "game:crc"] {
 		assert!(
 			provider_cache_key("screenscraper", segment, "1:abc")
-				.starts_with(&format!("playmatch:cache:v1:screenscraper:{segment}:")),
+				.starts_with(&format!("playmatch:cache:v2:screenscraper:{segment}:")),
 			"unexpected layout for segment {segment}"
 		);
 	}

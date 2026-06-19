@@ -3,5 +3,6 @@ use regex::Regex;
 
 lazy_static! {
 	pub static ref DAT_TAG_REGEX: Regex = Regex::new(r"\(([^)]+)\)").unwrap();
-	pub static ref DAT_NUMBER_REGEX: Regex = Regex::new(r"\(\d+\)").unwrap();
+	/// A parenthetical group plus the single space that introduces it.
+	pub static ref DAT_PAREN_GROUP_REGEX: Regex = Regex::new(r" ?\(([^)]+)\)").unwrap();
 }

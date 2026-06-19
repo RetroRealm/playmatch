@@ -48,6 +48,7 @@ mod m20260523_120000_drop_legacy_api_key_hash;
 mod m20260524_120000_add_hasheous_provider_enum_value;
 mod m20260616_120000_add_lifecycle_tracking;
 mod m20260616_130000_index_lifecycle_tracking;
+mod m20260619_120000_dedupe_dat_file_lifecycle;
 
 pub struct Migrator;
 
@@ -103,6 +104,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260524_120000_add_hasheous_provider_enum_value::Migration),
 			Box::new(m20260616_120000_add_lifecycle_tracking::Migration),
 			Box::new(m20260616_130000_index_lifecycle_tracking::Migration),
+			Box::new(m20260619_120000_dedupe_dat_file_lifecycle::Migration),
 		]
 	}
 }
