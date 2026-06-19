@@ -110,6 +110,8 @@ use crate::util::{
 };
 use actix_cors::Cors;
 use actix_governor::{Governor, GovernorConfigBuilder};
+use actix_web::http::Method;
+use actix_web::http::header;
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
 use actix_web::web::{Data, JsonConfig, PayloadConfig, ServiceConfig, scope};
 use actix_web::{App, HttpResponse, HttpServer, web};
@@ -323,7 +325,6 @@ async fn start() -> anyhow::Result<()> {
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
-			.wrap(Compress::default())
 			.app_data(JsonConfig::default().limit(64 * 1024))
 			.app_data(PayloadConfig::default().limit(256 * 1024))
 			.app_data(conn_data.clone())
@@ -362,6 +363,7 @@ async fn start() -> anyhow::Result<()> {
 				)
 				.wrap(Cors::permissive())
 				.wrap(prometheus.clone())
+				.wrap(Compress::default())
 				.configure(move |cfg| {
 					configure_public_api_routes(
 						cfg,
@@ -385,9 +387,38 @@ async fn start() -> anyhow::Result<()> {
 				),
 		);
 		if let Some(svc) = &mcp_service {
+			let mcp_cors = Cors::default()
+				.allow_any_origin()
+				.allowed_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+				.allowed_headers([
+					header::CONTENT_TYPE,
+					header::ACCEPT,
+					header::HeaderName::from_static("mcp-session-id"),
+					header::HeaderName::from_static("mcp-protocol-version"),
+					header::HeaderName::from_static("last-event-id"),
+				])
+				.expose_headers([
+					header::HeaderName::from_static("mcp-session-id"),
+					header::HeaderName::from_static("mcp-protocol-version"),
+				])
+				.max_age(3600);
 			app = app.service(
 				scope("/mcp")
 					.wrap(Governor::new(&governor_conf))
+					.wrap(from_fn(http_request_metrics))
+					.wrap(
+						Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
+							.log_level(Level::Debug),
+					)
+					.wrap(
+						DefaultHeaders::new()
+							.add((
+								"Strict-Transport-Security",
+								"max-age=31536000; includeSubDomains",
+							))
+							.add(("X-Content-Type-Options", "nosniff")),
+					)
+					.wrap(mcp_cors)
 					.service(svc.clone().scope()),
 			);
 		}

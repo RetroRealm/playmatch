@@ -77,7 +77,8 @@ fn not_found(kind: &str, id: &str) -> CallToolResult {
 }
 
 fn internal_error(context: &str, err: anyhow::Error) -> ErrorData {
-	ErrorData::internal_error(format!("{context}: {err}"), None)
+	log::error!("mcp internal error in {context}: {err:?}");
+	ErrorData::internal_error("internal error".to_string(), None)
 }
 
 fn invalid_uuid(raw: &str) -> CallToolResult {

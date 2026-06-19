@@ -103,7 +103,9 @@ impl ResponseError for Error {
 		service::metrics::record_service_error(label);
 		self.record_extra_metrics();
 
-		if status.is_server_error() && !matches!(self, Self::UpstreamUnavailable { .. }) {
+		let leak_safe =
+			!status.is_server_error() || matches!(self, Self::UpstreamUnavailable { .. });
+		if !leak_safe {
 			log::error!("HTTP {} ({label}): {self}", status.as_u16());
 		}
 
@@ -115,7 +117,12 @@ impl ResponseError for Error {
 		{
 			builder.insert_header(("Retry-After", s.to_string()));
 		}
-		builder.body(self.to_string())
+
+		if leak_safe {
+			builder.body(self.to_string())
+		} else {
+			builder.body("internal server error")
+		}
 	}
 }
 

@@ -28,5 +28,6 @@ pub fn build_mcp_service(
 		}))
 		.session_manager(Arc::new(LocalSessionManager::default()))
 		.stateful_mode(true)
+		.sse_keep_alive(std::time::Duration::from_secs(20))
 		.build()
 }

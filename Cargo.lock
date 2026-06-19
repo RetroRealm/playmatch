@@ -2557,6 +2557,7 @@ version = "0.2.0"
 dependencies = [
  "actix-web",
  "anyhow",
+ "log",
  "migration",
  "redis",
  "rmcp",
