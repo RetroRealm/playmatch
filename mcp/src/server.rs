@@ -4,7 +4,7 @@ use redis::aio::MultiplexedConnection;
 use rmcp::ErrorData;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, Content, ServerCapabilities, ServerInfo};
+use rmcp::model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo};
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use sea_orm::DatabaseConnection;
@@ -305,10 +305,14 @@ impl PlaymatchMcp {
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for PlaymatchMcp {
 	fn get_info(&self) -> ServerInfo {
-		ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
-			"playmatch identifies game ROMs by hash and exposes the playmatch catalogue. \
-			 Use the identify tools to resolve a ROM file to a game, and the get/list tools \
-			 to look up games, platforms, companies and signature groups by id.",
-		)
+		let mut info = ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+			.with_instructions(
+				"playmatch identifies game ROMs by hash and exposes the playmatch catalogue. \
+				 Use the identify tools to resolve a ROM file to a game, and the get/list tools \
+				 to look up games, platforms, companies and signature groups by id.",
+			);
+		info.server_info =
+			Implementation::new("playmatch", env!("CARGO_PKG_VERSION")).with_title("Playmatch");
+		info
 	}
 }

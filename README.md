@@ -60,9 +60,16 @@ on the main API listener and speaks MCP over Streamable HTTP at `/mcp` (so the
 endpoint is `http://<host>:<PORT>/mcp`). It shares the public API per-IP rate
 limit.
 
-It is controlled by one environment variable:
+It is controlled by these environment variables:
 
 * `MCP_ENABLED` - set to `false` to disable the server. Defaults to `true`.
+* `MCP_PUBLIC_URL` - the public origin of the deployment (for example
+  `https://playmatch.retrorealm.dev`). Used to advertise the endpoint in the
+  discovery document. Leave empty to omit the remote entry.
+
+For discovery, the server publishes an MCP Server Card at
+`/.well-known/mcp-server-card` (and the same document at `/.well-known/mcp.json`),
+so registries and clients can find the endpoint without connecting.
 
 The server exposes these tools:
 

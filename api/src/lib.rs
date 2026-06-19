@@ -310,6 +310,11 @@ async fn start() -> anyhow::Result<()> {
 	// Built once and cloned into each worker so the MCP session manager is shared.
 	let mcp_service =
 		mcp_enabled.then(|| mcp::build_mcp_service(conn_arc.clone(), redis_conn_for_mcp));
+	let mcp_public_url = env::var("MCP_PUBLIC_URL")
+		.ok()
+		.filter(|s| !s.trim().is_empty());
+	let mcp_card =
+		mcp_enabled.then(|| Data::new(McpCard(mcp::server_card_json(mcp_public_url.as_deref()))));
 
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
@@ -380,6 +385,15 @@ async fn start() -> anyhow::Result<()> {
 					.wrap(Governor::new(&governor_conf))
 					.service(svc.clone().scope()),
 			);
+		}
+		if let Some(card) = &mcp_card {
+			app = app
+				.app_data(card.clone())
+				.route(
+					"/.well-known/mcp-server-card",
+					web::get().to(serve_mcp_card),
+				)
+				.route("/.well-known/mcp.json", web::get().to(serve_mcp_card));
 		}
 		app.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
 			Url::new("playmatch API", "/api-docs/openapi.json"),
@@ -517,6 +531,19 @@ async fn start() -> anyhow::Result<()> {
 	tokio::try_join!(serv, metrics_serv)?;
 
 	Ok(())
+}
+
+struct McpCard(String);
+
+async fn serve_mcp_card(card: Data<McpCard>) -> HttpResponse {
+	HttpResponse::Ok()
+		.content_type("application/json")
+		.insert_header(("Access-Control-Allow-Origin", "*"))
+		.insert_header(("Access-Control-Allow-Methods", "GET"))
+		.insert_header(("Access-Control-Allow-Headers", "Content-Type"))
+		.insert_header(("Cache-Control", "public, max-age=3600"))
+		.insert_header(("X-Content-Type-Options", "nosniff"))
+		.body(card.0.clone())
 }
 
 async fn metrics_handler(registry: Data<Registry>) -> HttpResponse {
@@ -1153,4 +1180,45 @@ fn configure_authenticated_api_routes(cfg: &mut ServiceConfig) {
 		.service(get_user_by_discord_id)
 		.service(get_user)
 		.service(update_user_permission_level);
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{McpCard, serve_mcp_card};
+	use actix_web::web::Data;
+	use actix_web::{App, test, web};
+
+	#[actix_web::test]
+	async fn well_known_card_routes_serve_json() {
+		let card = Data::new(McpCard(mcp::server_card_json(Some("https://example.test"))));
+		let app = test::init_service(
+			App::new()
+				.app_data(card.clone())
+				.route(
+					"/.well-known/mcp-server-card",
+					web::get().to(serve_mcp_card),
+				)
+				.route("/.well-known/mcp.json", web::get().to(serve_mcp_card)),
+		)
+		.await;
+
+		for path in ["/.well-known/mcp.json", "/.well-known/mcp-server-card"] {
+			let req = test::TestRequest::get().uri(path).to_request();
+			let resp = test::call_service(&app, req).await;
+			assert!(resp.status().is_success(), "{path} should return 200");
+			assert_eq!(
+				resp.headers().get("content-type").unwrap(),
+				"application/json"
+			);
+			assert_eq!(
+				resp.headers().get("access-control-allow-origin").unwrap(),
+				"*"
+			);
+
+			let body = test::read_body(resp).await;
+			let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+			assert_eq!(json["name"], "dev.retrorealm/playmatch");
+			assert_eq!(json["remotes"][0]["url"], "https://example.test/mcp");
+		}
+	}
 }
