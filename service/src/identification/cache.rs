@@ -4,8 +4,9 @@ use crate::cache::{
 	serialize_option_redis_value, spawn_cache_write,
 };
 use crate::db::game::{
-	find_game_and_id_mapping_by_md5, find_game_and_id_mapping_by_name_and_size,
-	find_game_and_id_mapping_by_sha1, find_game_and_id_mapping_by_sha256,
+	find_game_and_id_mapping_by_crc, find_game_and_id_mapping_by_md5,
+	find_game_and_id_mapping_by_name_and_size, find_game_and_id_mapping_by_sha1,
+	find_game_and_id_mapping_by_sha256,
 };
 use crate::db::game_file::get_game_files_from_game_id;
 use crate::error::ServiceResult;
@@ -64,6 +65,9 @@ pub fn collect_identify_cache_keys(file: &game_file::Model, out: &mut Vec<String
 	}
 	if let Some(md5) = &file.md5 {
 		out.push(identify_cache_key(GameMatchType::MD5, md5));
+	}
+	if let Some(crc) = &file.crc {
+		out.push(identify_cache_key(GameMatchType::CRC, crc));
 	}
 	if let Some(size) = file.file_size_in_bytes {
 		let key = filename_size_key(&file.file_name, size);
@@ -168,6 +172,7 @@ pub async fn find_game_and_metadata_ids_by_hash_cached(
 		GameMatchType::SHA256 => find_game_and_id_mapping_by_sha256(hash, db_conn).await?,
 		GameMatchType::SHA1 => find_game_and_id_mapping_by_sha1(hash, db_conn).await?,
 		GameMatchType::MD5 => find_game_and_id_mapping_by_md5(hash, db_conn).await?,
+		GameMatchType::CRC => find_game_and_id_mapping_by_crc(hash, db_conn).await?,
 		GameMatchType::FileNameAndSize => {
 			unreachable!("filename+size has a dedicated cached wrapper")
 		}

@@ -23,7 +23,7 @@ fn cache_status_response<T: Serialize>(status: CacheStatus<T>, log_label: &str) 
 		.json(body)
 }
 
-/// Identify a game by its file hashes or filename and size, returning the matched metadata, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate)
+/// Identify a game by its file hashes or filename and size, returning the matched metadata, goes in order sha256, sha1, md5, crc and filename + size (from most accurate to least accurate)
 #[utoipa::path(
 	get,
 	context_path = "/api",
@@ -54,7 +54,7 @@ pub async fn identify_game_with_metadata_ids(
 	))
 }
 
-/// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5 and filename + size (from most accurate to least accurate), returning information about the game, game files, metadata mappings, publisher and company
+/// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5, crc and filename + size (from most accurate to least accurate), returning information about the game, game files, metadata mappings, publisher and company
 #[utoipa::path(
 	get,
 	context_path = "/api",

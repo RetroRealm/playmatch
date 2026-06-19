@@ -25,6 +25,8 @@ pub struct IdentifyRomArgs {
 	pub sha1: Option<String>,
 	/// Optional SHA256 hash of the ROM, lowercase hex, 64 characters.
 	pub sha256: Option<String>,
+	/// Optional CRC32 checksum of the ROM, lowercase hex, 8 characters.
+	pub crc: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -99,11 +101,11 @@ impl PlaymatchMcp {
 	/// provider ids. Call this when you have a ROM file and want to know which
 	/// game it is and how it maps to providers like IGDB. Provide hashes when
 	/// available for the most reliable match. The gameMatchType field is a closed
-	/// set: SHA256, SHA1, MD5, FileNameAndSize or NoMatch. NoMatch is a normal
+	/// set: SHA256, SHA1, MD5, CRC, FileNameAndSize or NoMatch. NoMatch is a normal
 	/// answer whose matched game id is null. FileNameAndSize is a weaker fallback
 	/// that only matches when file_name is exactly the catalogued ROM name.
 	#[tool(
-		description = "Identify a ROM by its hashes and file metadata and return the matched game id and external metadata provider ids. The gameMatchType field is one of SHA256, SHA1, MD5, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
+		description = "Identify a ROM by its hashes and file metadata and return the matched game id and external metadata provider ids. The gameMatchType field is one of SHA256, SHA1, MD5, CRC, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
 	)]
 	async fn playmatch_identify_rom_by_hash(
 		&self,
@@ -115,6 +117,7 @@ impl PlaymatchMcp {
 			args.md5,
 			args.sha1,
 			args.sha256,
+			args.crc,
 		);
 		if let Err(e) = search.validate() {
 			return Ok(bad_input(e));
@@ -129,12 +132,12 @@ impl PlaymatchMcp {
 	/// Identify a ROM and return the matched game together with its related
 	/// platform, company, signature group, dat file and game files. Call this
 	/// when you need the full context around a ROM, not just its ids. The
-	/// gameMatchType field is a closed set: SHA256, SHA1, MD5, FileNameAndSize or
+	/// gameMatchType field is a closed set: SHA256, SHA1, MD5, CRC, FileNameAndSize or
 	/// NoMatch. NoMatch is a normal answer whose matched game id is null.
 	/// FileNameAndSize is a weaker fallback that only matches when file_name is
 	/// exactly the catalogued ROM name.
 	#[tool(
-		description = "Identify a ROM by its hashes and file metadata and return the matched game with its related platform, company, signature group, dat file and files. The gameMatchType field is one of SHA256, SHA1, MD5, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
+		description = "Identify a ROM by its hashes and file metadata and return the matched game with its related platform, company, signature group, dat file and files. The gameMatchType field is one of SHA256, SHA1, MD5, CRC, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
 	)]
 	async fn playmatch_identify_rom_with_relations(
 		&self,
@@ -146,6 +149,7 @@ impl PlaymatchMcp {
 			args.md5,
 			args.sha1,
 			args.sha256,
+			args.crc,
 		);
 		if let Err(e) = search.validate() {
 			return Ok(bad_input(e));

@@ -17,6 +17,7 @@ const IMPORT: &str = "c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3";
 const GAME: &str = "e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5";
 const GF: &str = "99999999-9999-9999-9999-999999999999";
 const SHA1: &str = "432dbe312bc51e36bb8cb6fcb5e08f6968f124a4";
+const CRC: &str = "1a2b3c4d";
 
 async fn start_pg() -> (ContainerAsync<Postgres>, DbConn) {
 	let container = Postgres::default()
@@ -55,8 +56,8 @@ async fn seed_game(db: &DbConn) {
 		INSERT INTO game (id, dat_file_import_id, name, is_current, last_seen_dat_file_import_id)
 		VALUES ('{GAME}', '{IMPORT}', 'Pokemon - Diamant-Edition (Germany) (Rev 5)', true, '{IMPORT}');
 
-		INSERT INTO game_file (id, game_id, file_name, sha1, is_current, last_seen_dat_file_import_id)
-		VALUES ('{GF}', '{GAME}', 'Pokemon - Diamant-Edition (Germany) (Rev 5).nds', '{SHA1}', true, '{IMPORT}');
+		INSERT INTO game_file (id, game_id, file_name, sha1, crc, is_current, last_seen_dat_file_import_id)
+		VALUES ('{GF}', '{GAME}', 'Pokemon - Diamant-Edition (Germany) (Rev 5).nds', '{SHA1}', '{CRC}', true, '{IMPORT}');
 		"#
 	);
 	db.execute_unprepared(&sql).await.unwrap();
@@ -75,6 +76,7 @@ async fn identify_by_hash_and_get_game_return_seeded_game() {
 		None,
 		Some(SHA1.to_string()),
 		None,
+		None,
 	);
 	let json = mcp::tools::identify_rom_by_hash_json(search, &mut redis, &db)
 		.await
@@ -86,6 +88,26 @@ async fn identify_by_hash_and_get_game_return_seeded_game() {
 	assert!(
 		json.contains(GAME),
 		"the matched payload must carry the seeded game id, got: {json}"
+	);
+
+	let crc_search = mcp::tools::build_search(
+		"Pokemon - Diamant-Edition (Germany) (Rev 5).nds".to_string(),
+		1024,
+		None,
+		None,
+		None,
+		Some(CRC.to_string()),
+	);
+	let crc_json = mcp::tools::identify_rom_by_hash_json(crc_search, &mut redis, &db)
+		.await
+		.unwrap();
+	assert!(
+		crc_json.contains("CRC"),
+		"a crc hit must report a CRC match type, got: {crc_json}"
+	);
+	assert!(
+		crc_json.contains(GAME),
+		"the crc-matched payload must carry the seeded game id, got: {crc_json}"
 	);
 
 	let game_id = sea_orm::prelude::Uuid::parse_str(GAME).unwrap();
@@ -120,6 +142,7 @@ async fn identify_unknown_hash_returns_nomatch() {
 		2048,
 		None,
 		Some("0000000000000000000000000000000000000000".to_string()),
+		None,
 		None,
 	);
 	let json = mcp::tools::identify_rom_by_hash_json(search, &mut redis, &db)

@@ -134,9 +134,10 @@ pub async fn identify_game_and_metadata_mappings(
 	}
 }
 
-/// Tries each match type in order (sha256, sha1, md5, name+size) and returns
-/// the first hit. When every attempted hash produced a cached-but-empty
-/// result the outcome collapses to `Cached(None)`, otherwise `NonCached(None)`.
+/// Tries each match type in order (sha256, sha1, md5, crc, name+size) and
+/// returns the first hit. When every attempted content key produced a
+/// cached-but-empty result the outcome collapses to `Cached(None)`, otherwise
+/// `NonCached(None)`.
 async fn identify_game(
 	search: &GameFileMatchSearch,
 	redis_conn: &mut MultiplexedConnection,
@@ -147,9 +148,10 @@ async fn identify_game(
 		search.sha256.as_ref(),
 		search.sha1.as_ref(),
 		search.md5.as_ref(),
+		search.crc.as_ref(),
 	]
 	.iter()
-	.filter(|hash| hash.is_some())
+	.filter(|key| key.is_some())
 	.count();
 
 	let mut agg = IdentifyAggregator::new(expected_count);
@@ -185,6 +187,18 @@ async fn identify_game(
 					find_game_and_metadata_ids_by_hash_cached(
 						hash,
 						GameMatchType::MD5,
+						redis_conn,
+						db_conn,
+					)
+					.await?
+				}
+				None => continue,
+			},
+			GameMatchType::CRC => match &search.crc {
+				Some(crc) => {
+					find_game_and_metadata_ids_by_hash_cached(
+						crc,
+						GameMatchType::CRC,
 						redis_conn,
 						db_conn,
 					)

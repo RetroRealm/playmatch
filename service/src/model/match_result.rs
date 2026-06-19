@@ -27,6 +27,9 @@ pub struct GameFileMatchSearch {
 
 	/// Optional SHA256 hash of the game file.
 	pub sha256: Option<String>,
+
+	/// Optional CRC32 checksum of the game file.
+	pub crc: Option<String>,
 }
 
 impl GameFileMatchSearch {
@@ -40,6 +43,7 @@ impl GameFileMatchSearch {
 		validate_optional_hex(&self.md5, 32, "md5")?;
 		validate_optional_hex(&self.sha1, 40, "sha1")?;
 		validate_optional_hex(&self.sha256, 64, "sha256")?;
+		validate_optional_hex(&self.crc, 8, "crc")?;
 		Ok(())
 	}
 }
@@ -56,6 +60,9 @@ pub enum GameMatchType {
 	/// Matched by MD5 hash.
 	MD5,
 
+	/// Matched by CRC32 checksum.
+	CRC,
+
 	/// Matched by file name and size.
 	FileNameAndSize,
 
@@ -69,6 +76,7 @@ impl GameMatchType {
 			GameMatchType::SHA256 => "sha256",
 			GameMatchType::SHA1 => "sha1",
 			GameMatchType::MD5 => "md5",
+			GameMatchType::CRC => "crc",
 			GameMatchType::FileNameAndSize => "filename",
 			GameMatchType::NoMatch => "no_match",
 		}
@@ -87,6 +95,7 @@ impl GameMatchType {
 			GameMatchType::SHA256 => Some("sha256"),
 			GameMatchType::SHA1 => Some("sha1"),
 			GameMatchType::MD5 => Some("md5"),
+			GameMatchType::CRC => Some("crc"),
 			GameMatchType::FileNameAndSize => Some("filename_size"),
 			GameMatchType::NoMatch => None,
 		}

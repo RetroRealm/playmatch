@@ -207,6 +207,18 @@ pub async fn find_game_and_id_mapping_by_sha256(
 	.await
 }
 
+/// Find a game via any game file whose CRC32 matches (case-insensitive), together with its metadata mappings.
+pub async fn find_game_and_id_mapping_by_crc(
+	crc: &str,
+	conn: &DbConn,
+) -> Result<Option<(game::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	find_signature_metadata_mapping_if_exists_by_filter(
+		game_file::Column::Crc.eq_ignore_case(crc),
+		conn,
+	)
+	.await
+}
+
 /// Find a game via a game file whose name (case-insensitive) and exact size both match, together with its metadata mappings.
 pub async fn find_game_and_id_mapping_by_name_and_size(
 	name: &str,

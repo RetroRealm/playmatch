@@ -17,6 +17,7 @@ pub fn build_search(
 	md5: Option<String>,
 	sha1: Option<String>,
 	sha256: Option<String>,
+	crc: Option<String>,
 ) -> GameFileMatchSearch {
 	GameFileMatchSearch {
 		file_name,
@@ -24,6 +25,7 @@ pub fn build_search(
 		md5,
 		sha1,
 		sha256,
+		crc,
 	}
 }
 
@@ -151,7 +153,7 @@ mod tests {
 
 	#[test]
 	fn search_validation_rejects_negative_file_size() {
-		let search = build_search("game.rom".to_string(), -1, None, None, None);
+		let search = build_search("game.rom".to_string(), -1, None, None, None, None);
 		let err = search.validate().expect_err("negative size must fail");
 		assert!(err.contains("file_size"));
 	}
@@ -162,6 +164,7 @@ mod tests {
 			"game.rom".to_string(),
 			1024,
 			Some("zzzz".to_string()),
+			None,
 			None,
 			None,
 		);
@@ -176,7 +179,35 @@ mod tests {
 			Some("d41d8cd98f00b204e9800998ecf8427e".to_string()),
 			None,
 			None,
+			None,
 		);
 		assert!(search.validate().is_ok());
+	}
+
+	#[test]
+	fn search_validation_accepts_valid_crc() {
+		let search = build_search(
+			"game.rom".to_string(),
+			1024,
+			None,
+			None,
+			None,
+			Some("1a2b3c4d".to_string()),
+		);
+		assert!(search.validate().is_ok());
+	}
+
+	#[test]
+	fn search_validation_rejects_malformed_crc() {
+		let search = build_search(
+			"game.rom".to_string(),
+			1024,
+			None,
+			None,
+			None,
+			Some("1a2b3c".to_string()),
+		);
+		let err = search.validate().expect_err("short crc must fail");
+		assert!(err.contains("crc"));
 	}
 }
