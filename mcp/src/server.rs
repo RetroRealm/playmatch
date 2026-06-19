@@ -30,6 +30,16 @@ pub struct IdentifyRomArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct SearchGamesArgs {
+	/// The human game title to search for, for example "pokemon diamond".
+	pub query: String,
+	/// Optional playmatch platform id as a UUID string to narrow the search.
+	pub platform_id: Option<String>,
+	/// Optional maximum number of candidates to return.
+	pub limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct GameIdArgs {
 	/// The playmatch game id as a UUID string.
 	pub game_id: String,
@@ -158,6 +168,43 @@ impl PlaymatchMcp {
 		let json = tools::identify_rom_with_relations_json(search, &mut redis, &self.db)
 			.await
 			.map_err(|e| internal_error("identify_rom_with_relations", e))?;
+		Ok(ok_text(json))
+	}
+
+	/// Find a playmatch game by its human title when you do not have a ROM file
+	/// or any hash. This is a fuzzy substring search over the catalogue, ordered
+	/// by relevance, returning candidate ids, names and platforms. Pass a returned
+	/// id to playmatch_get_game or playmatch_get_game_with_relations for the full
+	/// record. Narrow with platform_id when you know the platform, and cap the
+	/// number of candidates with limit. An empty query is rejected.
+	#[tool(
+		description = "Find a playmatch game by human title when you do not have a hash. Fuzzy substring search over the catalogue, ordered by relevance, returning candidate ids, names and platforms. Pass a returned id to playmatch_get_game for the full record. Optional platform_id narrows to a platform; optional limit caps the candidates."
+	)]
+	async fn playmatch_search_games_by_name(
+		&self,
+		Parameters(args): Parameters<SearchGamesArgs>,
+	) -> Result<CallToolResult, ErrorData> {
+		let query = args.query.trim();
+		if query.is_empty() {
+			return Ok(bad_input("query must not be empty"));
+		}
+
+		let platform_id = match args.platform_id.as_deref() {
+			Some(raw) => match Uuid::parse_str(raw) {
+				Ok(id) => Some(id),
+				Err(_) => return Ok(invalid_uuid(raw)),
+			},
+			None => None,
+		};
+
+		let json = tools::search_games_by_name_json(
+			query,
+			platform_id,
+			args.limit.map(u64::from),
+			&self.db,
+		)
+		.await
+		.map_err(|e| internal_error("search_games_by_name", e))?;
 		Ok(ok_text(json))
 	}
 
@@ -321,10 +368,14 @@ impl ServerHandler for PlaymatchMcp {
 		let mut info = ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
 			.with_instructions(
 				"playmatch identifies game ROMs by hash and exposes the playmatch catalogue. \
-				 Use the identify tools to resolve a ROM file to a game, and the get/list tools \
-				 to look up games, platforms, companies and signature groups by id. \
-				 external_metadata entries are provider id mappings only; resolving them to full \
-				 records needs the separate provider HTTP API, so the ids are references, not dead ends.",
+				 Use the identify tools to resolve a ROM file to a game; they accept SHA256, \
+				 SHA1, MD5 and CRC hashes plus file name and size, and try them from most to \
+				 least accurate. When you have no ROM and no hash, only a human title, use \
+				 playmatch_search_games_by_name to find candidate game ids, then pass an id to \
+				 playmatch_get_game or playmatch_get_game_with_relations. The get/list tools look \
+				 up games, platforms, companies and signature groups by id. external_metadata \
+				 entries are provider id mappings only; resolving them to full records needs the \
+				 separate provider HTTP API, so the ids are references, not dead ends.",
 			);
 		info.server_info =
 			Implementation::new("playmatch", env!("CARGO_PKG_VERSION")).with_title("Playmatch");

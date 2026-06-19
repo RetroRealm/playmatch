@@ -49,6 +49,7 @@ mod m20260524_120000_add_hasheous_provider_enum_value;
 mod m20260616_120000_add_lifecycle_tracking;
 mod m20260616_130000_index_lifecycle_tracking;
 mod m20260619_120000_dedupe_dat_file_lifecycle;
+mod m20260619_130000_add_game_name_trigram_index;
 
 pub struct Migrator;
 
@@ -105,6 +106,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260616_120000_add_lifecycle_tracking::Migration),
 			Box::new(m20260616_130000_index_lifecycle_tracking::Migration),
 			Box::new(m20260619_120000_dedupe_dat_file_lifecycle::Migration),
+			Box::new(m20260619_130000_add_game_name_trigram_index::Migration),
 		]
 	}
 }

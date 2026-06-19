@@ -332,3 +332,20 @@ impl From<entity::game_file::Model> for PlaymatchGameFile {
 		}
 	}
 }
+
+/// A single candidate from a fuzzy game-name search. Carries just enough to let
+/// a caller pick a result and follow up with a get-game call by id.
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct GameNameSearchResult {
+	/// The ID of the game.
+	pub id: Uuid,
+
+	/// The name of the game.
+	pub name: String,
+
+	/// The ID of the platform this game belongs to.
+	pub platform_id: Uuid,
+
+	/// The name of the platform this game belongs to.
+	pub platform_name: String,
+}

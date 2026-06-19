@@ -2,7 +2,7 @@ use crate::model::sgdb::SgdbAssetFilterQuery;
 use crate::routes::company::{__path_get_all_companies, __path_get_company_by_id};
 use crate::routes::game::{
 	__path_get_game_file_history_by_id, __path_get_playmatch_game_by_id,
-	__path_get_playmatch_game_with_relations_by_id,
+	__path_get_playmatch_game_with_relations_by_id, __path_search_games,
 };
 use crate::routes::health::{__path_health, __path_ready};
 use crate::routes::identify::{
@@ -145,10 +145,10 @@ use service::model::user::{
 use service::model::{
 	AutomaticMatchReason, CompanyMetadataResponse, ExternalMetadata, FailedMatchReason,
 	GameAndRelationMatchResult, GameAndRelationsResult, GameMatchType, GameMetadataMatchResult,
-	GameMetadataResponse, ManualMatchMode, MetadataMatchType, MetadataProvider,
-	PlatformMetadataResponse, PlaymatchCompany, PlaymatchDatFile, PlaymatchDatFileImport,
-	PlaymatchGame, PlaymatchGameFile, PlaymatchPlatform, PlaymatchSignatureGroup,
-	UpdatedMatchResult,
+	GameMetadataResponse, GameNameSearchResult, ManualMatchMode, MetadataMatchType,
+	MetadataProvider, PlatformMetadataResponse, PlaymatchCompany, PlaymatchDatFile,
+	PlaymatchDatFileImport, PlaymatchGame, PlaymatchGameFile, PlaymatchPlatform,
+	PlaymatchSignatureGroup, UpdatedMatchResult,
 };
 use service::providers::igdb::model::{
 	AgeRating, AgeRatingCategory, AgeRatingContentDescriptionType, AgeRatingContentDescriptionV2,
@@ -210,6 +210,7 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 		manually_match_platform,
 		get_playmatch_game_by_id,
 		get_playmatch_game_with_relations_by_id,
+		search_games,
 		get_game_file_history_by_id,
 		get_suggestion_by_id,
 		get_all_suggestions,
@@ -418,6 +419,7 @@ use utoipa::openapi::{Components, ComponentsBuilder};
 	components(schemas(
 		GameMetadataMatchResult,
 		GameMetadataResponse,
+		GameNameSearchResult,
 		CompanyMetadataResponse,
 		PlatformMetadataResponse,
 		GameMatchType,

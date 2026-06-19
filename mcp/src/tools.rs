@@ -49,6 +49,18 @@ pub async fn identify_rom_with_relations_json(
 	Ok(serde_json::to_string(&unwrap_cache(result))?)
 }
 
+pub async fn search_games_by_name_json(
+	query: &str,
+	platform_id: Option<Uuid>,
+	limit: Option<u64>,
+	db: &DatabaseConnection,
+) -> anyhow::Result<String> {
+	let results =
+		service::entities::game::search_games_by_name_and_platform(query, platform_id, limit, db)
+			.await?;
+	Ok(serde_json::to_string(&results)?)
+}
+
 pub async fn get_game_json(
 	game_id: Uuid,
 	db: &DatabaseConnection,
@@ -143,12 +155,41 @@ pub async fn get_signature_group_json(
 #[cfg(test)]
 mod tests {
 	use super::build_search;
+	use crate::server::SearchGamesArgs;
 	use sea_orm::prelude::Uuid;
 
 	#[test]
 	fn invalid_uuid_is_rejected() {
 		let parsed = Uuid::parse_str("not-a-uuid");
 		assert!(parsed.is_err());
+	}
+
+	#[test]
+	fn search_args_deserialize_with_optional_fields_absent() {
+		let args: SearchGamesArgs = serde_json::from_str(r#"{"query":"pokemon diamond"}"#).unwrap();
+		assert_eq!(args.query, "pokemon diamond");
+		assert!(args.platform_id.is_none());
+		assert!(args.limit.is_none());
+	}
+
+	#[test]
+	fn search_args_blank_query_trims_to_empty() {
+		let args: SearchGamesArgs = serde_json::from_str(r#"{"query":"   "}"#).unwrap();
+		assert!(
+			args.query.trim().is_empty(),
+			"a whitespace-only query must trim to empty so the tool can reject it"
+		);
+	}
+
+	#[test]
+	fn search_args_platform_id_uuid_is_validated() {
+		let args: SearchGamesArgs =
+			serde_json::from_str(r#"{"query":"zelda","platform_id":"not-a-uuid"}"#).unwrap();
+		let raw = args.platform_id.expect("platform_id present");
+		assert!(
+			Uuid::parse_str(&raw).is_err(),
+			"a malformed platform_id must fail uuid parsing"
+		);
 	}
 
 	#[test]

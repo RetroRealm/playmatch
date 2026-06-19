@@ -3,6 +3,7 @@ use crate::openapi::create_openapi;
 use crate::routes::company::{get_all_companies, get_company_by_id};
 use crate::routes::game::{
 	get_game_file_history_by_id, get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id,
+	search_games,
 };
 use crate::routes::health::{health, ready};
 use crate::routes::identify::{identify_game_and_relations, identify_game_with_metadata_ids};
@@ -971,6 +972,7 @@ fn configure_public_api_routes(
 		.service(identify_game_and_relations)
 		.service(get_playmatch_game_by_id)
 		.service(get_playmatch_game_with_relations_by_id)
+		.service(search_games)
 		.service(get_game_file_history_by_id);
 	if igdb_enabled {
 		configure_igdb_routes(cfg);

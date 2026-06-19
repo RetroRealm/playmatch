@@ -9,6 +9,7 @@ use entity::sea_orm_active_enums::{FailedMatchReasonEnum, MatchTypeEnum, Metadat
 use entity::{company, dat_file, dat_file_import, game_file_presence, platform, signature_group};
 use futures_util::future::BoxFuture;
 use sea_orm::prelude::Uuid;
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::sea_query::{Alias, Expr};
 use sea_orm::{
 	ActiveEnum, ActiveModelTrait, ActiveValue::Set, ColumnTrait, DbConn, DbErr, EntityTrait,
@@ -252,6 +253,62 @@ pub async fn find_games_by_name_and_platform_id(
 				.eq(name)
 				.and(platform::Column::Id.eq(platform_id)),
 		)
+		.all(conn)
+		.await
+}
+
+/// Default number of fuzzy name-search candidates returned when no limit is given.
+pub const GAME_NAME_SEARCH_DEFAULT_LIMIT: u64 = 25;
+
+/// Hard ceiling on fuzzy name-search candidates regardless of the requested limit.
+pub const GAME_NAME_SEARCH_MAX_LIMIT: u64 = 50;
+
+/// Fuzzy-search games by name. A row matches when the query is a case-insensitive
+/// substring of the name, or when the query has a high enough pg_trgm word
+/// similarity to the name (so a partial title like "pokemon diamond" still finds
+/// "Pokemon - Diamant-Edition ..."). Results are ordered by word similarity desc
+/// and capped at [`GAME_NAME_SEARCH_MAX_LIMIT`]. An optional `platform_id` narrows
+/// to a single platform. Returns `(id, name, platform_id, platform_name)` tuples.
+pub async fn search_games_by_name(
+	query: &str,
+	platform_id: Option<Uuid>,
+	limit: u64,
+	conn: &DbConn,
+) -> Result<Vec<(Uuid, String, Uuid, String)>, DbErr> {
+	let capped_limit = limit.clamp(1, GAME_NAME_SEARCH_MAX_LIMIT);
+	let pattern = format!("%{query}%");
+
+	let mut select = Game::find()
+		.join(JoinType::InnerJoin, game::Relation::DatFileImport.def())
+		.join(
+			JoinType::InnerJoin,
+			dat_file_import::Relation::DatFile.def(),
+		)
+		.join(JoinType::InnerJoin, dat_file::Relation::Platform.def())
+		.filter(
+			Expr::col((game::Entity, game::Column::Name))
+				.ilike(pattern)
+				.or(Expr::cust_with_values("game.name %> $1", [query])),
+		);
+
+	if let Some(platform_id) = platform_id {
+		select = select.filter(platform::Column::Id.eq(platform_id));
+	}
+
+	select
+		.select_only()
+		.column(game::Column::Id)
+		.column(game::Column::Name)
+		.column_as(platform::Column::Id, "platform_id")
+		.column_as(platform::Column::Name, "platform_name")
+		.order_by_desc(Expr::cust_with_values(
+			"word_similarity($1, game.name)",
+			[query],
+		))
+		.order_by_asc(game::Column::Name)
+		.order_by_asc(game::Column::Id)
+		.limit(capped_limit)
+		.into_tuple::<(Uuid, String, Uuid, String)>()
 		.all(conn)
 		.await
 }

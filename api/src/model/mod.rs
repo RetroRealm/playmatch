@@ -1,3 +1,4 @@
+pub mod game;
 pub mod igdb;
 pub mod launchbox;
 pub mod mobygames;
