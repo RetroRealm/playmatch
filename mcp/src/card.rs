@@ -1,16 +1,12 @@
 use serde::Serialize;
 
-const CARD_SCHEMA: &str =
-	"https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json";
-const CARD_NAME: &str = "dev.retrorealm/playmatch";
+const CARD_NAME: &str = "io.github.retrorealm/playmatch";
 const CARD_DESCRIPTION: &str = "Identifies game ROMs by hash and exposes the playmatch catalogue of games, platforms, companies and signature groups.";
 const CARD_TITLE: &str = "Playmatch";
 const CARD_WEBSITE: &str = "https://github.com/RetroRealm/playmatch";
 
 #[derive(Serialize)]
 struct ServerCard<'a> {
-	#[serde(rename = "$schema")]
-	schema: &'a str,
 	name: &'a str,
 	description: &'a str,
 	version: &'a str,
@@ -49,7 +45,6 @@ pub fn server_card_json(public_base_url: Option<&str>) -> String {
 		.unwrap_or_default();
 
 	let card = ServerCard {
-		schema: CARD_SCHEMA,
 		name: CARD_NAME,
 		description: CARD_DESCRIPTION,
 		version: env!("CARGO_PKG_VERSION"),
@@ -73,7 +68,8 @@ mod tests {
 	#[test]
 	fn card_with_public_url_advertises_the_mcp_remote() {
 		let card: Value = serde_json::from_str(&server_card_json(Some("https://h"))).unwrap();
-		assert_eq!(card["name"], "dev.retrorealm/playmatch");
+		assert_eq!(card["name"], "io.github.retrorealm/playmatch");
+		assert!(card.get("$schema").is_none());
 		assert_eq!(card["version"], env!("CARGO_PKG_VERSION"));
 		assert_eq!(card["title"], "Playmatch");
 		assert_eq!(card["remotes"][0]["type"], "streamable-http");
@@ -90,6 +86,6 @@ mod tests {
 	fn card_without_public_url_omits_remotes() {
 		let card: Value = serde_json::from_str(&server_card_json(None)).unwrap();
 		assert!(card.get("remotes").is_none());
-		assert_eq!(card["name"], "dev.retrorealm/playmatch");
+		assert_eq!(card["name"], "io.github.retrorealm/playmatch");
 	}
 }

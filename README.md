@@ -67,9 +67,14 @@ It is controlled by these environment variables:
   `https://playmatch.retrorealm.dev`). Used to advertise the endpoint in the
   discovery document. Leave empty to omit the remote entry.
 
-For discovery, the server publishes an MCP Server Card at
-`/.well-known/mcp-server-card` (and the same document at `/.well-known/mcp.json`),
-so registries and clients can find the endpoint without connecting.
+The server publishes an MCP Server Card at `/.well-known/mcp-server-card` (and the
+same document at `/.well-known/mcp.json`). A client that already knows the host can
+read the card to learn the endpoint and metadata without connecting. This is a
+self-hosted card, not a registry listing, so it does not by itself make registries
+aware of the server.
+
+The MCP session manager is kept in-process, so the deployment must run as a single
+instance. This is the same constraint as the in-process cron and import jobs.
 
 The server exposes these tools:
 

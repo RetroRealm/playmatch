@@ -313,6 +313,11 @@ async fn start() -> anyhow::Result<()> {
 	let mcp_public_url = env::var("MCP_PUBLIC_URL")
 		.ok()
 		.filter(|s| !s.trim().is_empty());
+	if mcp_enabled && mcp_public_url.is_none() {
+		warn!(
+			"MCP enabled but MCP_PUBLIC_URL is unset; the server card will omit the remote endpoint"
+		);
+	}
 	let mcp_card =
 		mcp_enabled.then(|| Data::new(McpCard(mcp::server_card_json(mcp_public_url.as_deref()))));
 
@@ -1217,7 +1222,7 @@ mod tests {
 
 			let body = test::read_body(resp).await;
 			let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-			assert_eq!(json["name"], "dev.retrorealm/playmatch");
+			assert_eq!(json["name"], "io.github.retrorealm/playmatch");
 			assert_eq!(json["remotes"][0]["url"], "https://example.test/mcp");
 		}
 	}

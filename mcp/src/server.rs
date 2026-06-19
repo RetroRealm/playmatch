@@ -97,10 +97,12 @@ impl PlaymatchMcp {
 	/// Identify a ROM and return its matched game id plus external metadata
 	/// provider ids. Call this when you have a ROM file and want to know which
 	/// game it is and how it maps to providers like IGDB. Provide hashes when
-	/// available for the most reliable match. A ROM that matches nothing returns
-	/// a result with game_match_type NoMatch, which is a normal answer.
+	/// available for the most reliable match. The gameMatchType field is a closed
+	/// set: SHA256, SHA1, MD5, FileNameAndSize or NoMatch. NoMatch is a normal
+	/// answer whose matched game id is null. FileNameAndSize is a weaker fallback
+	/// that only matches when file_name is exactly the catalogued ROM name.
 	#[tool(
-		description = "Identify a ROM by its hashes and file metadata and return the matched game id and external metadata provider ids. Returns a NoMatch result when nothing is found."
+		description = "Identify a ROM by its hashes and file metadata and return the matched game id and external metadata provider ids. The gameMatchType field is one of SHA256, SHA1, MD5, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
 	)]
 	async fn playmatch_identify_rom_by_hash(
 		&self,
@@ -125,10 +127,13 @@ impl PlaymatchMcp {
 
 	/// Identify a ROM and return the matched game together with its related
 	/// platform, company, signature group, dat file and game files. Call this
-	/// when you need the full context around a ROM, not just its ids. A ROM that
-	/// matches nothing returns a result with game_match_type NoMatch.
+	/// when you need the full context around a ROM, not just its ids. The
+	/// gameMatchType field is a closed set: SHA256, SHA1, MD5, FileNameAndSize or
+	/// NoMatch. NoMatch is a normal answer whose matched game id is null.
+	/// FileNameAndSize is a weaker fallback that only matches when file_name is
+	/// exactly the catalogued ROM name.
 	#[tool(
-		description = "Identify a ROM by its hashes and file metadata and return the matched game with its related platform, company, signature group, dat file and files. Returns a NoMatch result when nothing is found."
+		description = "Identify a ROM by its hashes and file metadata and return the matched game with its related platform, company, signature group, dat file and files. The gameMatchType field is one of SHA256, SHA1, MD5, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
 	)]
 	async fn playmatch_identify_rom_with_relations(
 		&self,
@@ -153,8 +158,11 @@ impl PlaymatchMcp {
 
 	/// Fetch a single game and its external metadata by its playmatch game id.
 	/// Call this when you already have a game id and want its name, description
-	/// and provider mappings.
-	#[tool(description = "Fetch a single game and its external metadata by its playmatch game id.")]
+	/// and provider mappings. DAT-currency fields such as current_in_latest_dat
+	/// are populated only by playmatch_get_game_with_relations.
+	#[tool(
+		description = "Fetch a single game and its external metadata by its playmatch game id. DAT-currency fields such as current_in_latest_dat are populated only by playmatch_get_game_with_relations."
+	)]
 	async fn playmatch_get_game(
 		&self,
 		Parameters(args): Parameters<GameIdArgs>,
@@ -309,7 +317,9 @@ impl ServerHandler for PlaymatchMcp {
 			.with_instructions(
 				"playmatch identifies game ROMs by hash and exposes the playmatch catalogue. \
 				 Use the identify tools to resolve a ROM file to a game, and the get/list tools \
-				 to look up games, platforms, companies and signature groups by id.",
+				 to look up games, platforms, companies and signature groups by id. \
+				 external_metadata entries are provider id mappings only; resolving them to full \
+				 records needs the separate provider HTTP API, so the ids are references, not dead ends.",
 			);
 		info.server_info =
 			Implementation::new("playmatch", env!("CARGO_PKG_VERSION")).with_title("Playmatch");
