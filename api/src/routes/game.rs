@@ -48,8 +48,7 @@ pub async fn get_playmatch_game_with_relations_by_id(
 		.json(get_game_and_all_relations(id.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Fuzzy-searches the game catalogue by human title, optionally narrowed to a
-/// platform. Returns candidate games ordered by relevance.
+/// Fuzzy-searches the game catalogue by name, optionally narrowed to a platform.
 #[utoipa::path(
 	get,
 	context_path = "/api",

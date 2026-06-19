@@ -257,18 +257,12 @@ pub async fn find_games_by_name_and_platform_id(
 		.await
 }
 
-/// Default number of fuzzy name-search candidates returned when no limit is given.
 pub const GAME_NAME_SEARCH_DEFAULT_LIMIT: u64 = 25;
 
-/// Hard ceiling on fuzzy name-search candidates regardless of the requested limit.
 pub const GAME_NAME_SEARCH_MAX_LIMIT: u64 = 50;
 
-/// Fuzzy-search games by name. A row matches when the query is a case-insensitive
-/// substring of the name, or when the query has a high enough pg_trgm word
-/// similarity to the name (so a partial title like "pokemon diamond" still finds
-/// "Pokemon - Diamant-Edition ..."). Results are ordered by word similarity desc
-/// and capped at [`GAME_NAME_SEARCH_MAX_LIMIT`]. An optional `platform_id` narrows
-/// to a single platform. Returns `(id, name, platform_id, platform_name)` tuples.
+/// Fuzzy-search games by name: case-insensitive substring or pg_trgm word
+/// similarity, ordered by similarity and capped at [`GAME_NAME_SEARCH_MAX_LIMIT`].
 pub async fn search_games_by_name(
 	query: &str,
 	platform_id: Option<Uuid>,

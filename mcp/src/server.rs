@@ -107,13 +107,6 @@ impl PlaymatchMcp {
 		}
 	}
 
-	/// Identify a ROM and return its matched game id plus external metadata
-	/// provider ids. Call this when you have a ROM file and want to know which
-	/// game it is and how it maps to providers like IGDB. Provide hashes when
-	/// available for the most reliable match. The gameMatchType field is a closed
-	/// set: SHA256, SHA1, MD5, CRC, FileNameAndSize or NoMatch. NoMatch is a normal
-	/// answer whose matched game id is null. FileNameAndSize is a weaker fallback
-	/// that only matches when file_name is exactly the catalogued ROM name.
 	#[tool(
 		description = "Identify a ROM by its hashes and file metadata and return the matched game id and external metadata provider ids. The gameMatchType field is one of SHA256, SHA1, MD5, CRC, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
 	)]
@@ -139,13 +132,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// Identify a ROM and return the matched game together with its related
-	/// platform, company, signature group, dat file and game files. Call this
-	/// when you need the full context around a ROM, not just its ids. The
-	/// gameMatchType field is a closed set: SHA256, SHA1, MD5, CRC, FileNameAndSize or
-	/// NoMatch. NoMatch is a normal answer whose matched game id is null.
-	/// FileNameAndSize is a weaker fallback that only matches when file_name is
-	/// exactly the catalogued ROM name.
 	#[tool(
 		description = "Identify a ROM by its hashes and file metadata and return the matched game with its related platform, company, signature group, dat file and files. The gameMatchType field is one of SHA256, SHA1, MD5, CRC, FileNameAndSize or NoMatch; NoMatch is a normal result whose matched game id is null. FileNameAndSize is a weaker fallback that only matches when file_name is the catalogued ROM name."
 	)]
@@ -171,12 +157,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// Find a playmatch game by its human title when you do not have a ROM file
-	/// or any hash. This is a fuzzy substring search over the catalogue, ordered
-	/// by relevance, returning candidate ids, names and platforms. Pass a returned
-	/// id to playmatch_get_game or playmatch_get_game_with_relations for the full
-	/// record. Narrow with platform_id when you know the platform, and cap the
-	/// number of candidates with limit. An empty query is rejected.
 	#[tool(
 		description = "Find a playmatch game by human title when you do not have a hash. Fuzzy substring search over the catalogue, ordered by relevance, returning candidate ids, names and platforms. Pass a returned id to playmatch_get_game for the full record. Optional platform_id narrows to a platform; optional limit caps the candidates."
 	)]
@@ -208,10 +188,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// Fetch a single game and its external metadata by its playmatch game id.
-	/// Call this when you already have a game id and want its name, description
-	/// and provider mappings. DAT-currency fields such as current_in_latest_dat
-	/// are populated only by playmatch_get_game_with_relations.
 	#[tool(
 		description = "Fetch a single game and its external metadata by its playmatch game id. DAT-currency fields such as current_in_latest_dat are populated only by playmatch_get_game_with_relations."
 	)]
@@ -231,8 +207,6 @@ impl PlaymatchMcp {
 		}
 	}
 
-	/// Fetch a game with its full relations (platform, company, signature group,
-	/// dat file, dat file import and game files) by its playmatch game id.
 	#[tool(
 		description = "Fetch a game with its full relations (platform, company, signature group, dat file and files) by its playmatch game id."
 	)]
@@ -252,8 +226,6 @@ impl PlaymatchMcp {
 		}
 	}
 
-	/// Return the dat file imports a game file was seen in, newest first. Call
-	/// this with a game file id to trace which dat releases contained that file.
 	#[tool(
 		description = "Return the dat file imports a game file was seen in, newest first, by its playmatch game file id."
 	)]
@@ -270,8 +242,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// List every company and its external metadata provider mappings. Call this
-	/// to browse the full set of known publishers and developers.
 	#[tool(description = "List every company and its external metadata provider mappings.")]
 	async fn playmatch_list_companies(&self) -> Result<CallToolResult, ErrorData> {
 		let json = tools::list_companies_json(&self.db)
@@ -280,7 +250,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// Fetch a single company and its external metadata by its playmatch company id.
 	#[tool(
 		description = "Fetch a single company and its external metadata by its playmatch company id."
 	)]
@@ -300,8 +269,6 @@ impl PlaymatchMcp {
 		}
 	}
 
-	/// List every platform with its related company and external metadata
-	/// provider mappings. Call this to browse the full set of known platforms.
 	#[tool(
 		description = "List every platform with its related company and external metadata provider mappings."
 	)]
@@ -312,8 +279,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// Fetch a single platform with its related company and external metadata by
-	/// its playmatch platform id.
 	#[tool(
 		description = "Fetch a single platform with its related company and external metadata by its playmatch platform id."
 	)]
@@ -333,8 +298,6 @@ impl PlaymatchMcp {
 		}
 	}
 
-	/// List every signature group, the dat publishers playmatch ingests from
-	/// such as No-Intro and Redump. Call this to browse the known signature groups.
 	#[tool(description = "List every signature group (dat publisher) known to playmatch.")]
 	async fn playmatch_list_signature_groups(&self) -> Result<CallToolResult, ErrorData> {
 		let json = tools::list_signature_groups_json(&self.db)
@@ -343,7 +306,6 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	/// Fetch a single signature group by its playmatch signature group id.
 	#[tool(description = "Fetch a single signature group by its playmatch signature group id.")]
 	async fn playmatch_get_signature_group(
 		&self,
