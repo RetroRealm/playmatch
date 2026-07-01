@@ -86,6 +86,7 @@ struct OAuth2Handler {
 	>,
 	token_response: Option<BasicTokenResponse>,
 	last_token_request: Option<DateTime<Utc>>,
+	http: oauth2::reqwest::Client,
 }
 
 pub struct IgdbClient {
@@ -125,6 +126,11 @@ impl IgdbClient {
 
 		oauth2_client = oauth2_client.set_auth_type(RequestBody);
 
+		// oauth2 5 pins reqwest 0.12, so token requests go through its re-exported client.
+		let oauth2_http = oauth2::reqwest::ClientBuilder::new()
+			.redirect(oauth2::reqwest::redirect::Policy::none())
+			.build()?;
+
 		crate::metrics::set_provider_concurrency_configured(
 			"igdb",
 			crate::providers::DEFAULT_CHUNK_SIZE as i64,
@@ -138,6 +144,7 @@ impl IgdbClient {
 				oauth2: oauth2_client,
 				token_response: None,
 				last_token_request: None,
+				http: oauth2_http,
 			}),
 			redis_conn,
 		})
@@ -1154,7 +1161,7 @@ impl IgdbClient {
 		let token_result = handler_ref
 			.oauth2
 			.exchange_client_credentials()
-			.request_async(&self.client)
+			.request_async(&handler_ref.http)
 			.await?;
 
 		debug!(

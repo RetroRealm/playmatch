@@ -6,10 +6,10 @@ edition.workspace = true
 [dependencies]
 entity = { path = "../entity" }
 tokio = { workspace = true, features = ["macros", "rt"] }
-reqwest = { workspace = true, features = ["rustls-tls", "cookies", "stream"] }
+reqwest = { workspace = true, features = ["rustls", "cookies", "stream"] }
 serde = { workspace = true, features = ["derive"] }
 serde-xml-rs = "^0.8"
-quick-xml = "^0.39"
+quick-xml = "^0.41"
 serde_repr = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
@@ -23,7 +23,7 @@ lazy_static = "^1"
 unicode-normalization = "^0.1"
 futures-util = "^0.3"
 zip = "^8"
-sqlx = { version = "^0.8", default-features = false, features = ["sqlite", "runtime-tokio-rustls"] }
+sqlx = { version = "^0.9", default-features = false, features = ["sqlite", "runtime-tokio"] }
 async-recursion = "^1.1"
 strum = { version = "^0.28", features = ["derive"] }
 async-trait = "^0.1"
@@ -49,4 +49,4 @@ sea-orm = { workspace = true, features = ["debug-print", "runtime-tokio-rustls",
 # against the Postgres integration test instead.
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 migration = { path = "../migration" }
-testcontainers-modules = { version = "^0.12", features = ["postgres", "redis"] }
+testcontainers-modules = { version = "^0.15", features = ["postgres", "redis"] }

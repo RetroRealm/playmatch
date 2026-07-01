@@ -9,7 +9,7 @@ service = { path = "../service" }
 futures-util = "^0.3"
 rmcp = { workspace = true }
 rmcp-actix-web = "^0.12"
-actix-web = "~4.13"
+actix-web = "~4.14"
 sea-orm = { workspace = true, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
 redis = { workspace = true, features = ["tokio-rustls-comp"] }
 serde = { workspace = true, features = ["derive"] }
@@ -21,4 +21,4 @@ log = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 migration = { path = "../migration" }
-testcontainers-modules = { version = "^0.12", features = ["postgres", "redis"] }
+testcontainers-modules = { version = "^0.15", features = ["postgres", "redis"] }
