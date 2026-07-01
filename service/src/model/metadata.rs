@@ -218,9 +218,137 @@ pub enum AutomaticMatchReason {
 	CrossProviderNormalizedName,
 }
 
+/// External metadata for a game/platform/company.
+#[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalMetadataV2 {
+	/// The Name of the metadata provider.
+	pub provider_name: MetadataProvider,
+
+	/// The ID of the game for this provider.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider_id: Option<String>,
+
+	/// Type of how this game was matched to this Provider
+	pub match_type: MetadataMatchType,
+
+	/// Optional Comment about the match.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub comment: Option<String>,
+
+	/// Optional Type of manual match
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub manual_match_type: Option<ManualMatchMode>,
+
+	/// Optional Reason why the match failed
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub failed_match_reason: Option<FailedMatchReason>,
+
+	/// Optional Reason for automatic match
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub automatic_match_reason: Option<AutomaticMatchReasonV2>,
+}
+
+/// Reason why a game was automatically matched.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum AutomaticMatchReasonV2 {
+	/// Matched by an alternative name which was exactly matching the title.
+	AlternativeName,
+
+	/// Matched by the direct name which was exactly matching the title.
+	DirectName,
+
+	/// A Game which is a clone of this game (a different version) was matched.
+	ViaChild,
+
+	/// A Game which this game is a clone of (a different version) was matched.
+	ViaParent,
+
+	/// Matched by the normalized name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
+	NormalizedName,
+
+	/// Matched by the normalized alternative name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
+	NormalizedAlternativeName,
+
+	/// Matched by an MD5 hash of one of the game's files.
+	Md5Hash,
+
+	/// Matched by a SHA-1 hash of one of the game's files.
+	Sha1Hash,
+
+	/// Matched by a CRC32 of one of the game's files.
+	CrcHash,
+
+	/// Matched by another provider's canonical title via cross-provider name propagation, exact lower-case compare.
+	CrossProviderDirectName,
+
+	/// Matched by another provider's canonical title via cross-provider name propagation, after normalisation.
+	CrossProviderNormalizedName,
+
+	/// Propagated from a content-sibling game that shares the same file hash set.
+	ViaContentHash,
+
+	/// Matched by a SHA-256 hash of one of the game's files.
+	Sha256Hash,
+}
+
 impl From<entity::signature_metadata_mapping::Model> for ExternalMetadata {
 	fn from(value: entity::signature_metadata_mapping::Model) -> Self {
 		ExternalMetadata {
+			provider_name: value.provider.into(),
+			provider_id: value.provider_id,
+			match_type: value.match_type.into(),
+			comment: value.comment,
+			manual_match_type: value.manual_match_type.map(Into::into),
+			failed_match_reason: value.failed_match_reason.map(Into::into),
+			automatic_match_reason: value
+				.automatic_match_reason
+				.and_then(AutomaticMatchReason::from_entity),
+		}
+	}
+}
+
+impl From<ExternalMetadata> for ExternalMetadataV2 {
+	fn from(value: ExternalMetadata) -> Self {
+		ExternalMetadataV2 {
+			provider_name: value.provider_name,
+			provider_id: value.provider_id,
+			match_type: value.match_type,
+			comment: value.comment,
+			manual_match_type: value.manual_match_type,
+			failed_match_reason: value.failed_match_reason,
+			automatic_match_reason: value.automatic_match_reason.map(Into::into),
+		}
+	}
+}
+
+impl From<AutomaticMatchReason> for AutomaticMatchReasonV2 {
+	fn from(value: AutomaticMatchReason) -> Self {
+		match value {
+			AutomaticMatchReason::AlternativeName => AutomaticMatchReasonV2::AlternativeName,
+			AutomaticMatchReason::DirectName => AutomaticMatchReasonV2::DirectName,
+			AutomaticMatchReason::ViaChild => AutomaticMatchReasonV2::ViaChild,
+			AutomaticMatchReason::ViaParent => AutomaticMatchReasonV2::ViaParent,
+			AutomaticMatchReason::NormalizedName => AutomaticMatchReasonV2::NormalizedName,
+			AutomaticMatchReason::NormalizedAlternativeName => {
+				AutomaticMatchReasonV2::NormalizedAlternativeName
+			}
+			AutomaticMatchReason::Md5Hash => AutomaticMatchReasonV2::Md5Hash,
+			AutomaticMatchReason::Sha1Hash => AutomaticMatchReasonV2::Sha1Hash,
+			AutomaticMatchReason::CrcHash => AutomaticMatchReasonV2::CrcHash,
+			AutomaticMatchReason::CrossProviderDirectName => {
+				AutomaticMatchReasonV2::CrossProviderDirectName
+			}
+			AutomaticMatchReason::CrossProviderNormalizedName => {
+				AutomaticMatchReasonV2::CrossProviderNormalizedName
+			}
+		}
+	}
+}
+
+impl From<entity::signature_metadata_mapping::Model> for ExternalMetadataV2 {
+	fn from(value: entity::signature_metadata_mapping::Model) -> Self {
+		ExternalMetadataV2 {
 			provider_name: value.provider.into(),
 			provider_id: value.provider_id,
 			match_type: value.match_type.into(),
@@ -319,26 +447,58 @@ impl From<FailedMatchReasonEnum> for FailedMatchReason {
 	}
 }
 
-impl From<AutomaticMatchReasonEnum> for AutomaticMatchReason {
-	fn from(automatic_match_reason: AutomaticMatchReasonEnum) -> Self {
-		match automatic_match_reason {
-			AutomaticMatchReasonEnum::AlternativeName => AutomaticMatchReason::AlternativeName,
-			AutomaticMatchReasonEnum::DirectName => AutomaticMatchReason::DirectName,
-			AutomaticMatchReasonEnum::ViaChild => AutomaticMatchReason::ViaChild,
-			AutomaticMatchReasonEnum::ViaParent => AutomaticMatchReason::ViaParent,
-			AutomaticMatchReasonEnum::NormalizedName => AutomaticMatchReason::NormalizedName,
-			AutomaticMatchReasonEnum::NormalizedAlternativeName => {
-				AutomaticMatchReason::NormalizedAlternativeName
+impl AutomaticMatchReason {
+	/// Maps a stored match reason onto the v1 enum, returning `None` for reasons
+	/// that have no v1 representation. The v1 surface omits the field for those
+	/// rows rather than emitting a value outside its schema.
+	fn from_entity(value: AutomaticMatchReasonEnum) -> Option<Self> {
+		match value {
+			AutomaticMatchReasonEnum::AlternativeName => {
+				Some(AutomaticMatchReason::AlternativeName)
 			}
-			AutomaticMatchReasonEnum::Md5Hash => AutomaticMatchReason::Md5Hash,
-			AutomaticMatchReasonEnum::Sha1Hash => AutomaticMatchReason::Sha1Hash,
-			AutomaticMatchReasonEnum::CrcHash => AutomaticMatchReason::CrcHash,
+			AutomaticMatchReasonEnum::DirectName => Some(AutomaticMatchReason::DirectName),
+			AutomaticMatchReasonEnum::ViaChild => Some(AutomaticMatchReason::ViaChild),
+			AutomaticMatchReasonEnum::ViaParent => Some(AutomaticMatchReason::ViaParent),
+			AutomaticMatchReasonEnum::NormalizedName => Some(AutomaticMatchReason::NormalizedName),
+			AutomaticMatchReasonEnum::NormalizedAlternativeName => {
+				Some(AutomaticMatchReason::NormalizedAlternativeName)
+			}
+			AutomaticMatchReasonEnum::Md5Hash => Some(AutomaticMatchReason::Md5Hash),
+			AutomaticMatchReasonEnum::Sha1Hash => Some(AutomaticMatchReason::Sha1Hash),
+			AutomaticMatchReasonEnum::CrcHash => Some(AutomaticMatchReason::CrcHash),
 			AutomaticMatchReasonEnum::CrossProviderDirectName => {
-				AutomaticMatchReason::CrossProviderDirectName
+				Some(AutomaticMatchReason::CrossProviderDirectName)
 			}
 			AutomaticMatchReasonEnum::CrossProviderNormalizedName => {
-				AutomaticMatchReason::CrossProviderNormalizedName
+				Some(AutomaticMatchReason::CrossProviderNormalizedName)
 			}
+			AutomaticMatchReasonEnum::ViaContentHash | AutomaticMatchReasonEnum::Sha256Hash => None,
+		}
+	}
+}
+
+impl From<AutomaticMatchReasonEnum> for AutomaticMatchReasonV2 {
+	fn from(automatic_match_reason: AutomaticMatchReasonEnum) -> Self {
+		match automatic_match_reason {
+			AutomaticMatchReasonEnum::AlternativeName => AutomaticMatchReasonV2::AlternativeName,
+			AutomaticMatchReasonEnum::DirectName => AutomaticMatchReasonV2::DirectName,
+			AutomaticMatchReasonEnum::ViaChild => AutomaticMatchReasonV2::ViaChild,
+			AutomaticMatchReasonEnum::ViaParent => AutomaticMatchReasonV2::ViaParent,
+			AutomaticMatchReasonEnum::NormalizedName => AutomaticMatchReasonV2::NormalizedName,
+			AutomaticMatchReasonEnum::NormalizedAlternativeName => {
+				AutomaticMatchReasonV2::NormalizedAlternativeName
+			}
+			AutomaticMatchReasonEnum::Md5Hash => AutomaticMatchReasonV2::Md5Hash,
+			AutomaticMatchReasonEnum::Sha1Hash => AutomaticMatchReasonV2::Sha1Hash,
+			AutomaticMatchReasonEnum::CrcHash => AutomaticMatchReasonV2::CrcHash,
+			AutomaticMatchReasonEnum::CrossProviderDirectName => {
+				AutomaticMatchReasonV2::CrossProviderDirectName
+			}
+			AutomaticMatchReasonEnum::CrossProviderNormalizedName => {
+				AutomaticMatchReasonV2::CrossProviderNormalizedName
+			}
+			AutomaticMatchReasonEnum::ViaContentHash => AutomaticMatchReasonV2::ViaContentHash,
+			AutomaticMatchReasonEnum::Sha256Hash => AutomaticMatchReasonV2::Sha256Hash,
 		}
 	}
 }

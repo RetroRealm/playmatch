@@ -13,13 +13,12 @@ use service::providers::retroachievements::cache::{
 #[allow(unused_imports)] // Referenced only inside utoipa::path body attributes.
 use service::providers::retroachievements::model::{RaGame, RaGameHash, RaGameMatch, RaSystem};
 
-/// List every console RetroAchievements knows about.
+/// Lists every console known to RetroAchievements.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "RetroAchievements",
 	responses(
-		(status = 200, description = "RetroAchievements system catalog", body = Vec<RaSystem>)
+		(status = 200, description = "The full RetroAchievements system catalog", body = Vec<RaSystem>)
 	)
 )]
 #[get("/retroachievements/systems")]
@@ -32,14 +31,13 @@ pub async fn list_ra_systems(
 	Ok(HttpResponse::Ok().json(systems))
 }
 
-/// Look up a RetroAchievements game by its game id.
+/// Returns a RetroAchievements game by id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "RetroAchievements",
 	params(RaIdQuery),
 	responses(
-		(status = 200, description = "RetroAchievements game record", body = RaGame),
+		(status = 200, description = "The matched RetroAchievements game record", body = RaGame),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -58,15 +56,15 @@ pub async fn get_ra_game_by_id(
 	})
 }
 
-/// Look up a RetroAchievements game by one of its MD5 hashes and return the
-/// game record together with every other hash RetroAchievements has for it.
+/// Looks up a RetroAchievements game by one of its MD5 hashes.
+///
+/// The response carries the matched game and every other MD5 hash RetroAchievements has for it.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "RetroAchievements",
 	params(RaHashQuery),
 	responses(
-		(status = 200, description = "Matched game and its hashes", body = RaGameMatch),
+		(status = 200, description = "The matched game and its hashes", body = RaGameMatch),
 		(status = 404, description = "No game matched the supplied hash")
 	)
 )]
@@ -86,14 +84,15 @@ pub async fn get_ra_game_by_hash(
 	})
 }
 
-/// Search RetroAchievements games by title, optionally narrowed to a system.
+/// Searches RetroAchievements games by title.
+///
+/// Narrow the search to a single system by passing a system name. If omitted, all systems are included.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "RetroAchievements",
 	params(RaSearchQuery),
 	responses(
-		(status = 200, description = "Matching games", body = Vec<RaGame>)
+		(status = 200, description = "The matching games", body = Vec<RaGame>)
 	)
 )]
 #[get("/retroachievements/game/search")]

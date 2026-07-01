@@ -18,14 +18,13 @@ use service::providers::steamgriddb::cache::{
 #[allow(unused_imports)] // Referenced only inside utoipa::path body attributes.
 use service::providers::steamgriddb::model::{SgdbAsset, SgdbGame};
 
-/// Look up a SteamGridDB game by its SGDB id.
+/// Returns a SteamGridDB game by its SteamGridDB id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "SteamGridDB",
 	params(SgdbIdQuery),
 	responses(
-		(status = 200, description = "SteamGridDB game record", body = SgdbGame),
+		(status = 200, description = "The matched SteamGridDB game", body = SgdbGame),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -44,14 +43,15 @@ pub async fn get_sgdb_game_by_id(
 	})
 }
 
-/// Look up a SteamGridDB game by an external platform id (steam, origin, egs, etc.).
+/// Returns a SteamGridDB game by an external platform id.
+///
+/// The platform id is the game's id on an external store or service such as Steam, Origin, the Epic Games Store, GOG, or Flashpoint.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "SteamGridDB",
 	params(SgdbPlatformQuery),
 	responses(
-		(status = 200, description = "SteamGridDB game record", body = SgdbGame),
+		(status = 200, description = "The matched SteamGridDB game", body = SgdbGame),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -76,14 +76,15 @@ pub async fn get_sgdb_game_by_platform(
 	})
 }
 
-/// Search SteamGridDB games via its autocomplete endpoint.
+/// Searches SteamGridDB games by name.
+///
+/// Returns an empty array when no game name matches.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "SteamGridDB",
 	params(SgdbSearchQuery),
 	responses(
-		(status = 200, description = "Matching games", body = Vec<SgdbGame>)
+		(status = 200, description = "The matching SteamGridDB games", body = Vec<SgdbGame>)
 	)
 )]
 #[get("/sgdb/game/search")]
@@ -104,9 +105,9 @@ pub async fn search_sgdb_games(
 #[rustfmt::skip]
 macro_rules! sgdb_assets_by_game_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
+		#[doc = $tag_summary]
 		#[utoipa::path(
 							get,
-							context_path = "/api",
 							tag = "SteamGridDB",
 							params(SgdbGameAssetQuery),
 							responses(
@@ -136,9 +137,9 @@ macro_rules! sgdb_assets_by_game_route {
 #[rustfmt::skip]
 macro_rules! sgdb_assets_by_platform_route {
 	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
+		#[doc = $tag_summary]
 		#[utoipa::path(
 							get,
-							context_path = "/api",
 							tag = "SteamGridDB",
 							params(SgdbPlatformAssetQuery),
 							responses(
@@ -170,50 +171,50 @@ sgdb_assets_by_game_route!(
 	"/sgdb/grids",
 	get_sgdb_grids_by_game,
 	get_sgdb_grids_by_game_cached,
-	"Grid assets for the requested SGDB game"
+	"The grid assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/grids/by-platform",
 	get_sgdb_grids_by_platform,
 	get_sgdb_grids_by_platform_cached,
-	"Grid assets for the requested external platform id"
+	"The grid assets for the external platform id"
 );
 
 sgdb_assets_by_game_route!(
 	"/sgdb/heroes",
 	get_sgdb_heroes_by_game,
 	get_sgdb_heroes_by_game_cached,
-	"Hero assets for the requested SGDB game"
+	"The hero assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/heroes/by-platform",
 	get_sgdb_heroes_by_platform,
 	get_sgdb_heroes_by_platform_cached,
-	"Hero assets for the requested external platform id"
+	"The hero assets for the external platform id"
 );
 
 sgdb_assets_by_game_route!(
 	"/sgdb/logos",
 	get_sgdb_logos_by_game,
 	get_sgdb_logos_by_game_cached,
-	"Logo assets for the requested SGDB game"
+	"The logo assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/logos/by-platform",
 	get_sgdb_logos_by_platform,
 	get_sgdb_logos_by_platform_cached,
-	"Logo assets for the requested external platform id"
+	"The logo assets for the external platform id"
 );
 
 sgdb_assets_by_game_route!(
 	"/sgdb/icons",
 	get_sgdb_icons_by_game,
 	get_sgdb_icons_by_game_cached,
-	"Icon assets for the requested SGDB game"
+	"The icon assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/icons/by-platform",
 	get_sgdb_icons_by_platform,
 	get_sgdb_icons_by_platform_cached,
-	"Icon assets for the requested external platform id"
+	"The icon assets for the external platform id"
 );

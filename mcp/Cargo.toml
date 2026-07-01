@@ -6,6 +6,7 @@ license = "MIT"
 
 [dependencies]
 service = { path = "../service" }
+futures-util = "^0.3"
 rmcp = { workspace = true }
 rmcp-actix-web = "^0.12"
 actix-web = "~4.13"

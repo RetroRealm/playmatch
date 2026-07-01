@@ -13,13 +13,12 @@ use service::providers::launchbox::cache::{
 #[allow(unused_imports)] // Referenced only inside utoipa::path body attributes.
 use service::providers::launchbox::model::{LbGame, LbGameAlternateName, LbGameImage, LbPlatform};
 
-/// List every platform LaunchBox knows about.
+/// Lists every platform known to LaunchBox.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "LaunchBox",
 	responses(
-		(status = 200, description = "LaunchBox platform catalog", body = Vec<LbPlatform>)
+		(status = 200, description = "The full LaunchBox platform catalog", body = Vec<LbPlatform>)
 	)
 )]
 #[get("/launchbox/platforms")]
@@ -32,14 +31,13 @@ pub async fn list_lb_platforms(
 	Ok(HttpResponse::Ok().json(platforms))
 }
 
-/// Look up a LaunchBox game by its database id.
+/// Returns a LaunchBox game by id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "LaunchBox",
 	params(LbIdQuery),
 	responses(
-		(status = 200, description = "LaunchBox game record", body = LbGame),
+		(status = 200, description = "The matched LaunchBox game record", body = LbGame),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -58,14 +56,15 @@ pub async fn get_lb_game_by_id(
 	})
 }
 
-/// Search LaunchBox games by name, optionally narrowed to a platform.
+/// Searches LaunchBox games by name.
+///
+/// Narrow the search to a single platform by passing a platform name. If omitted, all platforms are included.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "LaunchBox",
 	params(LbSearchQuery),
 	responses(
-		(status = 200, description = "Matching games", body = Vec<LbGame>)
+		(status = 200, description = "The matching games", body = Vec<LbGame>)
 	)
 )]
 #[get("/launchbox/game/search")]
@@ -88,14 +87,13 @@ pub async fn search_lb_games(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Fetch every alternate name LaunchBox has for a given game.
+/// Lists every alternate name LaunchBox has for a game.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "LaunchBox",
 	params(LbGameIdQuery),
 	responses(
-		(status = 200, description = "Alternate names", body = Vec<LbGameAlternateName>)
+		(status = 200, description = "The alternate names for the game", body = Vec<LbGameAlternateName>)
 	)
 )]
 #[get("/launchbox/game/alternate-names")]
@@ -114,14 +112,13 @@ pub async fn get_lb_game_alternate_names(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Fetch every image LaunchBox has for a given game.
+/// Lists every image LaunchBox has for a game.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "LaunchBox",
 	params(LbGameIdQuery),
 	responses(
-		(status = 200, description = "Images", body = Vec<LbGameImage>)
+		(status = 200, description = "The images for the game", body = Vec<LbGameImage>)
 	)
 )]
 #[get("/launchbox/game/images")]

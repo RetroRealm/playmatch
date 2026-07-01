@@ -1,6 +1,4 @@
-use crate::sea_orm::{
-	ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
-};
+use crate::sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use entity::signature_group;
 use sea_orm_migration::prelude::*;
 
@@ -10,7 +8,6 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
 	async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-		// Get the connection and start a transaction
 		let db = manager.get_connection();
 		let no_intro = signature_group::ActiveModel {
 			name: Set("DatsSite-Legacy".to_string()),
@@ -19,7 +16,7 @@ impl MigrationTrait for Migration {
 			..Default::default()
 		};
 
-		no_intro.save(db).await?;
+		signature_group::Entity::insert(no_intro).exec(db).await?;
 
 		Ok(())
 	}

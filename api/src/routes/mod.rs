@@ -25,6 +25,8 @@ pub mod sgdb;
 pub mod signature_group;
 pub mod suggestion;
 pub mod user;
+pub mod v2;
+pub mod versions;
 
 async fn handle_auth_and_permissions(
 	required_user_perms: &UserPermissionsEnum,

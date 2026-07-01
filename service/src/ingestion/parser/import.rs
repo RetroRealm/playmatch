@@ -1,13 +1,16 @@
 use crate::db::company::create_or_find_company_by_name;
 use crate::db::dat_file::{DatFileCreateOrUpdateInput, create_or_update_dat_file};
 use crate::db::dat_file_import::create_dat_file_import;
-use crate::db::game::{find_game_by_name_and_dat_file_id, insert_game};
-use crate::db::game_file::{get_game_files_from_game_id, insert_game_file_bulk};
+use crate::db::game::{find_game_by_name_and_dat_file_id, get_game_by_id, insert_game};
+use crate::db::game_file::{
+	assign_content_anchor_for_game, get_game_files_from_game_id, insert_game_file_bulk,
+};
 use crate::db::lifecycle::reconcile_dat_file_lifecycle;
 use crate::db::platform::create_or_find_platform_by_name;
-use crate::identification::cache::bust_identify_cache_for_game;
+use crate::identification::cache::{bust_identify_cache_for_game, bust_identify_cache_for_hashes};
 use crate::ingestion::parser::model::{Datafile, Game};
 use crate::ingestion::parser::regex::{DAT_PAREN_GROUP_REGEX, DAT_TAG_REGEX};
+use crate::providers::content_anchor::seed_mappings_from_sibling;
 use entity::{company, dat_file_import, platform};
 use sea_orm::prelude::Uuid;
 use std::collections::HashSet;
@@ -25,11 +28,16 @@ use tokio::io::AsyncReadExt;
 use tokio::task;
 use tokio::task::JoinHandle;
 
-/// What a single game contributed to an import: its id and the ids of files
-/// that already existed and are still present in this version.
+/// What a single game contributed to an import: its id, the ids of files that
+/// already existed and are still present in this version, and whether this
+/// import added any file (a fresh game, or new files on an existing game). A
+/// pure addition retires nothing, so the lifecycle bust never fires for it; the
+/// added hashes are busted separately by hash.
 struct GamePresence {
 	game_id: Uuid,
 	present_existing_file_ids: Vec<Uuid>,
+	added_files: bool,
+	is_new: bool,
 }
 
 pub async fn parse_and_import_dat_file(
@@ -80,6 +88,8 @@ pub async fn parse_and_import_dat_file(
 
 	let mut all_game_ids: Vec<Uuid> = Vec::new();
 	let mut present_existing_file_ids: Vec<Uuid> = Vec::new();
+	let mut added_file_game_ids: Vec<Uuid> = Vec::new();
+	let mut new_game_ids: Vec<Uuid> = Vec::new();
 
 	if let Some(games) = dat.game {
 		let games_chunked = games
@@ -180,6 +190,8 @@ pub async fn parse_and_import_dat_file(
 						return Ok(GamePresence {
 							game_id: existing_game.id,
 							present_existing_file_ids: present_file_ids,
+							added_files: !to_insert.is_empty(),
+							is_new: false,
 						});
 					}
 
@@ -194,6 +206,8 @@ pub async fn parse_and_import_dat_file(
 					Ok(GamePresence {
 						game_id: game_release.id,
 						present_existing_file_ids: Vec::new(),
+						added_files: true,
+						is_new: true,
 					})
 				}));
 			}
@@ -201,6 +215,12 @@ pub async fn parse_and_import_dat_file(
 			for future in futures {
 				let presence = future.await??;
 				all_game_ids.push(presence.game_id);
+				if presence.added_files {
+					added_file_game_ids.push(presence.game_id);
+				}
+				if presence.is_new {
+					new_game_ids.push(presence.game_id);
+				}
 				present_existing_file_ids.extend(presence.present_existing_file_ids);
 			}
 		}
@@ -215,6 +235,17 @@ pub async fn parse_and_import_dat_file(
 	)
 	.await?;
 
+	// Anchor assignment and seed-from-sibling run only after the lifecycle pass
+	// has settled is_current, since the content key digests current files. A
+	// per-game failure must not fail the import.
+	new_game_ids.sort();
+	new_game_ids.dedup();
+	for game_id in &new_game_ids {
+		if let Err(e) = assign_and_seed_new_game(*game_id, conn, redis_conn).await {
+			warn!("failed to assign content anchor for new game {game_id}: {e:#}");
+		}
+	}
+
 	// A retired hash leaves a stale identify cache entry; a bust failure must
 	// not fail the import.
 	for game_id in retired_game_ids {
@@ -223,7 +254,40 @@ pub async fn parse_and_import_dat_file(
 		}
 	}
 
+	// A pure addition retires nothing, so the loop above never touches a hash a
+	// newly added game now shares with an existing one. Bust by hash across the
+	// full co-hashed set so a stale single winner cannot persist for the TTL.
+	added_file_game_ids.sort();
+	added_file_game_ids.dedup();
+	let mut added_files = Vec::new();
+	for game_id in added_file_game_ids {
+		added_files.extend(get_game_files_from_game_id(game_id, conn).await?);
+	}
+	if let Err(e) = bust_identify_cache_for_hashes(redis_conn, conn, &added_files).await {
+		warn!("failed to bust identify cache for added hashes: {e}");
+	}
+
 	Ok(())
+}
+
+/// Assign a content anchor to a freshly inserted game and, if it lands on an
+/// anchor that already has mapped siblings, copy their mappings down. A game
+/// left anchorless (a SHA1-less file or a vetoed engineered collision) is
+/// silently skipped.
+async fn assign_and_seed_new_game(
+	game_id: Uuid,
+	conn: &DbConn,
+	redis_conn: &mut MultiplexedConnection,
+) -> anyhow::Result<()> {
+	let Some(game) = get_game_by_id(game_id, conn).await? else {
+		return Ok(());
+	};
+
+	let Some(anchor_id) = assign_content_anchor_for_game(&game, conn).await? else {
+		return Ok(());
+	};
+
+	seed_mappings_from_sibling(&game, anchor_id, conn, redis_conn).await
 }
 
 async fn update_game_properties(

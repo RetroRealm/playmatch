@@ -9,13 +9,14 @@ use service::entities::platform::{
 };
 use uuid::Uuid;
 
-/// Returns all platforms with its company and its external metadata mappings.
+/// Lists all platforms with their company and external metadata mappings.
+///
+/// Each platform carries its owning company and the metadata provider mappings known for it.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Platform",
 	responses(
-		(status = 200, description = "Returns a list of Platforms playmatch knows about including its company and metadata mappings", body = Vec<PlatformMetadataResponse>)
+		(status = 200, description = "The full list of platforms, each with its company and external metadata mappings", body = Vec<PlatformMetadataResponse>)
 	)
 )]
 #[get("/platforms")]
@@ -26,13 +27,14 @@ pub async fn get_all_platforms(db_conn: Data<DatabaseConnection>) -> error::Resu
 	Ok(HttpResponse::Ok().json(companies))
 }
 
-/// Returns a platform and its metadata mappings by id.
+/// Returns a platform by id.
+///
+/// The platform carries its owning company and the metadata provider mappings known for it.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Platform",
 	responses(
-		(status = 200, description = "Returns a Platform and its metadata mappings", body = PlatformMetadataResponse),
+		(status = 200, description = "The platform with its company and external metadata mappings", body = PlatformMetadataResponse),
 		(status = 404, description = "Platform not found")
 	)
 )]

@@ -24,13 +24,14 @@ fn bail_if_ss_quota_exhausted(client: &ScreenScraperClient) -> error::Result<()>
 	Ok(())
 }
 
-/// List every system (platform) ScreenScraper knows about.
+/// Lists every system ScreenScraper knows about.
+///
+/// A system is a platform such as a console, handheld, or computer.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "ScreenScraper",
 	responses(
-		(status = 200, description = "ScreenScraper system catalog", body = Vec<SsSystem>),
+		(status = 200, description = "All ScreenScraper systems", body = Vec<SsSystem>),
 		(status = 503, description = "ScreenScraper quota exhausted", body = String)
 	)
 )]
@@ -45,14 +46,13 @@ pub async fn list_ss_systems(
 	Ok(HttpResponse::Ok().json(systems))
 }
 
-/// Look up a ScreenScraper game by its SS game id.
+/// Returns a ScreenScraper game by its ScreenScraper game id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "ScreenScraper",
 	params(SsIdQuery),
 	responses(
-		(status = 200, description = "ScreenScraper game record", body = SsGame),
+		(status = 200, description = "The matched ScreenScraper game", body = SsGame),
 		(status = 404, description = "Game not found"),
 		(status = 503, description = "ScreenScraper quota exhausted", body = String)
 	)
@@ -73,14 +73,15 @@ pub async fn get_ss_game_by_id(
 	})
 }
 
-/// Search ScreenScraper games by name within a system.
+/// Searches ScreenScraper games by name within a system.
+///
+/// Returns an empty array when no game name matches in the system.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "ScreenScraper",
 	params(SsSearchQuery),
 	responses(
-		(status = 200, description = "Matching games", body = Vec<SsGame>),
+		(status = 200, description = "The matching ScreenScraper games", body = Vec<SsGame>),
 		(status = 503, description = "ScreenScraper quota exhausted", body = String)
 	)
 )]
@@ -105,14 +106,15 @@ pub async fn search_ss_games(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Look up a ScreenScraper game by an exact rom file name within a system.
+/// Returns a ScreenScraper game by an exact rom file name within a system.
+///
+/// The rom name must match a known file name in the system exactly.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "ScreenScraper",
 	params(SsRomQuery),
 	responses(
-		(status = 200, description = "ScreenScraper game record", body = SsGame),
+		(status = 200, description = "The matched ScreenScraper game", body = SsGame),
 		(status = 404, description = "Game not found"),
 		(status = 503, description = "ScreenScraper quota exhausted", body = String)
 	)

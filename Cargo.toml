@@ -27,6 +27,7 @@ anyhow = "^1"
 thiserror = "^2"
 utoipa = "~4"
 derive_builder = "^0.20"
+base64 = "^0.22"
 redis = "^1"
 prometheus = "^0.14"
 rmcp = { version = "1.7", features = ["server", "macros", "transport-streamable-http-server-session"] }

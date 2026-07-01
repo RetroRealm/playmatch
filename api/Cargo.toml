@@ -28,7 +28,11 @@ utoipa = { workspace = true, features = ["actix_extras", "uuid", "chrono", "repr
 utoipa-swagger-ui = { version = "~7", features = ["actix-web"] }
 uuid = "^1.10"
 derive_builder = { workspace = true }
+base64 = { workspace = true }
 tokio-cron-scheduler = "^0.15"
 actix-web-prom = { version = "^0.10", features = ["process"] }
 prometheus = { workspace = true }
 redis = { workspace = true, features = ["tokio-rustls-comp"] }
+
+[dev-dependencies]
+testcontainers-modules = { version = "^0.12", features = ["postgres", "redis"] }

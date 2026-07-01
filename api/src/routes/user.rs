@@ -9,19 +9,19 @@ use service::entities::user;
 use service::model::user::{CreateOrGetUserRequest, UpdateUserPermissionsRequest};
 use uuid::Uuid;
 
-/// Find or Create a User by their Discord ID.
-/// This Endpoint requires Credentials of a User with at least Automation level.
+/// Returns a user by Discord id, creating one if none exists.
+///
+/// Looks up the user by Discord id and creates a new user when no match is found. Requires credentials of at least Automation level.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "User",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully created or got user", body = User),
-		(status = 401, description = "Unauthorized, you need to be logged in to get a user by discord id"),
-		(status = 403, description = "Forbidden, you do not have permission to get a user by discord id")
+		(status = 200, description = "The matching or newly created user", body = User),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level")
 	)
 )]
 #[post("/user/by-discord-id")]
@@ -36,21 +36,21 @@ pub async fn create_or_get_by_discord_id(
 		.json(user::create_or_get_user_by_discord_id(body.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Find a User by their Discord ID.
-/// This Endpoint requires Credentials of a User with at least Automation level.
+/// Returns a user by Discord id.
+///
+/// Requires credentials of at least Automation level.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "User",
 	params(GetUserQuery),
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully found user", body = User),
-		(status = 401, description = "Unauthorized, you need to be logged in to get a user by discord id"),
-		(status = 403, description = "Forbidden, you do not have permission to get a user by discord id"),
-		(status = 404, description = "Could not find User with the provided discord id")
+		(status = 200, description = "The matching user", body = User),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
+		(status = 404, description = "User not found")
 	)
 )]
 #[get("/user")]
@@ -65,20 +65,20 @@ pub async fn get_user_by_discord_id(
 		.json(user::get_user_by_discord_id(query.discord_id, db_conn.get_ref()).await?))
 }
 
-/// Find a User by their ID.
-/// This Endpoint requires Credentials of a User with at least Automation level.
+/// Returns a user by id.
+///
+/// Requires credentials of at least Automation level.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "User",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully found user", body = User),
-		(status = 401, description = "Unauthorized, you need to be logged in to get a user by id"),
-		(status = 403, description = "Forbidden, you do not have permission to get a user by id"),
-		(status = 404, description = "Could not find User with the provided id")
+		(status = 200, description = "The matching user", body = User),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
+		(status = 404, description = "User not found")
 	)
 )]
 #[get("/user/{id}")]
@@ -92,20 +92,20 @@ pub async fn get_user(
 	Ok(HttpResponse::Ok().json(user::get_user_by_id(id.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Update a user's Permission Level.
-/// This Endpoint requires Credentials of a User with at least Automation level.
+/// Updates a user's permission level.
+///
+/// Sets the permission level of the user to the value in the request body. Requires credentials of at least Automation level.
 #[utoipa::path(
 	patch,
-	context_path = "/api",
 	tag = "User",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully updated user permission level", body = User),
-		(status = 401, description = "Unauthorized, you need to be logged in to update a user permission level"),
-		(status = 403, description = "Forbidden, you do not have permission to update a user permission level"),
-		(status = 404, description = "Could not find User with the provided id")
+		(status = 200, description = "The user with its updated permission level", body = User),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
+		(status = 404, description = "User not found")
 	)
 )]
 #[patch("/user/{id}/permission")]

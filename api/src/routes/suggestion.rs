@@ -20,19 +20,19 @@ use service::model::suggestion::{
 };
 use uuid::Uuid;
 
-/// Gets all currently pending suggestions.
-/// This Endpoint requires Credentials of at least Automation level.
+/// Lists all pending suggestions.
+///
+/// Requires credentials of at least Automation level.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully retrieved suggestions", body = Vec<Suggestion>),
-		(status = 401, description = "Unauthorized, you need to be logged in to view all suggestion"),
-		(status = 403, description = "Forbidden, you do not have permission to view all suggestions"),
+		(status = 200, description = "All pending suggestions", body = Vec<Suggestion>),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
 	)
 )]
 #[get("/suggestion")]
@@ -45,19 +45,19 @@ pub async fn get_all_suggestions(
 	Ok(HttpResponse::Ok().json(get_suggestions(db_conn.get_ref()).await?))
 }
 
-/// Gets a pending suggestion by id.
-/// This Endpoint requires Credentials of at least Automation level.
+/// Returns a pending suggestion by id.
+///
+/// Requires credentials of at least Automation level.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully retrieved suggestions", body = Suggestion),
-		(status = 401, description = "Unauthorized, you need to be logged in to view suggestion"),
-		(status = 403, description = "Forbidden, you do not have permission to view suggestions"),
+		(status = 200, description = "The requested suggestion", body = Suggestion),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
 	)
 )]
 #[get("/suggestion/{id}")]
@@ -71,20 +71,20 @@ pub async fn get_suggestion_by_id(
 	Ok(HttpResponse::Ok().json(get_suggestion(id.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Adds a suggestion for a manual game metadata match.
-/// This Endpoint requires Credentials of a User.
+/// Creates a suggestion for a game metadata match.
+///
+/// Proposes external metadata for a game so a reviewer can approve or decline it. Requires credentials of at least User level.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully created suggestion", body = Suggestion),
-		(status = 401, description = "Unauthorized, you need to be logged in to create a suggestion"),
-		(status = 404, description = "Could not find a Game with the provided id"),
-		(status = 409, description = "A suggestion for this game already exists with the same provider & provider id.")
+		(status = 200, description = "The created suggestion", body = Suggestion),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 404, description = "Game not found"),
+		(status = 409, description = "A suggestion for this game with the same provider and provider id already exists")
 	)
 )]
 #[post("/suggestion/game")]
@@ -98,20 +98,20 @@ pub async fn create_game_suggestion(
 	Ok(HttpResponse::Ok().json(add_game_suggestion(body.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Adds a suggestion for a manual platform metadata match.
-/// This Endpoint requires Credentials of a User.
+/// Creates a suggestion for a platform metadata match.
+///
+/// Proposes external metadata for a platform so a reviewer can approve or decline it. Requires credentials of at least User level.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully created suggestion", body = Suggestion),
-		(status = 401, description = "Unauthorized, you need to be logged in to create a suggestion"),
-		(status = 404, description = "Could not find a Platform with the provided id"),
-		(status = 409, description = "A suggestion for this Platform already exists with the same provider & provider id.")
+		(status = 200, description = "The created suggestion", body = Suggestion),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 404, description = "Platform not found"),
+		(status = 409, description = "A suggestion for this platform with the same provider and provider id already exists")
 	)
 )]
 #[post("/suggestion/platform")]
@@ -126,20 +126,20 @@ pub async fn create_platform_suggestion(
 		.json(add_platform_suggestion(body.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Adds a suggestion for a manual company metadata match.
-/// This Endpoint requires Credentials of a User.
+/// Creates a suggestion for a company metadata match.
+///
+/// Proposes external metadata for a company so a reviewer can approve or decline it. Requires credentials of at least User level.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully created suggestion", body = Suggestion),
-		(status = 401, description = "Unauthorized, you need to be logged in to create a suggestion"),
-		(status = 404, description = "Could not find a Company with the provided id"),
-		(status = 409, description = "A suggestion for this Company already exists with the same provider & provider id.")
+		(status = 200, description = "The created suggestion", body = Suggestion),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 404, description = "Company not found"),
+		(status = 409, description = "A suggestion for this company with the same provider and provider id already exists")
 	)
 )]
 #[post("/suggestion/company")]
@@ -157,19 +157,19 @@ pub async fn create_company_suggestion(
 }
 
 /// Approves a suggestion by id.
-/// This Endpoint requires Credentials of at least Automation level.
+///
+/// Applies the suggested external metadata to its target. Requires credentials of at least Automation level.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully approved suggestion", body = UpdatedMetadataMatchesFromSuggestionResponse),
-		(status = 401, description = "Unauthorized, you need to be logged in to approve a suggestion"),
-		(status = 403, description = "Forbidden, you do not have permission to approve suggestions"),
-		(status = 404, description = "Could not find a Suggestion with the provided id"),
+		(status = 200, description = "The metadata matches updated from the approved suggestion", body = UpdatedMetadataMatchesFromSuggestionResponse),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
+		(status = 404, description = "Suggestion not found"),
 	)
 )]
 #[post("/suggestion/{id}/accept")]
@@ -187,15 +187,14 @@ pub async fn approve_suggestion(
 	Ok(HttpResponse::Ok().json(UpdatedMetadataMatchesFromSuggestionResponse { updated }))
 }
 
-/// Fire-and-forget signal from third-party tools. Always returns 204; a scheduled
-/// worker validates the payload and only creates a suggestion for ROMs already in
-/// the database where the proposed mapping is not yet represented.
+/// Submits a game match suggestion from a third-party tool.
+///
+/// Queues the proposed mapping for later processing and returns 204 without waiting on the result. The payload is validated in the background, and a suggestion is created only for a ROM already in the database whose proposed mapping is not yet recorded. No credentials are required. Submissions are rate limited per client IP.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Suggestion",
 	responses(
-		(status = 204, description = "Accepted. Processing happens asynchronously."),
+		(status = 204, description = "The submission was accepted for background processing"),
 	)
 )]
 #[post("/suggestion/external/game")]
@@ -246,19 +245,19 @@ pub async fn submit_external_game_suggestion(
 }
 
 /// Declines a suggestion by id.
-/// This Endpoint requires Credentials of at least Automation level.
+///
+/// Removes the pending suggestion without applying it. Requires credentials of at least Automation level.
 #[utoipa::path(
 	delete,
-	context_path = "/api",
 	tag = "Suggestion",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 204, description = "Successfully declined suggestion"),
-		(status = 401, description = "Unauthorized, you need to be logged in to decline a suggestion"),
-		(status = 403, description = "Forbidden, you do not have permission to decline suggestions"),
-		(status = 404, description = "Could not find a Suggestion with the provided id"),
+		(status = 204, description = "The suggestion was declined"),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Automation level"),
+		(status = 404, description = "Suggestion not found"),
 	)
 )]
 #[delete("/suggestion/{id}")]

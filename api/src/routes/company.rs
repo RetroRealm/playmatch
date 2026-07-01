@@ -8,13 +8,14 @@ use service::entities::company::{
 };
 use uuid::Uuid;
 
-/// Returns all companies and its external metadata mappings.
+/// Lists all companies with their external metadata mappings.
+///
+/// Each company carries the metadata provider mappings known for it.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Company",
 	responses(
-		(status = 200, description = "Returns a list of Companies playmatch knows about including its metadata mappings", body = Vec<CompanyMetadataResponse>)
+		(status = 200, description = "The full list of companies, each with its external metadata mappings", body = Vec<CompanyMetadataResponse>)
 	)
 )]
 #[get("/companies")]
@@ -24,13 +25,14 @@ pub async fn get_all_companies(db_conn: Data<DatabaseConnection>) -> error::Resu
 	Ok(HttpResponse::Ok().json(companies_response))
 }
 
-/// Returns a company and its metadata mappings by id.
+/// Returns a company by id.
+///
+/// The company carries the metadata provider mappings known for it.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Company",
 	responses(
-		(status = 200, description = "Returns a Company and its metadata mappings", body = CompanyMetadataResponse),
+		(status = 200, description = "The company and its external metadata mappings", body = CompanyMetadataResponse),
 		(status = 404, description = "Company not found")
 	)
 )]

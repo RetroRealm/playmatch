@@ -1,4 +1,5 @@
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
+use crate::db::pagination::{KeysetPage, fetch_keyset_page};
 use crate::db::unmatched_entities_with_limit;
 use entity::platform::ActiveModel;
 use entity::prelude::Platform;
@@ -6,12 +7,14 @@ use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
 use entity::{company, dat_file, dat_file_import, game, platform, signature_metadata_mapping};
 use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
+use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
 	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, JoinType, LoaderTrait, ModelTrait,
-	QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
+	PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, TryIntoModel,
 };
+use std::collections::HashMap;
 
-/// Load a platform by id together with its company (if any) and every signature metadata mapping attached to it.
 pub async fn get_by_id_and_join_company_and_signature_metadata_mappings(
 	id: Uuid,
 	conn: &DbConn,
@@ -42,7 +45,6 @@ pub async fn get_by_id_and_join_company_and_signature_metadata_mappings(
 	}
 }
 
-/// Return every platform paired with its company (if any) and its signature metadata mappings.
 pub async fn find_all_and_join_company_and_signature_metadata_mappings(
 	conn: &DbConn,
 ) -> Result<
@@ -97,7 +99,99 @@ pub async fn find_all_and_join_company_and_signature_metadata_mappings(
 		.collect())
 }
 
-/// Find a platform by case-insensitive name, creating one with that name and optional company if it does not exist.
+pub async fn find_platforms_page_and_join_company_and_signature_metadata_mappings(
+	after: Option<(String, Uuid)>,
+	limit: Option<u64>,
+	conn: &DbConn,
+) -> Result<
+	KeysetPage<(
+		platform::Model,
+		Option<company::Model>,
+		Vec<signature_metadata_mapping::Model>,
+	)>,
+	DbErr,
+> {
+	let mut cursor = Platform::find().cursor_by((platform::Column::Name, platform::Column::Id));
+	if let Some((name, id)) = after {
+		cursor.after((name, id));
+	}
+	let page = fetch_keyset_page(&mut cursor, limit, conn).await?;
+
+	let companies = page.rows.load_one(company::Entity, conn).await?;
+	let mappings = page
+		.rows
+		.load_many(signature_metadata_mapping::Entity, conn)
+		.await?;
+
+	let rows = page
+		.rows
+		.into_iter()
+		.zip(companies)
+		.zip(mappings)
+		.map(|((platform, company), mapping)| (platform, company, mapping))
+		.collect();
+
+	Ok(KeysetPage {
+		rows,
+		has_more: page.has_more,
+	})
+}
+
+/// Fetch one keyset page of platforms whose name matches `query` as a
+/// case-insensitive substring (`ILIKE %query%`), ordered by `(name, id)` and
+/// joined to their company and signature metadata mappings exactly like
+/// [`find_platforms_page_and_join_company_and_signature_metadata_mappings`].
+/// Seeks past `after` when supplied; the N+1 overflow row drives `has_more`.
+pub async fn search_platforms_by_name_page(
+	query: &str,
+	after: Option<(String, Uuid)>,
+	limit: Option<u64>,
+	conn: &DbConn,
+) -> Result<
+	KeysetPage<(
+		platform::Model,
+		Option<company::Model>,
+		Vec<signature_metadata_mapping::Model>,
+	)>,
+	DbErr,
+> {
+	let pattern = format!("%{query}%");
+
+	let mut cursor = Platform::find()
+		.filter(Expr::col((platform::Entity, platform::Column::Name)).ilike(pattern))
+		.cursor_by((platform::Column::Name, platform::Column::Id));
+	if let Some((name, id)) = after {
+		cursor.after((name, id));
+	}
+	let page = fetch_keyset_page(&mut cursor, limit, conn).await?;
+
+	let companies = page.rows.load_one(company::Entity, conn).await?;
+	let mappings = page
+		.rows
+		.load_many(signature_metadata_mapping::Entity, conn)
+		.await?;
+
+	let rows = page
+		.rows
+		.into_iter()
+		.zip(companies)
+		.zip(mappings)
+		.map(|((platform, company), mapping)| (platform, company, mapping))
+		.collect();
+
+	Ok(KeysetPage {
+		rows,
+		has_more: page.has_more,
+	})
+}
+
+/// Count every platform. Cheap enough on this bounded reference table that the
+/// v2 list opts into it when the caller asks for a total.
+pub async fn count_platforms(conn: &DbConn) -> Result<u64, DbErr> {
+	Platform::find().count(conn).await
+}
+
+/// Matches a platform by case-insensitive name, creating one (with optional company) when none exists.
 pub async fn create_or_find_platform_by_name(
 	name: &str,
 	company_id: Option<Uuid>,
@@ -133,7 +227,6 @@ unmatched_entities_with_limit! {
 	signature_metadata_mapping::Column::PlatformId
 }
 
-/// Resolve the platform a given game is attached to, via dat file and dat file import.
 pub async fn find_platform_of_game(
 	game_id: Uuid,
 	conn: &DbConn,
@@ -147,7 +240,6 @@ pub async fn find_platform_of_game(
 		.await
 }
 
-/// Return the signature metadata mapping for the given provider attached to a platform, if any.
 pub async fn find_platform_related_signature_metadata_mapping(
 	model: &platform::Model,
 	provider: MetadataProviderEnum,
@@ -160,7 +252,7 @@ pub async fn find_platform_related_signature_metadata_mapping(
 		.await
 }
 
-/// Find a platform by exact (case-sensitive) name.
+/// Looks up a platform by exact, case-sensitive name.
 pub async fn find_platform_by_name(
 	name: &str,
 	conn: &DbConn,
@@ -169,4 +261,20 @@ pub async fn find_platform_by_name(
 		.filter(platform::Column::Name.eq(name))
 		.one(conn)
 		.await
+}
+
+/// Load every platform in `ids` in one `is_in` query, keyed by id. Bulk variant
+/// used to hydrate a page of dat files without a query per row.
+pub async fn find_platforms_by_ids(
+	ids: &[Uuid],
+	conn: &DbConn,
+) -> Result<HashMap<Uuid, platform::Model>, DbErr> {
+	if ids.is_empty() {
+		return Ok(HashMap::new());
+	}
+	let rows = Platform::find()
+		.filter(platform::Column::Id.is_in(ids.iter().copied()))
+		.all(conn)
+		.await?;
+	Ok(rows.into_iter().map(|row| (row.id, row)).collect())
 }

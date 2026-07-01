@@ -1,5 +1,5 @@
 use crate::config::PARALLELISM;
-use crate::db::dat_file::find_all_dat_files;
+use crate::db::dat_file::find_all_dat_file_ids;
 use crate::db::game::{
 	find_game_by_signature_group_internal_id_and_dat_file_id, get_dat_file_id_of_game,
 	get_unpopulated_clone_of_games,
@@ -12,10 +12,10 @@ use sea_orm::{ActiveModelTrait, DbConn, IntoActiveModel};
 use tokio::task::JoinHandle;
 
 pub async fn populate_all_clone_of_ids(conn: &DbConn) -> anyhow::Result<()> {
-	let dat_files = find_all_dat_files(conn).await?;
+	let dat_file_ids = find_all_dat_file_ids(conn).await?;
 
-	for dat_file in dat_files {
-		populate_clone_of_id(dat_file.id, conn).await?;
+	for dat_file_id in dat_file_ids {
+		populate_clone_of_id(dat_file_id, conn).await?;
 	}
 
 	Ok(())

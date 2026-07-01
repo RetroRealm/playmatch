@@ -8,6 +8,7 @@ use crate::ingestion::sources::{
 	RedumpType, download_dats_site_legacy_dats, download_no_intro_dats, download_redump_dats,
 };
 use crate::matching::clone::populate_all_clone_of_ids;
+use crate::matching::content_anchor::assign_all_content_anchors;
 use anyhow::anyhow;
 use fs::read_files_recursive;
 use log::{debug, error, info};
@@ -152,6 +153,9 @@ pub async fn download_and_parse_dats(
 
 	populate_all_clone_of_ids(conn).await?;
 	info!("Finished populating all clone_of relationships");
+
+	assign_all_content_anchors(conn).await?;
+	info!("Finished backfilling content anchors");
 
 	Ok(())
 }

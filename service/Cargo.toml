@@ -49,4 +49,4 @@ sea-orm = { workspace = true, features = ["debug-print", "runtime-tokio-rustls",
 # against the Postgres integration test instead.
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 migration = { path = "../migration" }
-testcontainers-modules = { version = "^0.12", features = ["postgres"] }
+testcontainers-modules = { version = "^0.12", features = ["postgres", "redis"] }

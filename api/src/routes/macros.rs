@@ -19,16 +19,8 @@ macro_rules! __provider_id_route_impl {
 		$cached_fn:ident,
 		$model:ty
 	) => {
-		#[utoipa::path(
-			get,
-			context_path = "/api",
-			tag = $tag,
-			params(IdQuery),
-			responses(
-				(status = 200, description = "Returns provider metadata for the requested id", body = $model),
-				(status = 404, description = "Not found")
-			)
-		)]
+		/// Returns one entity by id.
+		#[utoipa::path(get, tag = $tag, params(IdQuery), responses((status = 200, description = "The matched entity", body = $model), (status = 404, description = "Entity not found")))]
 		#[get($route)]
 		pub async fn $fn_name(
 			query: Query<IdQuery>,
@@ -63,15 +55,8 @@ macro_rules! __provider_ids_route_impl {
 		$cached_fn:ident,
 		$model:ty
 	) => {
-		#[utoipa::path(
-			get,
-			context_path = "/api",
-			tag = $tag,
-			params(IdsQuery),
-			responses(
-				(status = 200, description = "Returns provider metadata for the requested ids", body = Vec<$model>)
-			)
-		)]
+		/// Looks up many entities by id in one request.
+		#[utoipa::path(get, tag = $tag, params(IdsQuery), responses((status = 200, description = "The matched entities", body = Vec<$model>)))]
 		#[get($route)]
 		pub async fn $fn_name(
 			query: Query<IdsQuery>,

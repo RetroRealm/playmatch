@@ -8,15 +8,17 @@ use crate::db::game::{
 };
 use crate::error::{ServiceError, ServiceResult};
 use crate::identification::cache::{
-	IdentifyEntry, find_game_and_metadata_ids_by_filename_size_cached,
-	find_game_and_metadata_ids_by_hash_cached,
+	IdentifyEntry, find_all_games_and_metadata_ids_by_crc_size_cached,
+	find_all_games_and_metadata_ids_by_hash_cached, find_game_and_metadata_ids_by_crc_size_cached,
+	find_game_and_metadata_ids_by_filename_size_cached, find_game_and_metadata_ids_by_hash_cached,
 };
 use crate::identification::protocol::IdentifyAggregator;
 use crate::matching::manual::build_result;
 use crate::model::{
-	GameAndRelationMatchResult, GameAndRelationMatchResultBuilder, GameAndRelationsResult,
-	GameAndRelationsResultBuilder, GameFileMatchSearch, GameMatchType, GameMetadataMatchResult,
-	GameMetadataResponse, PlaymatchGame, PlaymatchGameFile,
+	GameAndRelationMatchResult, GameAndRelationMatchResultBuilder, GameAndRelationMatchResultV2,
+	GameAndRelationsResult, GameAndRelationsResultBuilder, GameAndRelationsResultV2,
+	GameFileMatchSearch, GameMatchType, GameMetadataMatchResult, GameMetadataResponse,
+	PlaymatchGame, PlaymatchGameFile,
 };
 use entity::{dat_file_import, game, game_file};
 use log::debug;
@@ -111,6 +113,151 @@ pub async fn identify_game_and_get_relations(
 	}
 }
 
+/// V2 identify: the V1 primary stays element zero, and every co-hashed sibling
+/// the ranked resolver returns after it is surfaced in `additionalMatches`.
+///
+/// The winning match type and primary game are taken from the shared
+/// [`identify_game`] so the V2 primary is byte-identical to V1. Siblings are
+/// then read from the ranked V2 cache segment for that hash type. Only hash
+/// match types are ranked; a filename+size win surfaces the primary alone.
+pub async fn identify_game_and_get_relations_v2(
+	search: GameFileMatchSearch,
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> anyhow::Result<CacheStatus<GameAndRelationMatchResultV2>> {
+	let outcome = identify_game(&search, redis_conn, db_conn).await?;
+
+	let (cached, hit) = match outcome {
+		Cached(hit) => (true, hit),
+		NonCached(hit) => (false, hit),
+	};
+
+	let Some((match_type, entry)) = hit else {
+		let empty: GameAndRelationMatchResultV2 = empty_relation_match_result().into();
+		return Ok(wrap_cache_status(cached, empty));
+	};
+
+	let primary_id = entry.game.id;
+	let primary: GameAndRelationMatchResultV2 =
+		build_relation_match_result(match_type, entry, db_conn)
+			.await?
+			.into();
+
+	let additional_matches = match match_type.cache_segment() {
+		Some(_) if match_type != GameMatchType::FileNameAndSize => {
+			build_additional_matches_v2(match_type, &search, primary_id, redis_conn, db_conn)
+				.await?
+		}
+		_ => Vec::new(),
+	};
+
+	let result = GameAndRelationMatchResultV2 {
+		additional_matches,
+		..primary
+	};
+	Ok(wrap_cache_status(cached, result))
+}
+
+fn wrap_cache_status<T>(cached: bool, value: T) -> CacheStatus<T> {
+	if cached {
+		Cached(value)
+	} else {
+		NonCached(value)
+	}
+}
+
+/// Build the ranked siblings (every co-hashed game after element zero) for the
+/// winning hash type. The primary is dropped by id rather than position so a
+/// race that reorders the union cannot duplicate it.
+async fn build_additional_matches_v2(
+	match_type: GameMatchType,
+	search: &GameFileMatchSearch,
+	primary_id: Uuid,
+	redis_conn: &mut MultiplexedConnection,
+	db_conn: &DbConn,
+) -> anyhow::Result<Vec<GameAndRelationsResultV2>> {
+	// CRC is pinned to crc+size; the other hash rungs key on the hash alone.
+	let ranked = match match_type {
+		GameMatchType::CRC => match search.crc.as_deref() {
+			Some(crc) => {
+				find_all_games_and_metadata_ids_by_crc_size_cached(
+					crc,
+					search.file_size,
+					redis_conn,
+					db_conn,
+				)
+				.await?
+			}
+			None => return Ok(Vec::new()),
+		},
+		GameMatchType::SHA256 | GameMatchType::SHA1 | GameMatchType::MD5 => {
+			let hash = match match_type {
+				GameMatchType::SHA256 => search.sha256.as_deref(),
+				GameMatchType::SHA1 => search.sha1.as_deref(),
+				GameMatchType::MD5 => search.md5.as_deref(),
+				_ => unreachable!("outer arm restricts to the three sha/md5 rungs"),
+			};
+			let Some(hash) = hash else {
+				return Ok(Vec::new());
+			};
+			find_all_games_and_metadata_ids_by_hash_cached(hash, match_type, redis_conn, db_conn)
+				.await?
+		}
+		GameMatchType::FileNameAndSize | GameMatchType::NoMatch => return Ok(Vec::new()),
+	};
+	let ranked = match ranked {
+		Cached(v) | NonCached(v) => v,
+	};
+
+	let mut additional = Vec::new();
+	for sibling in ranked.games {
+		if sibling.game.id == primary_id {
+			continue;
+		}
+		additional.push(build_relations_result_v2(sibling, db_conn).await?);
+	}
+	Ok(additional)
+}
+
+async fn build_relations_result_v2(
+	entry: IdentifyEntry,
+	db_conn: &DbConn,
+) -> anyhow::Result<GameAndRelationsResultV2> {
+	let game = get_game_by_id(entry.game.id, db_conn)
+		.await?
+		.unwrap_or(entry.game);
+
+	let (dat_file_import, dat_file, signature_group, platform, company, game_files) =
+		find_all_relations_of_game(&game, db_conn).await?;
+
+	let latest = dat_file.latest_dat_file_import_id;
+	let versions =
+		versions_by_last_seen(game.last_seen_dat_file_import_id, &game_files, db_conn).await?;
+
+	let result = GameAndRelationsResultBuilder::default()
+		.game(enrich_game(game, latest, &versions))
+		.platform(platform.into())
+		.company(company.map(|c| c.into()))
+		.game_files(
+			game_files
+				.into_iter()
+				.map(|gf| enrich_game_file(gf, latest, &versions))
+				.collect(),
+		)
+		.dat_file(dat_file.into())
+		.dat_file_import(dat_file_import.into())
+		.signature_group(signature_group.into())
+		.external_metadata(
+			entry
+				.metadata_mappings
+				.into_iter()
+				.map(|m| m.into())
+				.collect(),
+		)
+		.build()?;
+	Ok(result.into())
+}
+
 pub async fn identify_game_and_metadata_mappings(
 	search: GameFileMatchSearch,
 	redis_conn: &mut MultiplexedConnection,
@@ -196,9 +343,9 @@ async fn identify_game(
 			},
 			GameMatchType::CRC => match &search.crc {
 				Some(crc) => {
-					find_game_and_metadata_ids_by_hash_cached(
+					find_game_and_metadata_ids_by_crc_size_cached(
 						crc,
-						GameMatchType::CRC,
+						search.file_size,
 						redis_conn,
 						db_conn,
 					)

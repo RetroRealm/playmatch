@@ -50,6 +50,13 @@ mod m20260616_120000_add_lifecycle_tracking;
 mod m20260616_130000_index_lifecycle_tracking;
 mod m20260619_120000_dedupe_dat_file_lifecycle;
 mod m20260619_130000_add_game_name_trigram_index;
+mod m20260620_120000_index_signature_group_name;
+mod m20260620_130000_index_game_name_id;
+mod m20260620_140000_index_suggestion_created_at;
+mod m20260620_150000_index_dat_file_import_timeline;
+mod m20260620_160000_add_signature_group_display_priority;
+mod m20260620_170000_create_content_anchor;
+mod m20260620_180000_add_content_hash_automatic_match_reason_enum_values;
 
 pub struct Migrator;
 
@@ -107,6 +114,15 @@ impl MigratorTrait for Migrator {
 			Box::new(m20260616_130000_index_lifecycle_tracking::Migration),
 			Box::new(m20260619_120000_dedupe_dat_file_lifecycle::Migration),
 			Box::new(m20260619_130000_add_game_name_trigram_index::Migration),
+			Box::new(m20260620_120000_index_signature_group_name::Migration),
+			Box::new(m20260620_130000_index_game_name_id::Migration),
+			Box::new(m20260620_140000_index_suggestion_created_at::Migration),
+			Box::new(m20260620_150000_index_dat_file_import_timeline::Migration),
+			Box::new(m20260620_160000_add_signature_group_display_priority::Migration),
+			Box::new(m20260620_170000_create_content_anchor::Migration),
+			Box::new(
+				m20260620_180000_add_content_hash_automatic_match_reason_enum_values::Migration,
+			),
 		]
 	}
 }

@@ -8,11 +8,13 @@ pub mod game_file;
 pub mod launchbox;
 pub mod lifecycle;
 pub mod openvgdb;
+pub mod pagination;
 pub mod platform;
 pub mod retroachievements;
 pub mod signature_group;
 pub mod signature_metadata_mapping;
 pub mod signature_metadata_mapping_suggestions;
+pub mod stats;
 pub mod thegamesdb;
 pub mod user;
 

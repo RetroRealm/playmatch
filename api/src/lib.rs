@@ -1,5 +1,6 @@
-use crate::middleware::http_request_metrics;
-use crate::openapi::create_openapi;
+use crate::middleware::{http_request_metrics, v2_error_envelope, version_lifecycle_headers};
+#[doc(hidden)]
+pub use crate::openapi::{create_openapi, create_openapi_v1, create_openapi_v2};
 use crate::routes::company::{get_all_companies, get_company_by_id};
 use crate::routes::game::{
 	get_game_file_history_by_id, get_playmatch_game_by_id, get_playmatch_game_with_relations_by_id,
@@ -105,12 +106,43 @@ use crate::routes::suggestion::{
 use crate::routes::user::{
 	create_or_get_by_discord_id, get_user, get_user_by_discord_id, update_user_permission_level,
 };
+use crate::routes::v2::bulk_by_id::{
+	bulk_companies_by_id_v2, bulk_dat_files_by_id_v2, bulk_game_files_by_id_v2,
+	bulk_games_by_id_v2, bulk_platforms_by_id_v2, bulk_signature_groups_by_id_v2,
+};
+use crate::routes::v2::company::{get_company_by_id_v2, list_companies_v2, search_companies_v2};
+use crate::routes::v2::dat_file::{
+	get_dat_file_by_id_v2, get_dat_file_import_v2, list_dat_file_games_v2,
+	list_dat_file_imports_v2, list_dat_files_by_hash_v2, list_dat_files_v2, list_game_dat_files_v2,
+};
+use crate::routes::v2::game::{
+	get_game_by_id_v2, get_game_file_by_id_v2, get_game_file_history_by_id_v2,
+	get_game_file_presence_v2, get_game_with_relations_by_id_v2, get_games_by_name_v2,
+	list_game_clones_v2, list_game_files_v2, list_game_mappings_v2, list_games_v2, search_games_v2,
+};
+use crate::routes::v2::identify::{
+	identify_game_and_relations_v2, identify_game_with_metadata_ids_v2,
+};
+use crate::routes::v2::identify_bulk::{identify_bulk_ids_v2, identify_bulk_relations_v2};
+use crate::routes::v2::platform::{get_platform_by_id_v2, list_platforms_v2, search_platforms_v2};
+use crate::routes::v2::signature_group::{
+	get_signature_group_by_id_v2, list_signature_group_dat_files_v2, list_signature_group_games_v2,
+	list_signature_groups_v2, search_signature_groups_v2,
+};
+use crate::routes::v2::stats::{get_platform_stats_v2, get_stats_v2};
+use crate::routes::v2::suggestion::list_suggestions_v2;
+use crate::routes::v2::user::{
+	create_or_get_by_discord_id_v2, get_user_by_discord_id_v2, update_user_permission_level_v2,
+};
+use crate::routes::versions::{ResolvedDefaultVersion, get_api_versions};
 use crate::util::{
 	wrap_download_and_parse_dats, wrap_launchbox_import, wrap_match_db_to_all_providers,
 	wrap_openvgdb_import, wrap_retroachievements_import,
 };
 use actix_cors::Cors;
-use actix_governor::{Governor, GovernorConfigBuilder};
+use actix_governor::governor::middleware::StateInformationMiddleware;
+use actix_governor::{Governor, GovernorConfig, GovernorConfigBuilder};
+use actix_web::dev::HttpServiceFactory;
 use actix_web::http::Method;
 use actix_web::http::header;
 use actix_web::middleware::{Compress, DefaultHeaders, Logger, from_fn};
@@ -124,6 +156,7 @@ use prometheus::{Encoder, Registry, TextEncoder};
 use reqwest::Client;
 use sea_orm::{ConnectOptions, Database};
 use service::config::http::X_VERSION_HEADER_API;
+use service::config::versions::ApiVersion;
 use service::db::constants::MAX_CONNECTIONS;
 use service::providers::emuready::EmuReadyClient;
 use service::providers::hasheous::HasheousClient;
@@ -140,7 +173,8 @@ use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use util::http::ReverProxyExtractor;
+#[doc(hidden)]
+pub use util::http::ReverProxyExtractor;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 pub mod error;
@@ -158,15 +192,7 @@ async fn start() -> anyhow::Result<()> {
 		Err(_) => *service::config::CPU_COUNT,
 	};
 
-	// Allow bursts with up to 20 requests per IP address
-	// and replenishes four elements every second
-	let governor_conf = GovernorConfigBuilder::default()
-		.use_headers()
-		.milliseconds_per_request(250)
-		.key_extractor(ReverProxyExtractor)
-		.burst_size(20)
-		.finish()
-		.expect("governor config is valid by construction");
+	let governor_conf = public_api_governor_config();
 
 	let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
 	opt.max_connections(
@@ -324,6 +350,11 @@ async fn start() -> anyhow::Result<()> {
 	let mcp_card =
 		mcp_enabled.then(|| Data::new(McpCard(mcp::server_card_json(mcp_public_url.as_deref()))));
 
+	// Resolved once at boot; the bare /api alias mirrors this version's routes
+	// and header value for the lifetime of the process.
+	let default_api_version = service::config::versions::resolve_default_version();
+	info!("Default API version for the bare /api alias: {default_api_version}");
+
 	let serv = HttpServer::new(move || {
 		let mut app = App::new()
 			.app_data(JsonConfig::default().limit(64 * 1024))
@@ -343,50 +374,45 @@ async fn start() -> anyhow::Result<()> {
 		if let Some(d) = &mg_data {
 			app = app.app_data(d.clone());
 		}
-		app = app.service(
-			scope("/api")
-				.wrap(Governor::new(&governor_conf))
-				.wrap(from_fn(http_request_metrics))
-				.wrap(
-					Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T")
-						.log_level(Level::Debug),
-				)
-				.wrap(
-					DefaultHeaders::new()
-						.add(("X-Version", X_VERSION_HEADER_API))
-						.add((
-							"Strict-Transport-Security",
-							"max-age=31536000; includeSubDomains",
-						))
-						.add(("X-Content-Type-Options", "nosniff"))
-						.add(("Referrer-Policy", "no-referrer"))
-						.add(("Vary", "Origin")),
-				)
-				.wrap(Cors::permissive())
-				.wrap(prometheus.clone())
-				.wrap(Compress::default())
-				.configure(move |cfg| {
-					configure_public_api_routes(
-						cfg,
-						igdb_enabled,
-						sgdb_enabled,
-						ss_enabled,
-						mg_enabled,
-						lb_enabled,
-						ovgdb_enabled,
-						ra_enabled,
-					)
-				})
-				.service(
-					scope("")
-						.wrap(
-							DefaultHeaders::new()
-								.add(("Cache-Control", "no-store"))
-								.add(("Vary", "Authorization")),
-						)
-						.configure(configure_authenticated_api_routes),
-				),
-		);
+		let flags = PublicRouteFlags {
+			igdb_enabled,
+			sgdb_enabled,
+			ss_enabled,
+			mg_enabled,
+			lb_enabled,
+			ovgdb_enabled,
+			ra_enabled,
+		};
+
+		// Explicit version scopes register before the bare /api alias because
+		// actix matches overlapping prefixes by registration order and "/api"
+		// is a prefix of "/api/v1".
+		app = app.service(versioned_api_scope(
+			"/api/v1",
+			ApiVersion::V1,
+			flags,
+			&governor_conf,
+			prometheus.clone(),
+		));
+		app = app.service(versioned_api_scope(
+			"/api/v2",
+			ApiVersion::V2,
+			flags,
+			&governor_conf,
+			prometheus.clone(),
+		));
+		// The discovery doc registers before the bare /api alias: "/api" is a
+		// prefix of "/api/versions", so the alias would otherwise swallow it.
+		app = app
+			.app_data(Data::new(ResolvedDefaultVersion(default_api_version)))
+			.route("/api/versions", web::get().to(get_api_versions));
+		app = app.service(versioned_api_scope(
+			"/api",
+			default_api_version,
+			flags,
+			&governor_conf,
+			prometheus.clone(),
+		));
 		if let Some(svc) = &mcp_service {
 			let mcp_cors = Cors::default()
 				.allow_any_origin()
@@ -432,10 +458,20 @@ async fn start() -> anyhow::Result<()> {
 				)
 				.route("/.well-known/mcp.json", web::get().to(serve_mcp_card));
 		}
-		app.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
-			Url::new("playmatch API", "/api-docs/openapi.json"),
-			create_openapi(),
-		)]))
+		app.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![
+			(
+				Url::with_primary("playmatch API v2", "/api-docs/v2/openapi.json", true),
+				create_openapi_v2(),
+			),
+			(
+				Url::new("playmatch API v1", "/api-docs/v1/openapi.json"),
+				create_openapi_v1(),
+			),
+			(
+				Url::new("playmatch API (alias)", "/api-docs/openapi.json"),
+				create_openapi_v1(),
+			),
+		]))
 	})
 	.bind(format!("0.0.0.0:{port}"))?
 	.shutdown_timeout(15)
@@ -948,6 +984,230 @@ fn build_igdb_client(
 	}
 }
 
+/// Builds the rate-limiter config used by the public API scopes. Exposed for
+/// integration tests so they can construct the version scopes exactly as the
+/// running server does without naming internal extractor types.
+#[doc(hidden)]
+pub fn public_api_governor_config()
+-> GovernorConfig<ReverProxyExtractor, StateInformationMiddleware> {
+	GovernorConfigBuilder::default()
+		.use_headers()
+		.milliseconds_per_request(250)
+		.key_extractor(ReverProxyExtractor)
+		.burst_size(20)
+		.finish()
+		.expect("governor config is valid by construction")
+}
+
+/// Builds a Prometheus middleware instance for the public API scopes. Exposed
+/// for integration tests; each call owns a fresh registry so tests do not
+/// collide on global metric registration.
+#[doc(hidden)]
+pub fn test_prometheus_metrics() -> actix_web_prom::PrometheusMetrics {
+	PrometheusMetricsBuilder::new("api")
+		.mask_unmatched_patterns("UNKNOWN")
+		.build()
+		.expect("prometheus middleware builds")
+}
+
+#[doc(hidden)]
+#[derive(Clone, Copy, Default)]
+pub struct PublicRouteFlags {
+	pub igdb_enabled: bool,
+	pub sgdb_enabled: bool,
+	pub ss_enabled: bool,
+	pub mg_enabled: bool,
+	pub lb_enabled: bool,
+	pub ovgdb_enabled: bool,
+	pub ra_enabled: bool,
+}
+
+/// Builds one path-versioned API scope reproducing the exact shared middleware
+/// stack (Governor, request metrics, Logger, security headers, permissive CORS,
+/// Prometheus, Compress) plus the always-on `Playmatch-Api-Version` header and
+/// the nested authenticated sub-scope. The bare `/api` alias passes the
+/// resolved default version so it reports that version's header value.
+///
+/// `version` selects which route set is mounted: V1 carries the full current
+/// surface, while later versions mount only their own handlers (none yet) so v2
+/// does not silently inherit v1 routes.
+#[doc(hidden)]
+pub fn versioned_api_scope(
+	path: &str,
+	version: ApiVersion,
+	flags: PublicRouteFlags,
+	governor_conf: &GovernorConfig<ReverProxyExtractor, StateInformationMiddleware>,
+	prometheus: actix_web_prom::PrometheusMetrics,
+) -> impl HttpServiceFactory + use<> {
+	scope(path)
+		.wrap(Governor::new(governor_conf))
+		// Wraps outside the rate limiter so a v2 429 is rewritten into the JSON
+		// envelope too; version-aware, so v1 passes through as plain text.
+		.wrap(from_fn(v2_error_envelope(version)))
+		.wrap(from_fn(http_request_metrics))
+		.wrap(from_fn(version_lifecycle_headers(version)))
+		.wrap(Logger::new("%{r}a %t \"%r\" %s %b \"%{User-Agent}i\" %T").log_level(Level::Debug))
+		.wrap(
+			DefaultHeaders::new()
+				.add(("X-Version", X_VERSION_HEADER_API))
+				.add((
+					"Strict-Transport-Security",
+					"max-age=31536000; includeSubDomains",
+				))
+				.add(("X-Content-Type-Options", "nosniff"))
+				.add(("Referrer-Policy", "no-referrer"))
+				.add(("Vary", "Origin")),
+		)
+		.wrap(DefaultHeaders::new().add(("Playmatch-Api-Version", version.as_str())))
+		.wrap(Cors::permissive())
+		.wrap(prometheus)
+		.wrap(Compress::default())
+		.configure(move |cfg| configure_version_routes(cfg, version, flags))
+}
+
+fn configure_version_routes(cfg: &mut ServiceConfig, version: ApiVersion, flags: PublicRouteFlags) {
+	match version {
+		ApiVersion::V1 => {
+			configure_public_api_routes(
+				cfg,
+				flags.igdb_enabled,
+				flags.sgdb_enabled,
+				flags.ss_enabled,
+				flags.mg_enabled,
+				flags.lb_enabled,
+				flags.ovgdb_enabled,
+				flags.ra_enabled,
+			);
+			cfg.service(
+				scope("")
+					.wrap(
+						DefaultHeaders::new()
+							.add(("Cache-Control", "no-store"))
+							.add(("Vary", "Authorization")),
+					)
+					.configure(configure_authenticated_api_routes),
+			);
+		}
+		ApiVersion::V2 => {
+			configure_public_api_routes_v2(cfg, flags);
+		}
+	}
+}
+
+/// The 256 KiB JsonConfig for the v2 bulk endpoints, with an error handler that
+/// turns a malformed, mistyped, or oversized JSON body into the v2 `V2ErrorBody`
+/// envelope. Scoped to the v2 surface only; v1 keeps the global plain-text
+/// JsonConfig. Every `JsonPayloadError` (deserialize failure, wrong content type,
+/// or overflow past the cap) maps to a single `malformed_body` 400 so a bad bulk
+/// body never reaches the client as actix's default plain-text error.
+fn v2_json_config() -> JsonConfig {
+	JsonConfig::default()
+		.limit(256 * 1024)
+		.error_handler(|err, _req| {
+			let response = crate::routes::v2::error::v2_malformed_body(err.to_string());
+			actix_web::error::InternalError::from_response(err, response).into()
+		})
+}
+
+/// v2 public surface. Self-contained: it carries its own paginated reference
+/// lists plus singular reads that reuse the same service fns as v1, and it
+/// mounts the version-agnostic shared routes and provider proxies so the v2
+/// scope answers every resource v1 does without registering two services at the
+/// same literal path. `flags` gate the provider proxies exactly as in v1.
+fn configure_public_api_routes_v2(cfg: &mut ServiceConfig, flags: PublicRouteFlags) {
+	// Everything mounts inside ONE empty-prefix scope. An actix `scope("")` matches
+	// every path, so a sibling empty scope registered ahead of other services
+	// swallows their requests and 404s them; a single scope avoids that. It also
+	// carries the larger 256 KiB JsonConfig so a full bulk batch (up to 100 items
+	// with hashes) clears the global 64 KiB body limit, which stays untouched
+	// elsewhere. Each bulk batch still counts as one request against the version
+	// scope's shared Governor.
+	//
+	// Literal paths (`/games/bulk`, `/games/search`, `/games/by-name`, the
+	// `/games/{id}/...` sub-resources, `/companies/search`, `/platforms/search`,
+	// `/signature-groups/search`, `/dat-files/by-hash`, `/dat-files/bulk`)
+	// register before their `/{id}` dynamic peers so the dynamic segment cannot
+	// swallow them.
+	cfg.service(
+		scope("")
+			.app_data(v2_json_config())
+			.service(bulk_games_by_id_v2)
+			.service(bulk_platforms_by_id_v2)
+			.service(bulk_companies_by_id_v2)
+			.service(bulk_signature_groups_by_id_v2)
+			.service(bulk_dat_files_by_id_v2)
+			.service(bulk_game_files_by_id_v2)
+			.service(identify_bulk_ids_v2)
+			.service(identify_bulk_relations_v2)
+			.service(get_stats_v2)
+			.service(list_companies_v2)
+			.service(search_companies_v2)
+			.service(get_company_by_id_v2)
+			.service(list_platforms_v2)
+			.service(get_platform_stats_v2)
+			.service(search_platforms_v2)
+			.service(get_platform_by_id_v2)
+			.service(list_signature_groups_v2)
+			.service(list_signature_group_dat_files_v2)
+			.service(list_signature_group_games_v2)
+			.service(search_signature_groups_v2)
+			.service(get_signature_group_by_id_v2)
+			.service(list_games_v2)
+			.service(search_games_v2)
+			.service(get_games_by_name_v2)
+			.service(get_game_file_presence_v2)
+			.service(get_game_file_by_id_v2)
+			.service(get_game_with_relations_by_id_v2)
+			.service(list_game_files_v2)
+			.service(list_game_mappings_v2)
+			.service(list_game_clones_v2)
+			.service(list_game_dat_files_v2)
+			.service(get_game_by_id_v2)
+			.service(list_dat_files_v2)
+			.service(list_dat_files_by_hash_v2)
+			.service(list_dat_file_games_v2)
+			.service(get_dat_file_import_v2)
+			.service(list_dat_file_imports_v2)
+			.service(get_dat_file_by_id_v2)
+			.configure(configure_shared_public_routes)
+			.configure(move |c| configure_provider_proxy_routes(c, flags))
+			.service(
+				scope("")
+					.wrap(
+						DefaultHeaders::new()
+							.add(("Cache-Control", "no-store"))
+							.add(("Vary", "Authorization")),
+					)
+					.configure(configure_authenticated_api_routes_v2),
+			),
+	);
+}
+
+/// v2 authenticated surface. Reuses the v1 suggestion and manual match handlers,
+/// which enforce their own permission level on the request and already serialize
+/// camelCase, and adds the v2 keyset suggestion list. The two user endpoints that
+/// take a request body are mounted as forked handlers reading the camelCase
+/// request bodies; `get_user` carries no body or query and reuses the v1 handler.
+/// `get_user_by_discord_id_v2` is forked so its `discordId` query param is
+/// camelCase. `get_all_suggestions` is intentionally omitted because
+/// `list_suggestions_v2` answers `/suggestion` for this version.
+fn configure_authenticated_api_routes_v2(cfg: &mut ServiceConfig) {
+	cfg.service(list_suggestions_v2)
+		.service(get_suggestion_by_id)
+		.service(create_game_suggestion)
+		.service(create_company_suggestion)
+		.service(create_platform_suggestion)
+		.service(approve_suggestion)
+		.service(delete_suggestion)
+		.service(manually_match_game)
+		.service(manually_match_platform)
+		.service(manually_match_company)
+		.service(create_or_get_by_discord_id_v2)
+		.service(get_user_by_discord_id_v2)
+		.service(get_user)
+		.service(update_user_permission_level_v2);
+}
+
 #[allow(clippy::too_many_arguments)]
 fn configure_public_api_routes(
 	cfg: &mut ServiceConfig,
@@ -959,6 +1219,32 @@ fn configure_public_api_routes(
 	ovgdb_enabled: bool,
 	ra_enabled: bool,
 ) {
+	configure_provider_routes(
+		cfg,
+		PublicRouteFlags {
+			igdb_enabled,
+			sgdb_enabled,
+			ss_enabled,
+			mg_enabled,
+			lb_enabled,
+			ovgdb_enabled,
+			ra_enabled,
+		},
+	);
+}
+
+/// Registers the full v1 public surface: health and readiness probes, the
+/// external suggestion intake, the company, platform, signature group, identify,
+/// and playmatch game reads, and the optional provider proxy routes gated by
+/// `flags`. The registration order matches the historical v1 order so v1
+/// reproduces its existing route set byte for byte after the refactor.
+///
+/// v2 does not call this because it carries its own paginated equivalents for
+/// the company, platform, signature group, game read, and search resources at
+/// the same literal paths; v2 instead mounts only the collision-free shared
+/// routes via [`configure_shared_public_routes`] and the provider proxies via
+/// [`configure_provider_proxy_routes`].
+fn configure_provider_routes(cfg: &mut ServiceConfig, flags: PublicRouteFlags) {
 	cfg.service(health)
 		.service(ready)
 		.service(submit_external_game_suggestion)
@@ -974,25 +1260,49 @@ fn configure_public_api_routes(
 		.service(get_playmatch_game_with_relations_by_id)
 		.service(search_games)
 		.service(get_game_file_history_by_id);
-	if igdb_enabled {
+	configure_provider_proxy_routes(cfg, flags);
+}
+
+/// Registers the public routes the v2 scope reuses from the shared surface.
+/// `/identify/ids`, the relations identify, and the game-file history are all
+/// mounted as v2 forks: `identify_game_with_metadata_ids_v2` answers the v2
+/// `{code, message}` envelope on a malformed query (matching the relations fork)
+/// instead of v1's plain-text body, and the relations/history forks emit the
+/// camelCase wrapper types over the snake_case playmatch objects. Excludes the
+/// company, platform, signature group, `/game/{id}` reads, and `/games/search`
+/// handlers whose paths v2 already owns through its own handlers.
+fn configure_shared_public_routes(cfg: &mut ServiceConfig) {
+	cfg.service(health)
+		.service(ready)
+		.service(submit_external_game_suggestion)
+		.service(identify_game_with_metadata_ids_v2)
+		.service(identify_game_and_relations_v2)
+		.service(get_game_file_history_by_id_v2);
+}
+
+/// Registers the optional external provider proxy routes gated by `flags`. These
+/// proxies are version-agnostic and have no v2-specific equivalents, so both v1
+/// and v2 mount the identical set.
+fn configure_provider_proxy_routes(cfg: &mut ServiceConfig, flags: PublicRouteFlags) {
+	if flags.igdb_enabled {
 		configure_igdb_routes(cfg);
 	}
-	if sgdb_enabled {
+	if flags.sgdb_enabled {
 		configure_sgdb_routes(cfg);
 	}
-	if ss_enabled {
+	if flags.ss_enabled {
 		configure_screenscraper_routes(cfg);
 	}
-	if mg_enabled {
+	if flags.mg_enabled {
 		configure_mobygames_routes(cfg);
 	}
-	if lb_enabled {
+	if flags.lb_enabled {
 		configure_launchbox_routes(cfg);
 	}
-	if ovgdb_enabled {
+	if flags.ovgdb_enabled {
 		configure_openvgdb_routes(cfg);
 	}
-	if ra_enabled {
+	if flags.ra_enabled {
 		configure_retroachievements_routes(cfg);
 	}
 }

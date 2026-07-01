@@ -1,4 +1,5 @@
 use crate::db::abstraction::ColumnEqIgnoreCaseTrait;
+use crate::db::pagination::{KeysetPage, fetch_keyset_page};
 use crate::db::unmatched_entities_with_limit;
 use entity::company::ActiveModel;
 use entity::prelude::Company;
@@ -6,12 +7,15 @@ use entity::sea_orm_active_enums::{MatchTypeEnum, MetadataProviderEnum};
 use entity::{company, signature_metadata_mapping};
 use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
+use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
-	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, ModelTrait, QueryFilter, QueryOrder,
-	QuerySelect, TryIntoModel,
+	ActiveModelTrait, ColumnTrait, DbConn, DbErr, EntityTrait, LoaderTrait, ModelTrait,
+	QueryFilter, QueryOrder, QuerySelect, TryIntoModel,
 };
+use std::collections::HashMap;
 
-/// Find a company by exact (case-sensitive) name.
+/// Looks up a company by exact, case-sensitive name.
 pub async fn find_company_by_name(
 	name: &str,
 	conn: &DbConn,
@@ -24,7 +28,6 @@ pub async fn find_company_by_name(
 	Ok(company)
 }
 
-/// Return the signature metadata mapping for the given provider attached to a company, if any.
 pub async fn find_company_related_signature_metadata_mapping(
 	model: &company::Model,
 	provider: MetadataProviderEnum,
@@ -37,7 +40,6 @@ pub async fn find_company_related_signature_metadata_mapping(
 		.await
 }
 
-/// Load a company by id together with all of its signature metadata mappings.
 pub async fn get_by_id_and_join_signature_metadata_mappings(
 	id: Uuid,
 	conn: &DbConn,
@@ -59,7 +61,22 @@ pub async fn get_by_id_and_join_signature_metadata_mappings(
 	}
 }
 
-/// Return every company paired with its signature metadata mappings.
+/// Load every company in `ids` in one `is_in` query, keyed by id. Bulk variant
+/// used to hydrate a page of dat files without a query per row.
+pub async fn find_companies_by_ids(
+	ids: &[Uuid],
+	conn: &DbConn,
+) -> Result<HashMap<Uuid, company::Model>, DbErr> {
+	if ids.is_empty() {
+		return Ok(HashMap::new());
+	}
+	let rows = company::Entity::find()
+		.filter(company::Column::Id.is_in(ids.iter().copied()))
+		.all(conn)
+		.await?;
+	Ok(rows.into_iter().map(|row| (row.id, row)).collect())
+}
+
 pub async fn find_all_and_join_signature_metadata_mapping(
 	conn: &DbConn,
 ) -> Result<Vec<(company::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
@@ -71,7 +88,63 @@ pub async fn find_all_and_join_signature_metadata_mapping(
 	Ok(companies_with_mappings)
 }
 
-/// Find a company by case-insensitive name, creating one with that name if it does not exist.
+pub async fn find_companies_page_and_join_signature_metadata_mapping(
+	after: Option<(String, Uuid)>,
+	limit: Option<u64>,
+	conn: &DbConn,
+) -> Result<KeysetPage<(company::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	let mut cursor =
+		company::Entity::find().cursor_by((company::Column::Name, company::Column::Id));
+	if let Some((name, id)) = after {
+		cursor.after((name, id));
+	}
+	let page = fetch_keyset_page(&mut cursor, limit, conn).await?;
+
+	let mappings = page
+		.rows
+		.load_many(signature_metadata_mapping::Entity, conn)
+		.await?;
+
+	let rows = page.rows.into_iter().zip(mappings).collect();
+	Ok(KeysetPage {
+		rows,
+		has_more: page.has_more,
+	})
+}
+
+/// One keyset page of companies whose name matches `query` as a case-insensitive
+/// substring, ordered by `(name, id)` and joined to their metadata mappings like
+/// [`find_companies_page_and_join_signature_metadata_mapping`]. The match is an
+/// ILIKE against a `%query%` pattern; `after` is the last row of the previous page.
+pub async fn search_companies_by_name_page(
+	query: &str,
+	after: Option<(String, Uuid)>,
+	limit: Option<u64>,
+	conn: &DbConn,
+) -> Result<KeysetPage<(company::Model, Vec<signature_metadata_mapping::Model>)>, DbErr> {
+	let pattern = format!("%{query}%");
+
+	let mut cursor = company::Entity::find()
+		.filter(Expr::col((company::Entity, company::Column::Name)).ilike(pattern))
+		.cursor_by((company::Column::Name, company::Column::Id));
+	if let Some((name, id)) = after {
+		cursor.after((name, id));
+	}
+	let page = fetch_keyset_page(&mut cursor, limit, conn).await?;
+
+	let mappings = page
+		.rows
+		.load_many(signature_metadata_mapping::Entity, conn)
+		.await?;
+
+	let rows = page.rows.into_iter().zip(mappings).collect();
+	Ok(KeysetPage {
+		rows,
+		has_more: page.has_more,
+	})
+}
+
+/// Matches a company by case-insensitive name, creating one when none exists.
 pub async fn create_or_find_company_by_name(
 	name: &str,
 	conn: &DbConn,

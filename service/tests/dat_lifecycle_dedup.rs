@@ -1,6 +1,5 @@
 //! Postgres-backed tests for dat_file dedup and lifecycle currency.
-//! Require Docker; ignored by default. Run with:
-//!   cargo test -p service --test dat_lifecycle_dedup -- --ignored
+//! Require Docker.
 
 use migration::{Migrator, MigratorTrait};
 use sea_orm::prelude::Uuid;
@@ -26,6 +25,17 @@ async fn start_pg() -> (ContainerAsync<Postgres>, DbConn) {
 	(container, db)
 }
 
+/// Number of trailing migrations to roll back so that `name` and everything
+/// registered after it are undone, regardless of how many migrations follow.
+fn rollback_steps_through(name: &str) -> u32 {
+	let migrations = Migrator::migrations();
+	let index = migrations
+		.iter()
+		.position(|m| m.name() == name)
+		.unwrap_or_else(|| panic!("migration {name} must be registered"));
+	(migrations.len() - index) as u32
+}
+
 const SHA1: &str = "432dbe312bc51e36bb8cb6fcb5e08f6968f124a4";
 
 const SG: &str = "11111111-1111-1111-1111-111111111111";
@@ -42,7 +52,6 @@ const CANON_GF: &str = "99999999-9999-9999-9999-999999999999";
 const ORPHAN_GF: &str = "07070707-0707-0707-0707-070707070707";
 
 #[tokio::test]
-#[ignore = "requires Docker (testcontainers Postgres)"]
 async fn dedupe_migration_merges_buildstamp_orphan_and_fixes_currency() {
 	let (_pg, db) = start_pg().await;
 	seed_orphan_scenario(&db).await;
@@ -64,7 +73,10 @@ async fn dedupe_migration_merges_buildstamp_orphan_and_fixes_currency() {
 	);
 
 	// Re-apply the dedupe migration over the seeded data (its down is a no-op).
-	Migrator::down(&db, Some(1)).await.unwrap();
+	// Compute how many trailing migrations to roll back so the count stays correct
+	// as migrations are appended after the dedupe one.
+	let steps = rollback_steps_through("m20260619_120000_dedupe_dat_file_lifecycle");
+	Migrator::down(&db, Some(steps)).await.unwrap();
 	Migrator::up(&db, None).await.unwrap();
 
 	assert_eq!(
@@ -167,7 +179,6 @@ const R_F2_PRESENT: &str = "82828282-8282-8282-8282-828282828282";
 // A second import re-sees only the present game; the vanished one must retire
 // and come back in the returned ids, the present one must stay current.
 #[tokio::test]
-#[ignore = "requires Docker (testcontainers Postgres)"]
 async fn reconcile_retires_vanished_rows_and_returns_their_game_ids() {
 	let (_pg, db) = start_pg().await;
 	seed_reconcile_scenario(&db).await;

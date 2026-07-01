@@ -1,5 +1,7 @@
+use crate::db::pagination::KeysetPage;
 use crate::db::platform::{
-	find_all_and_join_company_and_signature_metadata_mappings,
+	count_platforms, find_all_and_join_company_and_signature_metadata_mappings,
+	find_platforms_page_and_join_company_and_signature_metadata_mappings,
 	get_by_id_and_join_company_and_signature_metadata_mappings,
 };
 use crate::model::PlatformMetadataResponse;
@@ -40,4 +42,31 @@ pub async fn find_all_and_related_company_and_signature_metadata_mapping(
 			external_metadata: mappings.into_iter().map(Into::into).collect(),
 		})
 		.collect())
+}
+
+/// One keyset page of platforms ordered by `(name, id)`, each mapped to the
+/// public DTO with its company and external metadata. `after` is the last row
+/// of the previous page.
+pub async fn find_platforms_page_and_related_company_and_signature_metadata_mapping(
+	after: Option<(String, Uuid)>,
+	limit: Option<u64>,
+	db_conn: &DbConn,
+) -> anyhow::Result<KeysetPage<PlatformMetadataResponse>> {
+	let page =
+		find_platforms_page_and_join_company_and_signature_metadata_mappings(after, limit, db_conn)
+			.await?;
+
+	Ok(
+		page.map_rows(|(platform, company, mappings)| PlatformMetadataResponse {
+			id: platform.id,
+			name: platform.name,
+			company_id: company.clone().map(|company| company.id),
+			company_name: company.map(|company| company.name),
+			external_metadata: mappings.into_iter().map(Into::into).collect(),
+		}),
+	)
+}
+
+pub async fn count_all_platforms(db_conn: &DbConn) -> anyhow::Result<u64> {
+	Ok(count_platforms(db_conn).await?)
 }

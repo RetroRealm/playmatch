@@ -93,36 +93,78 @@ impl Error {
 	}
 }
 
+/// The pieces both error renderers need, produced once per rendered error so
+/// metrics are recorded exactly once regardless of which surface renders it.
+pub(crate) struct RenderParts {
+	pub status: StatusCode,
+	pub code: &'static str,
+	pub message: String,
+	pub retry_after_secs: Option<u64>,
+}
+
+impl Error {
+	/// Records the error metrics and logs server errors. Kept separate from
+	/// rendering so the v2 middleware can re-render an already-recorded error into
+	/// the JSON envelope without double-counting. Call exactly once per response.
+	pub(crate) fn record_error_metrics(&self) {
+		let (status, code) = self.status_and_metric();
+		service::metrics::record_service_error(code);
+		self.record_extra_metrics();
+		if status.is_server_error() && !matches!(self, Self::UpstreamUnavailable { .. }) {
+			log::error!("HTTP {} ({code}): {self}", status.as_u16());
+		}
+	}
+
+	/// The render inputs, without recording metrics. The message is leak-safe:
+	/// client errors and the deliberate upstream-unavailable case carry their real
+	/// message, every other server error collapses to a generic string.
+	pub(crate) fn render_parts(&self) -> RenderParts {
+		let (status, code) = self.status_and_metric();
+		let leak_safe =
+			!status.is_server_error() || matches!(self, Self::UpstreamUnavailable { .. });
+
+		let message = if leak_safe {
+			self.to_string()
+		} else {
+			"internal server error".to_string()
+		};
+
+		let retry_after_secs = match self {
+			Self::UpstreamUnavailable {
+				retry_after_secs, ..
+			} => *retry_after_secs,
+			_ => None,
+		};
+
+		RenderParts {
+			status,
+			code,
+			message,
+			retry_after_secs,
+		}
+	}
+
+	/// Render this error as the v2 JSON envelope (`{code, message, ...}`) instead of
+	/// v1's plain-text body. Pure render, no metrics; the caller records once.
+	pub(crate) fn v2_error_response(&self) -> HttpResponse {
+		crate::routes::v2::error::v2_status_error(self.render_parts())
+	}
+}
+
 impl ResponseError for Error {
 	fn status_code(&self) -> StatusCode {
 		self.status_and_metric().0
 	}
 
 	fn error_response(&self) -> HttpResponse {
-		let (status, label) = self.status_and_metric();
-		service::metrics::record_service_error(label);
-		self.record_extra_metrics();
+		self.record_error_metrics();
+		let parts = self.render_parts();
 
-		let leak_safe =
-			!status.is_server_error() || matches!(self, Self::UpstreamUnavailable { .. });
-		if !leak_safe {
-			log::error!("HTTP {} ({label}): {self}", status.as_u16());
-		}
-
-		let mut builder = HttpResponse::build(status);
-		if let Self::UpstreamUnavailable {
-			retry_after_secs: Some(s),
-			..
-		} = self
-		{
+		let mut builder = HttpResponse::build(parts.status);
+		if let Some(s) = parts.retry_after_secs {
 			builder.insert_header(("Retry-After", s.to_string()));
 		}
-
-		if leak_safe {
-			builder.body(self.to_string())
-		} else {
-			builder.body("internal server error")
-		}
+		builder.body(parts.message)
 	}
 }
 

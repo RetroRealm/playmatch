@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod company;
+pub mod content_anchor;
 pub mod dat_file;
 pub mod dat_file_import;
 pub mod game;

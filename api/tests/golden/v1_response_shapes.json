@@ -1,0 +1,42 @@
+{
+  "game_match_no_match": {
+    "gameMatchType": "NoMatch",
+    "id": null
+  },
+  "game_match_hit": {
+    "gameMatchType": "SHA256",
+    "id": "00000000-0000-0000-0000-000000000000"
+  },
+  "game_name_search_result": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Sample Game",
+    "platform_id": "00000000-0000-0000-0000-000000000000",
+    "platform_name": "Sample Platform"
+  },
+  "game_match_type_variants": [
+    "SHA256",
+    "SHA1",
+    "MD5",
+    "CRC",
+    "FileNameAndSize",
+    "NoMatch"
+  ],
+  "metadata_provider_variants": [
+    "IGDB",
+    "SteamGridDB",
+    "ScreenScraper",
+    "MobyGames",
+    "LaunchBox",
+    "EmuReady",
+    "OpenVGDB",
+    "RetroAchievements",
+    "TheGamesDB",
+    "Hasheous"
+  ],
+  "failed_match_reason_variants": [
+    "NoDirectMatch",
+    "TooManyMatches",
+    "Ambiguous",
+    "TooManyFiles"
+  ]
+}

@@ -12,20 +12,20 @@ use service::matching::manual::{
 use service::model::ManualMatchMode;
 use service::model::matching::{CompanyOrPlatformMatchRequest, GameMatchRequest, MatchRequest};
 
-/// Manually match a Game by its file hashes, filename or Game name, returning the matched game ExternalMetadata.
-/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
+/// Matches a game to external metadata by file hash, filename, or name.
+///
+/// Identify the game by any of its file hashes, its filename, or its game name, then attach the chosen external metadata to it. The strongest supplied hash resolves the file: sha256, then sha1, then md5, then crc. At least one of `file_name`, `md5`, `sha1`, or `sha256` is required. Requires credentials of at least Trusted level. Callers without a Trusted account use the suggestion endpoints instead.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Match",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully Matched Game", body = Vec<UpdatedMatchResult>),
-		(status = 400, description = "At least one of file_name, md5, sha1 or sha256 must be provided."),
-		(status = 401, description = "Unauthorized, you need to be logged in to manually match a game"),
-		(status = 403, description = "Forbidden, you do not have permission to manually match a game"),
+		(status = 200, description = "The matched game and its updated external metadata", body = Vec<UpdatedMatchResult>),
+		(status = 400, description = "None of file_name, md5, sha1, or sha256 supplied, or a supplied hash is malformed"),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Trusted level"),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -46,7 +46,7 @@ pub async fn manually_match_game(
 	.await?;
 
 	if let Err(msg) = match_request.validate() {
-		return Ok(HttpResponse::BadRequest().body(msg));
+		return Err(error::Error::BadRequest(msg));
 	}
 
 	if match_request.name.is_none()
@@ -54,8 +54,9 @@ pub async fn manually_match_game(
 		&& match_request.sha1.is_none()
 		&& match_request.sha256.is_none()
 	{
-		return Ok(HttpResponse::BadRequest()
-			.body("At least one of file_name, md5, sha1 or sha256 must be provided."));
+		return Err(error::Error::BadRequest(
+			"At least one of file_name, md5, sha1 or sha256 must be provided.".to_string(),
+		));
 	}
 
 	let mut redis_conn = redis_conn.get_ref().clone();
@@ -65,19 +66,19 @@ pub async fn manually_match_game(
 	Ok(HttpResponse::Ok().json(updated))
 }
 
-/// Manually match a Platform by its name, returning the matched ExternalMetadata.
-/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
+/// Matches a platform to external metadata by name.
+///
+/// Identify the platform by its name and attach the chosen external metadata to it. Requires credentials of at least Trusted level. Callers without a Trusted account use the suggestion endpoints instead.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Match",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully Matched Platform", body = UpdatedMatchResult),
-		(status = 401, description = "Unauthorized, you need to be logged in to manually match a platform"),
-		(status = 403, description = "Forbidden, you do not have permission to manually match a platform"),
+		(status = 200, description = "The matched platform and its updated external metadata", body = UpdatedMatchResult),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Trusted level"),
 		(status = 404, description = "Platform not found")
 	)
 )]
@@ -97,7 +98,7 @@ pub async fn manually_match_platform(
 	.await?;
 
 	if let Err(msg) = match_request.validate() {
-		return Ok(HttpResponse::BadRequest().body(msg));
+		return Err(error::Error::BadRequest(msg));
 	}
 
 	let updated = apply_manual_platform_match(match_request, db_conn.get_ref()).await?;
@@ -105,19 +106,19 @@ pub async fn manually_match_platform(
 	Ok(HttpResponse::Ok().json(updated))
 }
 
-/// Manually match a Company by its name, returning the matched ExternalMetadata.
-/// This Endpoint requires Credentials of a User with at least Trusted level, if you do not have user credentials and a user account with at least Trusted level, use the suggestion endpoints instead.
+/// Matches a company to external metadata by name.
+///
+/// Identify the company by its name and attach the chosen external metadata to it. Requires credentials of at least Trusted level. Callers without a Trusted account use the suggestion endpoints instead.
 #[utoipa::path(
 	post,
-	context_path = "/api",
 	tag = "Match",
 	security(
         ("bearer_auth" = [])
 	),
 	responses(
-		(status = 200, description = "Successfully Matched Company", body = UpdatedMatchResult),
-		(status = 401, description = "Unauthorized, you need to be logged in to manually match a company"),
-		(status = 403, description = "Forbidden, you do not have permission to manually match a company"),
+		(status = 200, description = "The matched company and its updated external metadata", body = UpdatedMatchResult),
+		(status = 401, description = "Missing or invalid credentials"),
+		(status = 403, description = "Credentials below Trusted level"),
 		(status = 404, description = "Company not found")
 	)
 )]
@@ -137,7 +138,7 @@ pub async fn manually_match_company(
 	.await?;
 
 	if let Err(msg) = match_request.validate() {
-		return Ok(HttpResponse::BadRequest().body(msg));
+		return Err(error::Error::BadRequest(msg));
 	}
 
 	let updated = apply_manual_company_match(match_request, db_conn.get_ref()).await?;

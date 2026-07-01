@@ -38,6 +38,10 @@ pub enum AutomaticMatchReasonEnum {
 	CrossProviderDirectName,
 	#[sea_orm(string_value = "cross_provider_normalized_name")]
 	CrossProviderNormalizedName,
+	#[sea_orm(string_value = "via_content_hash")]
+	ViaContentHash,
+	#[sea_orm(string_value = "sha256_hash")]
+	Sha256Hash,
 }
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Copy, Serialize, Deserialize)]
 #[sea_orm(

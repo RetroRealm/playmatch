@@ -1,6 +1,5 @@
 //! Postgres + Redis backed round-trip tests for the MCP tool free functions.
-//! Require Docker; ignored by default. Run with:
-//!   cargo test -p mcp --test identify_roundtrip -- --ignored
+//! Require Docker.
 
 use migration::{Migrator, MigratorTrait};
 use redis::aio::MultiplexedConnection;
@@ -56,15 +55,17 @@ async fn seed_game(db: &DbConn) {
 		INSERT INTO game (id, dat_file_import_id, name, is_current, last_seen_dat_file_import_id)
 		VALUES ('{GAME}', '{IMPORT}', 'Pokemon - Diamant-Edition (Germany) (Rev 5)', true, '{IMPORT}');
 
-		INSERT INTO game_file (id, game_id, file_name, sha1, crc, is_current, last_seen_dat_file_import_id)
-		VALUES ('{GF}', '{GAME}', 'Pokemon - Diamant-Edition (Germany) (Rev 5).nds', '{SHA1}', '{CRC}', true, '{IMPORT}');
+		INSERT INTO game_file (id, game_id, file_name, file_size_in_bytes, sha1, crc, is_current, last_seen_dat_file_import_id)
+		VALUES ('{GF}', '{GAME}', 'Pokemon - Diamant-Edition (Germany) (Rev 5).nds', 1024, '{SHA1}', '{CRC}', true, '{IMPORT}');
+
+		INSERT INTO game_file_presence (game_file_id, dat_file_import_id)
+		VALUES ('{GF}', '{IMPORT}');
 		"#
 	);
 	db.execute_unprepared(&sql).await.unwrap();
 }
 
 #[tokio::test]
-#[ignore = "requires Docker (testcontainers Postgres + Redis)"]
 async fn identify_by_hash_and_get_game_return_seeded_game() {
 	let (_pg, db) = start_pg().await;
 	let (_redis, mut redis) = start_redis().await;
@@ -132,7 +133,6 @@ async fn identify_by_hash_and_get_game_return_seeded_game() {
 }
 
 #[tokio::test]
-#[ignore = "requires Docker (testcontainers Postgres + Redis)"]
 async fn identify_unknown_hash_returns_nomatch() {
 	let (_pg, db) = start_pg().await;
 	let (_redis, mut redis) = start_redis().await;
@@ -151,5 +151,127 @@ async fn identify_unknown_hash_returns_nomatch() {
 	assert!(
 		json.contains("NoMatch"),
 		"an unknown hash must be a normal NoMatch result, got: {json}"
+	);
+}
+
+#[tokio::test]
+async fn dat_file_and_game_file_tools_return_seeded_records() {
+	let (_pg, db) = start_pg().await;
+	seed_game(&db).await;
+
+	let dat_file_id = sea_orm::prelude::Uuid::parse_str(DF).unwrap();
+	let game_id = sea_orm::prelude::Uuid::parse_str(GAME).unwrap();
+
+	let list = mcp::tools::list_dat_files_json(None, None, None, None, None, &db)
+		.await
+		.unwrap();
+	assert!(
+		list.contains(DF),
+		"the dat file listing must carry the seeded dat file id, got: {list}"
+	);
+
+	let detail = mcp::tools::get_dat_file_json(dat_file_id, &db)
+		.await
+		.unwrap()
+		.expect("seeded dat file must be found");
+	assert!(
+		detail.contains("gameCount"),
+		"the dat file detail must carry aggregate game counts, got: {detail}"
+	);
+
+	let games = mcp::tools::list_dat_file_games_json(dat_file_id, true, false, false, None, &db)
+		.await
+		.unwrap()
+		.expect("seeded dat file must resolve its games");
+	assert!(
+		games.contains("Pokemon - Diamant-Edition (Germany) (Rev 5)"),
+		"the dat file games must carry the seeded game name, got: {games}"
+	);
+
+	let files = mcp::tools::get_game_files_json(game_id, true, None, &db)
+		.await
+		.unwrap()
+		.expect("seeded game must resolve its files");
+	assert!(
+		files.contains(SHA1),
+		"the game files must carry the seeded sha1, got: {files}"
+	);
+
+	let unknown =
+		sea_orm::prelude::Uuid::parse_str("dddddddd-dddd-dddd-dddd-dddddddddddd").unwrap();
+	assert!(
+		mcp::tools::get_dat_file_json(unknown, &db)
+			.await
+			.unwrap()
+			.is_none(),
+		"an unknown dat file id must resolve to None"
+	);
+	assert!(
+		mcp::tools::get_game_files_json(unknown, true, None, &db)
+			.await
+			.unwrap()
+			.is_none(),
+		"an unknown game id must resolve to None for the files tool"
+	);
+}
+
+#[tokio::test]
+async fn reverse_hash_lookup_and_bulk_identify_match_the_single_endpoint() {
+	let (_pg, db) = start_pg().await;
+	let (_redis, redis) = start_redis().await;
+	seed_game(&db).await;
+
+	let lookup = service::entities::dat_file::HashLookup {
+		sha1: Some(SHA1.to_string()),
+		..Default::default()
+	};
+	let presence = mcp::tools::find_dats_containing_hash_json(lookup, false, &db)
+		.await
+		.unwrap()
+		.expect("a seeded sha1 must resolve to a dat file presence");
+	assert!(
+		presence.contains(DF),
+		"the reverse lookup must carry the seeded dat file id, got: {presence}"
+	);
+
+	let items = vec![
+		mcp::tools::BulkIdentifyItem {
+			search: mcp::tools::build_search(
+				"Pokemon - Diamant-Edition (Germany) (Rev 5).nds".to_string(),
+				1024,
+				None,
+				Some(SHA1.to_string()),
+				None,
+				None,
+			),
+			key: Some("hit".to_string()),
+		},
+		mcp::tools::BulkIdentifyItem {
+			search: mcp::tools::build_search(
+				"unknown.rom".to_string(),
+				2048,
+				None,
+				Some("0000000000000000000000000000000000000000".to_string()),
+				None,
+				None,
+			),
+			key: None,
+		},
+	];
+
+	let json = mcp::tools::bulk_identify_json(items, &redis, &db)
+		.await
+		.unwrap();
+	assert!(
+		json.contains("\"total\":2"),
+		"the bulk summary must report two items, got: {json}"
+	);
+	assert!(
+		json.contains(GAME) && json.contains("SHA1"),
+		"the bulk hit must mirror the single endpoint's SHA1 match, got: {json}"
+	);
+	assert!(
+		json.contains("NoMatch") && json.contains("\"hit\""),
+		"the bulk batch must carry both the no-match item and the echoed key, got: {json}"
 	);
 }

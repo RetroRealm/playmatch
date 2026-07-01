@@ -22,6 +22,8 @@ pub struct Model {
 	pub last_seen_dat_file_import_id: Option<Uuid>,
 	#[serde(default)]
 	pub is_current: bool,
+	#[serde(default)]
+	pub content_anchor_id: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -42,6 +44,14 @@ pub enum Relation {
 		on_delete = "Cascade"
 	)]
 	SelfRef,
+	#[sea_orm(
+		belongs_to = "super::content_anchor::Entity",
+		from = "Column::ContentAnchorId",
+		to = "super::content_anchor::Column::Id",
+		on_update = "NoAction",
+		on_delete = "SetNull"
+	)]
+	ContentAnchor,
 	#[sea_orm(has_many = "super::game_file::Entity")]
 	GameFile,
 	#[sea_orm(has_many = "super::signature_metadata_mapping::Entity")]
@@ -53,6 +63,12 @@ pub enum Relation {
 impl Related<super::dat_file_import::Entity> for Entity {
 	fn to() -> RelationDef {
 		Relation::DatFileImport.def()
+	}
+}
+
+impl Related<super::content_anchor::Entity> for Entity {
+	fn to() -> RelationDef {
+		Relation::ContentAnchor.def()
 	}
 }
 

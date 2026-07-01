@@ -20,6 +20,40 @@ pub struct CreateOrGetUserRequest {
 	pub permissions: UserPermissions,
 }
 
+/// Request to update a user's permissions.
+#[derive(Debug, Clone, IntoParams, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateUserPermissionsRequestV2 {
+	pub new_permission: UserPermissions,
+}
+
+impl From<UpdateUserPermissionsRequestV2> for UpdateUserPermissionsRequest {
+	fn from(value: UpdateUserPermissionsRequestV2) -> Self {
+		UpdateUserPermissionsRequest {
+			new_permission: value.new_permission,
+		}
+	}
+}
+
+/// Request to get or create a user by their Discord ID.
+#[derive(Debug, Clone, IntoParams, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateOrGetUserRequestV2 {
+	pub discord_id: i64,
+	pub username: String,
+	pub permissions: UserPermissions,
+}
+
+impl From<CreateOrGetUserRequestV2> for CreateOrGetUserRequest {
+	fn from(value: CreateOrGetUserRequestV2) -> Self {
+		CreateOrGetUserRequest {
+			discord_id: value.discord_id,
+			username: value.username,
+			permissions: value.permissions,
+		}
+	}
+}
+
 /// A User inside Playmatch.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]

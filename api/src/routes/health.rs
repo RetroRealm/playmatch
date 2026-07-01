@@ -16,12 +16,12 @@ fn unix_now() -> i64 {
 		.unwrap_or(0)
 }
 
+/// Returns the liveness status of the service.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Health",
 	responses(
-		(status = 200, description = "Service is healthy")
+		(status = 200, description = "The service is live")
 	)
 )]
 #[get("/health")]
@@ -29,13 +29,17 @@ pub async fn health() -> impl Responder {
 	HttpResponse::Ok().body("Healthy")
 }
 
+/// Returns the readiness status of the service.
+///
+/// Confirms the database and cache backends respond before reporting ready. A
+/// successful result is held for a few seconds before the backends are checked
+/// again.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Health",
 	responses(
-		(status = 200, description = "Service is Ready"),
-		(status = 503, description = "Service is not ready")
+		(status = 200, description = "The service is ready to serve traffic"),
+		(status = 503, description = "A backend dependency is unavailable")
 	)
 )]
 #[get("/ready")]

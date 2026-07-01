@@ -1,6 +1,5 @@
 //! Postgres backed round-trip test for the fuzzy game-name search tool.
-//! Requires Docker; ignored by default. Run with:
-//!   cargo test -p mcp --test search_games -- --ignored
+//! Requires Docker.
 
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectionTrait, Database, DbConn};
@@ -58,7 +57,6 @@ async fn seed_games(db: &DbConn) {
 }
 
 #[tokio::test]
-#[ignore = "requires Docker (testcontainers Postgres)"]
 async fn fuzzy_search_returns_canonical_pokemon_diamond() {
 	let (_pg, db) = start_pg().await;
 	seed_games(&db).await;
@@ -82,7 +80,6 @@ async fn fuzzy_search_returns_canonical_pokemon_diamond() {
 }
 
 #[tokio::test]
-#[ignore = "requires Docker (testcontainers Postgres)"]
 async fn fuzzy_search_respects_platform_filter() {
 	let (_pg, db) = start_pg().await;
 	seed_games(&db).await;

@@ -1,8 +1,11 @@
+pub mod bulk;
+pub mod dat_file;
 pub mod game;
 pub mod igdb;
 pub mod launchbox;
 pub mod mobygames;
 pub mod openvgdb;
+pub mod pagination;
 pub mod retroachievements;
 pub mod screenscraper;
 pub mod sgdb;

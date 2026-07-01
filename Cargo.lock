@@ -427,6 +427,7 @@ dependencies = [
  "actix-web-lab",
  "actix-web-prom",
  "anyhow",
+ "base64",
  "chrono",
  "derive_builder",
  "entity",
@@ -442,6 +443,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "service",
+ "testcontainers-modules",
  "thiserror 2.0.18",
  "tokio",
  "tokio-cron-scheduler",
@@ -2557,6 +2559,7 @@ version = "0.2.0"
 dependencies = [
  "actix-web",
  "anyhow",
+ "futures-util",
  "log",
  "migration",
  "redis",

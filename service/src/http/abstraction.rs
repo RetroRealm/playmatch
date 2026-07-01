@@ -156,6 +156,17 @@ impl<E: std::fmt::Display> Policy<Request, Response, E> for RetryPolicy {
 	}
 }
 
+pub trait RequestClientExt {
+	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder;
+}
+
+impl RequestClientExt for reqwest::Client {
+	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder {
+		self.get(url)
+			.header("User-Agent", REQWEST_DEFAULT_USER_AGENT)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -219,16 +230,5 @@ mod tests {
 	fn classify_status_treats_unknown_high_codes_as_server_error() {
 		assert_eq!(classify_status(600), "5xx");
 		assert_eq!(classify_status(999), "5xx");
-	}
-}
-
-pub trait RequestClientExt {
-	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder;
-}
-
-impl RequestClientExt for reqwest::Client {
-	fn get_default_user_agent<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-		self.get(url)
-			.header("User-Agent", REQWEST_DEFAULT_USER_AGENT)
 	}
 }

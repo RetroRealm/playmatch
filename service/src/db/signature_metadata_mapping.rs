@@ -11,6 +11,7 @@ use sea_orm::ActiveValue::Set;
 use sea_orm::prelude::Uuid;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, DbConn, DbErr, EntityTrait, QueryFilter};
+use std::collections::HashMap;
 
 /// Builder input for [`create_or_update_signature_metadata_mapping`]. Exactly one of
 /// `company_id`, `game_id`, `platform_id` should be set.
@@ -97,6 +98,32 @@ pub async fn find_sibling_matched_names(
 		.into_iter()
 		.filter_map(|m| m.matched_name.map(|n| (m.provider, n)))
 		.collect())
+}
+
+/// Bulk variant of the per-game metadata mapping lookup. Loads every mapping
+/// whose `game_id` is in `game_ids` in one `is_in` query and groups them by
+/// `game_id`, so a page of games can be hydrated without a query per row. The
+/// returned vectors keep the natural row order of the single query.
+pub async fn find_signature_metadata_mappings_by_game_ids(
+	game_ids: &[Uuid],
+	conn: &DbConn,
+) -> Result<HashMap<Uuid, Vec<Model>>, DbErr> {
+	if game_ids.is_empty() {
+		return Ok(HashMap::new());
+	}
+
+	let rows = signature_metadata_mapping::Entity::find()
+		.filter(signature_metadata_mapping::Column::GameId.is_in(game_ids.iter().copied()))
+		.all(conn)
+		.await?;
+
+	let mut by_game: HashMap<Uuid, Vec<Model>> = HashMap::new();
+	for mapping in rows {
+		if let Some(game_id) = mapping.game_id {
+			by_game.entry(game_id).or_default().push(mapping);
+		}
+	}
+	Ok(by_game)
 }
 
 /// Look up the mapping that targets the given platform, game, company and provider tuple.

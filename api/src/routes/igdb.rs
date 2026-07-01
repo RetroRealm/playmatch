@@ -81,14 +81,15 @@ macro_rules! igdb_entity_routes {
 	};
 }
 
-/// Queries the IGDB API for a game by its Id or Slug
+/// Returns an IGDB game by id or slug.
+///
+/// Supply either `id` or `slug`. If both are present, `id` is used.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "IGDB",
 	params(SlugIdQuery),
 	responses(
-		(status = 200, description = "Returns IGDB metadata about an game", body = Game),
+		(status = 200, description = "The matched IGDB game", body = Game),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -119,14 +120,13 @@ pub async fn get_igdb_game_by_id(
 	}
 }
 
-/// Queries the IGDB API for games by its Ids
+/// Looks up many IGDB games by id in one request.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "IGDB",
 	params(IdsQuery),
 	responses(
-		(status = 200, description = "Returns IGDB metadata about games", body = Vec<Game>)
+		(status = 200, description = "The matched IGDB games", body = Vec<Game>)
 	)
 )]
 #[get("/igdb/games")]
@@ -149,14 +149,13 @@ pub async fn get_igdb_games_by_ids(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Searches the IGDB API for games by its name
+/// Searches IGDB games by name, ordered by relevance.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "IGDB",
 	params(SearchQuery),
 	responses(
-		(status = 200, description = "Returns IGDB metadata about games", body = Vec<Game>)
+		(status = 200, description = "Matching IGDB games ordered by relevance", body = Vec<Game>)
 	)
 )]
 #[get("/igdb/game/search")]

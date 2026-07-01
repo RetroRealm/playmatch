@@ -15,10 +15,10 @@ use std::ops::ControlFlow;
 /// a hit, [`Self::finalize`] collapses the tally into a final
 /// `Cached(None)` / `NonCached(None)`.
 ///
-/// `expected_count` should be the number of content-key fields (sha256,
-/// sha1, md5, crc) the caller is going to attempt. The filename+size attempt
-/// is intentionally NOT part of `expected_count`; see the note on
-/// [`Self::finalize`] for why this matters.
+/// `expected_count` is the number of content-key fields (sha256, sha1, md5,
+/// crc) the caller will attempt. The filename and size attempt is excluded so
+/// that a `Cached(None)` verdict requires every content key to have been a
+/// cached miss, not merely the cheaper filename and size lookup.
 pub struct IdentifyAggregator {
 	expected_count: usize,
 	cached_but_empty: usize,
@@ -52,10 +52,7 @@ impl IdentifyAggregator {
 	/// Collapse the running tally into a final cache outcome.
 	///
 	/// Returns `Cached(None)` only when every content-key attempt produced
-	/// `Cached(None)`. `cached_but_empty` is bumped on every `Cached(None)`
-	/// outcome including the filename+size attempt, while `expected_count`
-	/// only counts content-key fields; see the test module for the pinned
-	/// behavior.
+	/// `Cached(None)`.
 	pub fn finalize(self) -> CacheStatus<Option<(GameMatchType, IdentifyEntry)>> {
 		if self.cached_but_empty == self.expected_count && self.cached_but_empty != 0 {
 			Cached(None)
@@ -86,6 +83,7 @@ mod tests {
 				signature_group_internal_clone_of_id: None,
 				last_seen_dat_file_import_id: None,
 				is_current: true,
+				content_anchor_id: None,
 			},
 			metadata_mappings: Vec::new(),
 		}

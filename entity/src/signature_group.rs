@@ -11,6 +11,7 @@ pub struct Model {
 	pub name: String,
 	pub website_link: Option<String>,
 	pub description: Option<String>,
+	pub display_priority: i16,
 	pub created_at: DateTimeWithTimeZone,
 	pub updated_at: DateTimeWithTimeZone,
 }

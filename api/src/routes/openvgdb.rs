@@ -13,14 +13,13 @@ use service::providers::openvgdb::model::OvgdbRomMatch;
 #[allow(unused_imports)] // Referenced only inside utoipa::path body attributes.
 use service::providers::openvgdb::model::{OvgdbRelease, OvgdbRom};
 
-/// Look up an OpenVGDB release by its release id.
+/// Returns an OpenVGDB release by id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "OpenVGDB",
 	params(OvgdbReleaseIdQuery),
 	responses(
-		(status = 200, description = "OpenVGDB release record", body = OvgdbRelease),
+		(status = 200, description = "The matched OpenVGDB release record", body = OvgdbRelease),
 		(status = 404, description = "Release not found")
 	)
 )]
@@ -43,17 +42,16 @@ pub async fn get_ovgdb_release_by_id(
 	})
 }
 
-/// Look up an OpenVGDB rom by a file hash (sha1, md5 or crc) and return it
-/// together with every release attached to it. At least one hash query
-/// parameter must be supplied; sha1 is preferred, then md5, then crc.
+/// Looks up an OpenVGDB rom by a file hash.
+///
+/// The strongest supplied hash resolves the rom: sha1, then md5, then crc. At least one hash must be supplied. The response carries the matched rom and every release attached to it.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "OpenVGDB",
 	params(OvgdbHashQuery),
 	responses(
-		(status = 200, description = "Matched rom and its releases", body = OvgdbRomMatch),
-		(status = 400, description = "No hash query parameter supplied"),
+		(status = 200, description = "The matched rom and its releases", body = OvgdbRomMatch),
+		(status = 400, description = "No hash supplied"),
 		(status = 404, description = "No rom matched the supplied hash")
 	)
 )]

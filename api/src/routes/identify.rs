@@ -23,14 +23,17 @@ fn cache_status_response<T: Serialize>(status: CacheStatus<T>, log_label: &str) 
 		.json(body)
 }
 
-/// Identify a game by its file hashes or filename and size, returning the matched metadata, goes in order sha256, sha1, md5, crc and filename + size (from most accurate to least accurate)
+/// Identifies a game by its file hashes or by filename and size.
+///
+/// The strongest supplied hash resolves the file: sha256, then sha1, then md5,
+/// then crc. When no hash matches, the filename and size are tried last. The
+/// result carries the matched game along with its metadata provider ids.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Identify",
 	params(GameFileMatchSearch),
 	responses(
-		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameMetadataMatchResult)
+		(status = 200, description = "The match result, including a no-match outcome", body = GameMetadataMatchResult)
 	)
 )]
 #[get("/identify/ids")]
@@ -54,14 +57,18 @@ pub async fn identify_game_with_metadata_ids(
 	))
 }
 
-/// Identify a game by its file hashes or filename and size, goes in order sha256, sha1, md5, crc and filename + size (from most accurate to least accurate), returning information about the game, game files, metadata mappings, publisher and company
+/// Identifies a game by its file hashes or by filename and size.
+///
+/// The strongest supplied hash resolves the file: sha256, then sha1, then md5,
+/// then crc. When no hash matches, the filename and size are tried last. The
+/// result carries the matched game together with its game files, metadata
+/// mappings, publisher, and company.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Identify",
 	params(GameFileMatchSearch),
 	responses(
-		(status = 200, description = "Returns info about a possible match via hashes or filename and size", body = GameAndRelationMatchResult)
+		(status = 200, description = "The match result and its related records, including a no-match outcome", body = GameAndRelationMatchResult)
 	)
 )]
 #[get("/identify/relations")]

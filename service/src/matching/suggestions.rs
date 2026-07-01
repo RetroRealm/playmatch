@@ -8,7 +8,8 @@ use crate::db::signature_metadata_mapping::{
 	SignatureMetadataMappingInputBuilder, create_or_update_signature_metadata_mapping,
 };
 use crate::db::signature_metadata_mapping_suggestions::{
-	get_all_suggestions, get_suggestion_by_id, insert_suggestion, suggestion_exists,
+	find_suggestions_page, get_all_suggestions, get_suggestion_by_id, insert_suggestion,
+	suggestion_exists,
 };
 use crate::error::{ServiceError, ServiceResult};
 use crate::matching::manual::apply_manual_game_match_by_game;
@@ -54,6 +55,17 @@ pub async fn get_suggestions(db_conn: &DatabaseConnection) -> ServiceResult<Vec<
 	let suggestions = get_all_suggestions(db_conn).await?;
 
 	Ok(suggestions.into_iter().map(|s| s.into()).collect())
+}
+
+/// One keyset page of suggestions newest first, ordered by `(created_at, id)`
+/// descending. `after` is the previous page's last row.
+pub async fn get_suggestions_page(
+	after: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
+	limit: Option<u64>,
+	db_conn: &DatabaseConnection,
+) -> ServiceResult<crate::db::pagination::KeysetPage<Suggestion>> {
+	let page = find_suggestions_page(after, limit, db_conn).await?;
+	Ok(page.map_rows(Into::into))
 }
 
 pub async fn get_suggestion(id: Uuid, db_conn: &DatabaseConnection) -> ServiceResult<Suggestion> {

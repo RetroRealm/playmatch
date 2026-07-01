@@ -16,13 +16,12 @@ use service::providers::mobygames::model::{
 	MgCoversResp, MgGame, MgGenre, MgPlatform, MgScreenshotsResp,
 };
 
-/// List every platform MobyGames knows about.
+/// Lists every platform known to MobyGames.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "MobyGames",
 	responses(
-		(status = 200, description = "MobyGames platform catalog", body = Vec<MgPlatform>)
+		(status = 200, description = "The full MobyGames platform catalog", body = Vec<MgPlatform>)
 	)
 )]
 #[get("/mobygames/platforms")]
@@ -35,13 +34,12 @@ pub async fn list_mg_platforms(
 	Ok(HttpResponse::Ok().json(platforms))
 }
 
-/// List every genre MobyGames knows about.
+/// Lists every genre known to MobyGames.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "MobyGames",
 	responses(
-		(status = 200, description = "MobyGames genre catalog", body = Vec<MgGenre>)
+		(status = 200, description = "The full MobyGames genre catalog", body = Vec<MgGenre>)
 	)
 )]
 #[get("/mobygames/genres")]
@@ -54,14 +52,13 @@ pub async fn list_mg_genres(
 	Ok(HttpResponse::Ok().json(genres))
 }
 
-/// Look up a MobyGames game by its game id.
+/// Returns a MobyGames game by id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "MobyGames",
 	params(MgIdQuery),
 	responses(
-		(status = 200, description = "MobyGames game record", body = MgGame),
+		(status = 200, description = "The matched MobyGames game record", body = MgGame),
 		(status = 404, description = "Game not found")
 	)
 )]
@@ -80,14 +77,15 @@ pub async fn get_mg_game_by_id(
 	})
 }
 
-/// Search MobyGames games by title, optionally narrowed to a platform.
+/// Searches MobyGames games by title.
+///
+/// Narrow the search to a single platform by passing a platform id. If omitted, all platforms are included.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "MobyGames",
 	params(MgSearchQuery),
 	responses(
-		(status = 200, description = "Matching games", body = Vec<MgGame>)
+		(status = 200, description = "The matching games", body = Vec<MgGame>)
 	)
 )]
 #[get("/mobygames/game/search")]
@@ -110,14 +108,13 @@ pub async fn search_mg_games(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Fetch MobyGames cover groups for a given game/platform combination.
+/// Returns the cover groups for a game on a platform.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "MobyGames",
 	params(MgGamePlatformQuery),
 	responses(
-		(status = 200, description = "MobyGames covers", body = MgCoversResp)
+		(status = 200, description = "The cover groups for the game on the platform", body = MgCoversResp)
 	)
 )]
 #[get("/mobygames/game/covers")]
@@ -137,14 +134,13 @@ pub async fn get_mg_game_covers(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Fetch MobyGames screenshots for a given game/platform combination.
+/// Returns the screenshots for a game on a platform.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "MobyGames",
 	params(MgGamePlatformQuery),
 	responses(
-		(status = 200, description = "MobyGames screenshots", body = MgScreenshotsResp)
+		(status = 200, description = "The screenshots for the game on the platform", body = MgScreenshotsResp)
 	)
 )]
 #[get("/mobygames/game/screenshots")]

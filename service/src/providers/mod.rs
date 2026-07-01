@@ -1,3 +1,4 @@
+pub mod content_anchor;
 pub mod emuready;
 pub mod hasheous;
 pub mod igdb;
@@ -196,6 +197,8 @@ fn automatic_reason_label(r: AutomaticMatchReasonEnum) -> &'static str {
 		AutomaticMatchReasonEnum::CrcHash => "crc_hash",
 		AutomaticMatchReasonEnum::CrossProviderDirectName => "cross_provider_direct_name",
 		AutomaticMatchReasonEnum::CrossProviderNormalizedName => "cross_provider_normalized_name",
+		AutomaticMatchReasonEnum::ViaContentHash => "via_content_hash",
+		AutomaticMatchReasonEnum::Sha256Hash => "sha256_hash",
 	}
 }
 
@@ -691,6 +694,20 @@ pub async fn match_db_to_all_providers(
 	let aggregate_started = Instant::now();
 	run_primary_wave(registry, db_conn).await;
 	run_cross_match_wave(registry, db_conn).await;
+	let reconcile_started = Instant::now();
+	let reconcile_result =
+		match content_anchor::run_content_anchor_reconcile_wave(registry, db_conn).await {
+			Ok(()) => "success",
+			Err(e) => {
+				error!("Content-anchor reconcile wave failed: {e:#}");
+				"failure"
+			}
+		};
+	record_background_job(
+		"content_anchor_reconcile",
+		reconcile_result,
+		reconcile_started.elapsed().as_secs_f64(),
+	);
 	record_background_job(
 		"provider_match_all",
 		"success",

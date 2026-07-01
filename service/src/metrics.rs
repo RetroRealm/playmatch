@@ -40,6 +40,10 @@ static AUTH_ATTEMPTS: OnceLock<IntCounterVec> = OnceLock::new();
 static AUTH_LATENCY: OnceLock<HistogramVec> = OnceLock::new();
 static UPSTREAM_UNAVAILABLE: OnceLock<IntCounterVec> = OnceLock::new();
 static BUILDER_ERRORS: OnceLock<IntCounterVec> = OnceLock::new();
+static BULK_IDENTIFY_ITEMS: OnceLock<IntCounterVec> = OnceLock::new();
+static BULK_IDENTIFY_BATCH_SIZE: OnceLock<HistogramVec> = OnceLock::new();
+static BULK_BY_ID_ITEMS: OnceLock<IntCounterVec> = OnceLock::new();
+static BULK_BY_ID_BATCH_SIZE: OnceLock<HistogramVec> = OnceLock::new();
 
 pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
@@ -491,6 +495,56 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 		.set(builder_errors)
 		.map_err(|_| anyhow::anyhow!("builder errors metrics already initialised"))?;
 
+	let bulk_identify_items = IntCounterVec::new(
+		Opts::new(
+			"api_bulk_identify_items_total",
+			"Bulk identify items processed, labelled by per-item outcome (ok, invalid, error)",
+		),
+		&["outcome"],
+	)?;
+	registry.register(Box::new(bulk_identify_items.clone()))?;
+	BULK_IDENTIFY_ITEMS
+		.set(bulk_identify_items)
+		.map_err(|_| anyhow::anyhow!("bulk identify items metrics already initialised"))?;
+
+	let bulk_identify_batch_size = HistogramVec::new(
+		HistogramOpts::new(
+			"api_bulk_identify_batch_size",
+			"Number of items per accepted bulk identify request",
+		)
+		.buckets(vec![1.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0]),
+		&["endpoint"],
+	)?;
+	registry.register(Box::new(bulk_identify_batch_size.clone()))?;
+	BULK_IDENTIFY_BATCH_SIZE
+		.set(bulk_identify_batch_size)
+		.map_err(|_| anyhow::anyhow!("bulk identify batch size metrics already initialised"))?;
+
+	let bulk_by_id_items = IntCounterVec::new(
+		Opts::new(
+			"api_bulk_by_id_items_total",
+			"Bulk get-by-id items resolved, labelled by resource and per-item outcome (ok, not_found)",
+		),
+		&["resource", "outcome"],
+	)?;
+	registry.register(Box::new(bulk_by_id_items.clone()))?;
+	BULK_BY_ID_ITEMS
+		.set(bulk_by_id_items)
+		.map_err(|_| anyhow::anyhow!("bulk by id items metrics already initialised"))?;
+
+	let bulk_by_id_batch_size = HistogramVec::new(
+		HistogramOpts::new(
+			"api_bulk_by_id_batch_size",
+			"Number of distinct ids per accepted bulk get-by-id request",
+		)
+		.buckets(vec![1.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0]),
+		&["resource"],
+	)?;
+	registry.register(Box::new(bulk_by_id_batch_size.clone()))?;
+	BULK_BY_ID_BATCH_SIZE
+		.set(bulk_by_id_batch_size)
+		.map_err(|_| anyhow::anyhow!("bulk by id batch size metrics already initialised"))?;
+
 	Ok(())
 }
 
@@ -752,5 +806,33 @@ pub fn record_builder_error(builder: &str, field: &str) {
 pub fn record_thegamesdb_api_call(outcome: &str) {
 	if let Some(counter) = THEGAMESDB_API_CALLS.get() {
 		counter.with_label_values(&[outcome]).inc();
+	}
+}
+
+pub fn record_bulk_identify_item(outcome: &str) {
+	if let Some(counter) = BULK_IDENTIFY_ITEMS.get() {
+		counter.with_label_values(&[outcome]).inc();
+	}
+}
+
+pub fn observe_bulk_identify_batch_size(endpoint: &str, size: usize) {
+	if let Some(histogram) = BULK_IDENTIFY_BATCH_SIZE.get() {
+		histogram
+			.with_label_values(&[endpoint])
+			.observe(size as f64);
+	}
+}
+
+pub fn record_bulk_by_id_item(resource: &str, outcome: &str) {
+	if let Some(counter) = BULK_BY_ID_ITEMS.get() {
+		counter.with_label_values(&[resource, outcome]).inc();
+	}
+}
+
+pub fn observe_bulk_by_id_batch_size(resource: &str, size: usize) {
+	if let Some(histogram) = BULK_BY_ID_BATCH_SIZE.get() {
+		histogram
+			.with_label_values(&[resource])
+			.observe(size as f64);
 	}
 }

@@ -13,13 +13,12 @@ use service::identification::{
 use service::model::GameNameSearchResult;
 use uuid::Uuid;
 
-/// Gets a Playmatch game by its ID.
+/// Returns a game by id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Game",
 	responses(
-		(status = 200, description = "Returns the found game", body = GameMetadataResponse)
+		(status = 200, description = "The matched game and its metadata", body = GameMetadataResponse)
 	)
 )]
 #[get("/game/{id}")]
@@ -30,13 +29,15 @@ pub async fn get_playmatch_game_by_id(
 	Ok(HttpResponse::Ok().json(get_game_by_id_from_db(id.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Gets a Playmatch game by its ID, includes all relations.
+/// Returns a game by id with all related records.
+///
+/// The response carries the game together with its game files, metadata
+/// mappings, publisher, and company.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Game",
 	responses(
-		(status = 200, description = "Returns the found game including all relations", body = GameAndRelationsResult)
+		(status = 200, description = "The matched game and its related records", body = GameAndRelationsResult)
 	)
 )]
 #[get("/game/{id}/with-relations")]
@@ -48,15 +49,17 @@ pub async fn get_playmatch_game_with_relations_by_id(
 		.json(get_game_and_all_relations(id.into_inner(), db_conn.get_ref()).await?))
 }
 
-/// Fuzzy-searches the game catalogue by name, optionally narrowed to a platform.
+/// Searches games by name, ordered by relevance.
+///
+/// Pass a platform to limit the results to that platform. Returns an empty
+/// array when nothing matches.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Game",
 	params(GameSearchQuery),
 	responses(
 		(status = 200, description = "Matching games ordered by relevance", body = Vec<GameNameSearchResult>),
-		(status = 400, description = "The search query was empty or too long")
+		(status = 400, description = "Empty search query, or a query over the length limit")
 	)
 )]
 #[get("/games/search")]
@@ -80,14 +83,14 @@ pub async fn search_games(
 	Ok(HttpResponse::Ok().json(results))
 }
 
-/// Gets the dat file version history for a game file: every dat file release in
-/// which this hash was seen, newest first.
+/// Lists the dat file imports a game file was seen in, newest first.
+///
+/// Each entry is a dat file release in which this hash appeared.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Game",
 	responses(
-		(status = 200, description = "Returns the dat file imports this hash was seen in, newest first", body = Vec<PlaymatchDatFileImport>)
+		(status = 200, description = "The dat file imports this hash was seen in, newest first", body = Vec<PlaymatchDatFileImport>)
 	)
 )]
 #[get("/game-file/{id}/history")]

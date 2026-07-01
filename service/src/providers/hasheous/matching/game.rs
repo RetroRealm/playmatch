@@ -204,11 +204,10 @@ fn rung_for(kind: HashKind) -> &'static str {
 	}
 }
 
-// SHA256 is not yet a variant on AutomaticMatchReasonEnum; record it as Sha1Hash
-// for now so we do not need to grow the enum in this change.
 fn reason_for(kind: HashKind) -> AutomaticMatchReasonEnum {
 	match kind {
-		HashKind::Sha256 | HashKind::Sha1 => AutomaticMatchReasonEnum::Sha1Hash,
+		HashKind::Sha256 => AutomaticMatchReasonEnum::Sha256Hash,
+		HashKind::Sha1 => AutomaticMatchReasonEnum::Sha1Hash,
 		HashKind::Md5 => AutomaticMatchReasonEnum::Md5Hash,
 		HashKind::Crc => AutomaticMatchReasonEnum::CrcHash,
 	}
@@ -389,10 +388,10 @@ mod tests {
 	}
 
 	#[test]
-	fn reason_for_maps_sha256_to_sha1_reason() {
+	fn reason_for_maps_each_hash_kind_to_its_reason() {
 		assert_eq!(
 			reason_for(HashKind::Sha256),
-			AutomaticMatchReasonEnum::Sha1Hash
+			AutomaticMatchReasonEnum::Sha256Hash
 		);
 		assert_eq!(
 			reason_for(HashKind::Sha1),

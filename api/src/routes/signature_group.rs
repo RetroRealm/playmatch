@@ -6,13 +6,12 @@ use sea_orm::DatabaseConnection;
 use service::entities::signature_group::{find_all_signature_groups, find_signature_group_by_id};
 use uuid::Uuid;
 
-/// Returns all signature groups playmatch knows about.
+/// Lists all signature groups ordered by name.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Signature Group",
 	responses(
-		(status = 200, description = "Returns a list of Signature Groups playmatch knows about", body = Vec<PlaymatchSignatureGroup>)
+		(status = 200, description = "The full list of signature groups ordered by name", body = Vec<PlaymatchSignatureGroup>)
 	)
 )]
 #[get("/signature-groups")]
@@ -27,11 +26,10 @@ pub async fn get_all_signature_groups(
 /// Returns a signature group by id.
 #[utoipa::path(
 	get,
-	context_path = "/api",
 	tag = "Signature Group",
 	responses(
-		(status = 200, description = "Returns a Signature Group", body = PlaymatchSignatureGroup),
-		(status = 404, description = "Signature Group not found")
+		(status = 200, description = "The signature group", body = PlaymatchSignatureGroup),
+		(status = 404, description = "Signature group not found")
 	)
 )]
 #[get("/signature-groups/{id}")]
