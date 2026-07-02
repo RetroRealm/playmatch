@@ -91,7 +91,7 @@ pub async fn check_rate_limit(
 	if count == 1
 		&& let Err(e) = redis_conn.expire(&key, RATE_LIMIT_WINDOW_SECS).await
 	{
-		warn!("rate-limit expire failed for {key}: {e}");
+		warn!("Rate-limit expire failed for {key}: {e}");
 	}
 	Ok(count <= RATE_LIMIT_PER_MINUTE)
 }
@@ -104,7 +104,7 @@ pub async fn enqueue_external_suggestion(
 	let len = redis_conn.llen(QUEUE_KEY).await.unwrap_or(0);
 	crate::metrics::set_external_suggestion_queue_depth(len as i64);
 	if len >= QUEUE_SOFT_CAP {
-		warn!("external suggestion queue soft cap reached at {len}, dropping payload");
+		warn!("External suggestion queue soft cap reached at {len}, dropping payload");
 		return Ok(EnqueueOutcome::QueueFull);
 	}
 
@@ -167,7 +167,7 @@ pub async fn drain_external_suggestions(
 		Ok(Some(v)) => v,
 		Ok(None) => Vec::new(),
 		Err(e) => {
-			warn!("external suggestion queue pop failed: {e}");
+			warn!("External suggestion queue pop failed: {e}");
 			return Ok(stats);
 		}
 	};
@@ -183,7 +183,7 @@ pub async fn drain_external_suggestions(
 			Ok(envelope) => envelopes.push(envelope),
 			Err(e) => {
 				let preview: String = raw.chars().take(200).collect();
-				warn!("dropping unparseable external suggestion envelope ({e}): {preview}");
+				warn!("Dropping unparseable external suggestion envelope ({e}): {preview}");
 				stats.record(ProcessOutcome::InvalidPayload);
 			}
 		}
@@ -216,7 +216,7 @@ async fn process_envelope(
 	db_conn: &DbConn,
 ) -> Vec<ProcessOutcome> {
 	if let Err(reason) = validate_envelope_basics(&envelope.payload) {
-		debug!("external suggestion rejected: {reason}");
+		debug!("External suggestion rejected: {reason}");
 		return vec![ProcessOutcome::InvalidPayload];
 	}
 
@@ -224,7 +224,7 @@ async fn process_envelope(
 		Ok(Some(g)) => g,
 		Ok(None) => return vec![ProcessOutcome::UnknownRom],
 		Err(e) => {
-			warn!("db error while resolving external suggestion game: {e}");
+			warn!("Db error while resolving external suggestion game: {e}");
 			return vec![ProcessOutcome::UnknownRom];
 		}
 	};
@@ -302,7 +302,7 @@ async fn process_mapping(
 ) -> ProcessOutcome {
 	let Some(provider) = parse_provider(&mapping.provider) else {
 		debug!(
-			"external suggestion: dropping mapping with unsupported provider '{}'",
+			"External suggestion: dropping mapping with unsupported provider '{}'",
 			mapping.provider
 		);
 		return ProcessOutcome::UnsupportedProvider;
@@ -324,7 +324,7 @@ async fn process_mapping(
 		{
 			Ok(v) => v,
 			Err(e) => {
-				warn!("db error while checking existing mapping: {e}");
+				warn!("Db error while checking existing mapping: {e}");
 				return ProcessOutcome::AlreadyMatched;
 			}
 		};
@@ -349,7 +349,7 @@ async fn process_mapping(
 	{
 		Ok(v) => v,
 		Err(e) => {
-			warn!("db error while checking existing suggestion: {e}");
+			warn!("Db error while checking existing suggestion: {e}");
 			return ProcessOutcome::DuplicateSuggestion;
 		}
 	};
@@ -371,7 +371,7 @@ async fn process_mapping(
 	match insert_suggestion(active, db_conn).await {
 		Ok(_) => ProcessOutcome::Created,
 		Err(e) => {
-			warn!("failed to insert external suggestion: {e}");
+			warn!("Failed to insert external suggestion: {e}");
 			ProcessOutcome::InvalidPayload
 		}
 	}

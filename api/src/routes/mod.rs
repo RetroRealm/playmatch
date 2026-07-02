@@ -34,7 +34,7 @@ async fn handle_auth_and_permissions(
 	db_conn: Data<DatabaseConnection>,
 ) -> error::Result<entity::user::Model> {
 	// One message for every auth failure path; distinct bodies would leak whether a token exists.
-	const INVALID_AUTH_BODY: &str = "Invalid or missing credentials.";
+	const INVALID_AUTH_BODY: &str = "invalid or missing credentials";
 	let started = std::time::Instant::now();
 	let finish = |outcome: &'static str| {
 		service::metrics::record_auth_attempt(outcome);

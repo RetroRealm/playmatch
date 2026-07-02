@@ -137,6 +137,9 @@ fn match_game_to_launchbox(
 		let parsed_dat = parse_name(&game.name);
 		let cleaned = parsed_dat.base.to_lowercase();
 		let cleaned_normalized = normalize_title(&cleaned);
+		// Region priority only applies to the alternate-name rungs below: each
+		// alternate name row carries its own region, while a game's primary
+		// name has none to prioritize against.
 		let dat_lb_regions: Vec<&'static str> = parsed_dat
 			.regions
 			.iter()

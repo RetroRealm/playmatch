@@ -1,3 +1,11 @@
+//! Provider registry and the shared matching pipeline. A match cycle runs
+//! three waves: every provider's own `match_db` pass, a cross-provider name
+//! retry pass fed by the sibling matches the first wave wrote, and the
+//! content-anchor reconcile wave in [`content_anchor`]. Within a provider,
+//! name matching descends a shared rung cascade (direct name, normalized,
+//! alternative, normalized alternative): strongest evidence first, each rung
+//! looser than the last.
+
 pub mod content_anchor;
 pub mod emuready;
 pub mod hasheous;
@@ -639,7 +647,7 @@ async fn run_primary_wave(registry: &ProviderRegistry, db_conn: &DbConn) {
 	}
 	while let Some(res) = set.join_next().await {
 		if let Err(join_err) = res {
-			error!("Provider match task panicked or was cancelled: {join_err:?}");
+			error!("Provider match task panicked or was canceled: {join_err:?}");
 		}
 	}
 }
@@ -678,7 +686,7 @@ async fn run_cross_match_wave(registry: &ProviderRegistry, db_conn: &DbConn) {
 	}
 	while let Some(res) = set.join_next().await {
 		if let Err(join_err) = res {
-			error!("Cross-provider match task panicked or was cancelled: {join_err:?}");
+			error!("Cross-provider match task panicked or was canceled: {join_err:?}");
 		}
 	}
 }
@@ -763,7 +771,7 @@ mod throttler_tests {
 		);
 		assert!(
 			observed_peak >= 2,
-			"observed peak in-flight {observed_peak} suggests the throttler serialised work"
+			"observed peak in-flight {observed_peak} suggests the throttler serialized work"
 		);
 	}
 

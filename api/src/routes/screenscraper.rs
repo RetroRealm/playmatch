@@ -106,9 +106,9 @@ pub async fn search_ss_games(
 	Ok(HttpResponse::Ok().json(response))
 }
 
-/// Returns a ScreenScraper game by an exact rom file name within a system.
+/// Returns a ScreenScraper game by an exact ROM file name within a system.
 ///
-/// The rom name must match a known file name in the system exactly.
+/// The ROM name must match a known file name in the system exactly.
 #[utoipa::path(
 	get,
 	tag = "ScreenScraper",

@@ -42,17 +42,17 @@ pub async fn get_ovgdb_release_by_id(
 	})
 }
 
-/// Looks up an OpenVGDB rom by a file hash.
+/// Looks up an OpenVGDB ROM by a file hash.
 ///
-/// The strongest supplied hash resolves the rom: sha1, then md5, then crc. At least one hash must be supplied. The response carries the matched rom and every release attached to it.
+/// The strongest supplied hash resolves the ROM: sha1, then md5, then crc. At least one hash must be supplied. The response carries the matched ROM and every release attached to it.
 #[utoipa::path(
 	get,
 	tag = "OpenVGDB",
 	params(OvgdbHashQuery),
 	responses(
-		(status = 200, description = "The matched rom and its releases", body = OvgdbRomMatch),
+		(status = 200, description = "The matched ROM and its releases", body = OvgdbRomMatch),
 		(status = 400, description = "No hash supplied"),
-		(status = 404, description = "No rom matched the supplied hash")
+		(status = 404, description = "No ROM matched the supplied hash")
 	)
 )]
 #[get("/openvgdb/rom/by-hash")]
@@ -80,7 +80,7 @@ pub async fn get_ovgdb_rom_by_hash(
 		});
 
 	let Some((kind, hash)) = lookup else {
-		return Ok(HttpResponse::BadRequest().body("supply at least one of sha1, md5 or crc"));
+		return Ok(HttpResponse::BadRequest().body("at least one of sha1, md5 or crc is required"));
 	};
 
 	let rom = get_ovgdb_rom_by_hash_cached(db_conn.get_ref(), &mut redis_conn, kind, hash).await?;

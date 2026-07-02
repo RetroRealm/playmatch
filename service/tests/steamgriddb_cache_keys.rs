@@ -24,7 +24,7 @@ fn sgdb_game_by_platform_layout_is_stable() {
 
 #[test]
 fn sgdb_game_search_layout_is_stable() {
-	// The trailing component is a sha256 of the normalised query; assert the
+	// The trailing component is a sha256 of the normalized query; assert the
 	// surrounding shape only so we can change the term without churning here.
 	assert!(
 		provider_cache_key("steamgriddb", "game:search", "deadbeef")

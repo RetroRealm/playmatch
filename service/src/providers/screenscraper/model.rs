@@ -164,7 +164,7 @@ pub struct SsRom {
 // `id` is `Option<i64>` because ScreenScraper sometimes returns game entries
 // without an `id` field (typically placeholder / unmatched stubs). The
 // matcher filters those out at the use site rather than failing the whole
-// envelope deserialise.
+// envelope deserialize.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SsGame {
 	#[serde(default, deserialize_with = "de_opt_string_i64")]

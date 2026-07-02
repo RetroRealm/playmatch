@@ -4,7 +4,7 @@ use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// contains basic information about an imported dat file in Playmatch.
+/// A single import run of a dat file, returned by the import-history lookups and embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchDatFileImport {
 	/// The ID of the dat file import.
@@ -13,26 +13,26 @@ pub struct PlaymatchDatFileImport {
 	/// The ID of the dat file this import belongs to.
 	pub dat_file_id: Uuid,
 
-	/// The name of the imported file, this contains usually some information like version and date of creation
+	/// The name of the imported file, which usually encodes the version and build date.
 	pub name: String,
 
 	/// The version of the dat file which was imported.
 	pub version: String,
 
-	/// MD5 hash of the imported dat file.
+	/// The MD5 hash of the imported dat file.
 	pub md5: String,
 
-	/// When the dat file was imported into playmatch.
+	/// When the dat file was imported into Playmatch.
 	pub imported_at: DateTime<Utc>,
 
-	/// When the dat file import was created inside playmatch.
+	/// When the dat file import was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the dat file import was last updated inside playmatch.
+	/// When the dat file import was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
-/// contains basic information about a Dat File.
+/// A dat file tracked by Playmatch, embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchDatFile {
 	/// The ID of the dat file.
@@ -41,11 +41,11 @@ pub struct PlaymatchDatFile {
 	/// The name of the dat file.
 	pub name: String,
 
-	/// Optional company for the platform this dat file is for.
+	/// The id of the company for the platform this dat file is for, absent when the platform has no company.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_id: Option<Uuid>,
 
-	/// The platform this dat file is for.
+	/// The id of the platform this dat file is for.
 	pub platform_id: Uuid,
 
 	/// The current version of the dat file.
@@ -54,46 +54,46 @@ pub struct PlaymatchDatFile {
 	/// The id of the signature group which publishes this dat file.
 	pub signature_group_id: Uuid,
 
-	/// Optional tags for the dat file.
+	/// Tags for the dat file, absent when it has none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tags: Option<Vec<String>>,
 
-	/// The subset this dat file is for, if any
+	/// The subset this dat file is for, absent when it has none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub subset: Option<String>,
 
-	/// When the dat file was created inside playmatch.
+	/// When the dat file was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the dat file was last updated inside playmatch.
+	/// When the dat file was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
-/// contains basic information about a Signature Group.
+/// A signature group, the project that publishes dat files, returned by the signature group endpoints and embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchSignatureGroup {
 	/// The ID of the signature group.
 	pub id: Uuid,
 
-	/// The ID of the dat file import this signature group belongs to.
+	/// The name of the signature group, for example No-Intro or Redump.
 	pub name: String,
 
-	/// Optional Link to the website of the signature group.
+	/// The signature group's website URL, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub website_link: Option<String>,
 
-	/// Optional description of the signature group.
+	/// A description of the signature group, absent when it has none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 
-	/// When the signature group was created inside playmatch.
+	/// When the signature group was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the signature group was last updated inside playmatch.
+	/// When the signature group was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
-/// contains basic information about a Platform.
+/// A platform in the Playmatch catalogue, embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchPlatform {
 	/// The ID of the platform.
@@ -102,18 +102,18 @@ pub struct PlaymatchPlatform {
 	/// The name of the platform.
 	pub name: String,
 
-	/// Optional id of the company that made the platform.
+	/// The id of the company that made the platform, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_id: Option<Uuid>,
 
-	/// When the platform was last updated inside playmatch.
+	/// When the platform was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 
-	/// When the platform was created inside playmatch.
+	/// When the platform was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 }
 
-/// contains basic information about a Company.
+/// A company in the Playmatch catalogue, embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchCompany {
 	/// The ID of the company.
@@ -122,14 +122,14 @@ pub struct PlaymatchCompany {
 	/// The name of the company.
 	pub name: String,
 
-	/// When the company was last updated inside playmatch.
+	/// When the company was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 
-	/// When the company was created inside playmatch.
+	/// When the company was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 }
 
-/// contains basic information about a Game.
+/// A game in the Playmatch catalogue, embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchGame {
 	/// The ID of the game.
@@ -138,37 +138,37 @@ pub struct PlaymatchGame {
 	/// The name of the game.
 	pub name: String,
 
-	/// Optional description of the game.
+	/// A description of the game, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 
-	/// Optional categories for the game.
+	/// Categories for the game, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub categories: Option<Vec<String>>,
 
-	/// Optional which game this game is a clone of (different editions/versions).
+	/// The id of the game this game is a clone of (a different edition or regional version), absent when the game is not a clone.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub clone_of: Option<Uuid>,
 
 	/// Whether this game is still present in the current version of its dat file.
 	pub current_in_latest_dat: bool,
 
-	/// Version string of the last dat file release this game was seen in.
+	/// The version of the last dat file release this game was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_version: Option<String>,
 
-	/// Id of the last dat file import this game was seen in.
+	/// The id of the last dat file import this game was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_file_import_id: Option<Uuid>,
 
-	/// When the game was created inside playmatch.
+	/// When the game was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the game was last updated inside playmatch.
+	/// When the game was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
-/// contains basic information about a Game File.
+/// A single file (ROM entry) of a game, embedded in identify and game responses.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 pub struct PlaymatchGameFile {
 	/// The ID of the game file.
@@ -180,49 +180,49 @@ pub struct PlaymatchGameFile {
 	/// The name of the file, including extension.
 	pub file_name: String,
 
-	/// The size of the file in bytes, if available.
+	/// The size of the file in bytes, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub file_size_in_bytes: Option<i64>,
 
-	/// Optional crc32 checksum of the file.
+	/// The CRC32 checksum of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub crc: Option<String>,
 
-	/// Optional MD5 hash of the file.
+	/// The MD5 hash of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub md5: Option<String>,
 
-	/// Optional SHA1 hash of the file.
+	/// The SHA1 hash of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub sha1: Option<String>,
 
-	/// Optional SHA256 hash of the file.
+	/// The SHA256 hash of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub sha256: Option<String>,
 
-	/// Optional status of the file, e.g. "verified", etc.
+	/// The dat-file status of the file, for example `verified`, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub status: Option<String>,
 
-	/// Optional serial number of the rom file, if applicable.
+	/// The serial number of the ROM, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub serial: Option<String>,
 
 	/// Whether this hash is still present in the current version of its dat file.
 	pub current_in_latest_dat: bool,
 
-	/// Version string of the last dat file release this hash was seen in.
+	/// The version of the last dat file release this hash was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_version: Option<String>,
 
-	/// Id of the last dat file import this hash was seen in.
+	/// The id of the last dat file import this hash was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_file_import_id: Option<Uuid>,
 
-	/// When the game file was created inside playmatch.
+	/// When the game file was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the game file was last updated inside playmatch.
+	/// When the game file was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -350,7 +350,7 @@ pub struct GameNameSearchResult {
 	pub platform_name: String,
 }
 
-/// contains basic information about an imported dat file in Playmatch.
+/// A single import run of a dat file, returned by the import-history lookups and embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchDatFileImportV2 {
@@ -360,22 +360,22 @@ pub struct PlaymatchDatFileImportV2 {
 	/// The ID of the dat file this import belongs to.
 	pub dat_file_id: Uuid,
 
-	/// The name of the imported file, this contains usually some information like version and date of creation
+	/// The name of the imported file, which usually encodes the version and build date.
 	pub name: String,
 
 	/// The version of the dat file which was imported.
 	pub version: String,
 
-	/// MD5 hash of the imported dat file.
+	/// The MD5 hash of the imported dat file.
 	pub md5: String,
 
-	/// When the dat file was imported into playmatch.
+	/// When the dat file was imported into Playmatch.
 	pub imported_at: DateTime<Utc>,
 
-	/// When the dat file import was created inside playmatch.
+	/// When the dat file import was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the dat file import was last updated inside playmatch.
+	/// When the dat file import was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -394,7 +394,7 @@ impl From<PlaymatchDatFileImport> for PlaymatchDatFileImportV2 {
 	}
 }
 
-/// contains basic information about a Dat File.
+/// A dat file tracked by Playmatch, embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchDatFileV2 {
@@ -404,11 +404,11 @@ pub struct PlaymatchDatFileV2 {
 	/// The name of the dat file.
 	pub name: String,
 
-	/// Optional company for the platform this dat file is for.
+	/// The id of the company for the platform this dat file is for, absent when the platform has no company.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_id: Option<Uuid>,
 
-	/// The platform this dat file is for.
+	/// The id of the platform this dat file is for.
 	pub platform_id: Uuid,
 
 	/// The current version of the dat file.
@@ -417,18 +417,18 @@ pub struct PlaymatchDatFileV2 {
 	/// The id of the signature group which publishes this dat file.
 	pub signature_group_id: Uuid,
 
-	/// Optional tags for the dat file.
+	/// Tags for the dat file, absent when it has none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tags: Option<Vec<String>>,
 
-	/// The subset this dat file is for, if any
+	/// The subset this dat file is for, absent when it has none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub subset: Option<String>,
 
-	/// When the dat file was created inside playmatch.
+	/// When the dat file was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the dat file was last updated inside playmatch.
+	/// When the dat file was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -449,28 +449,28 @@ impl From<PlaymatchDatFile> for PlaymatchDatFileV2 {
 	}
 }
 
-/// contains basic information about a Signature Group.
+/// A signature group, the project that publishes dat files, returned by the signature group endpoints and embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchSignatureGroupV2 {
 	/// The ID of the signature group.
 	pub id: Uuid,
 
-	/// The name of the signature group.
+	/// The name of the signature group, for example No-Intro or Redump.
 	pub name: String,
 
-	/// Optional Link to the website of the signature group.
+	/// The signature group's website URL, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub website_link: Option<String>,
 
-	/// Optional description of the signature group.
+	/// A description of the signature group, absent when it has none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 
-	/// When the signature group was created inside playmatch.
+	/// When the signature group was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the signature group was last updated inside playmatch.
+	/// When the signature group was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -493,7 +493,7 @@ impl From<entity::signature_group::Model> for PlaymatchSignatureGroupV2 {
 	}
 }
 
-/// contains basic information about a Platform.
+/// A platform in the Playmatch catalogue, embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchPlatformV2 {
@@ -503,14 +503,14 @@ pub struct PlaymatchPlatformV2 {
 	/// The name of the platform.
 	pub name: String,
 
-	/// Optional id of the company that made the platform.
+	/// The id of the company that made the platform, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_id: Option<Uuid>,
 
-	/// When the platform was last updated inside playmatch.
+	/// When the platform was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 
-	/// When the platform was created inside playmatch.
+	/// When the platform was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 }
 
@@ -526,7 +526,7 @@ impl From<PlaymatchPlatform> for PlaymatchPlatformV2 {
 	}
 }
 
-/// contains basic information about a Company.
+/// A company in the Playmatch catalogue, embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchCompanyV2 {
@@ -536,10 +536,10 @@ pub struct PlaymatchCompanyV2 {
 	/// The name of the company.
 	pub name: String,
 
-	/// When the company was last updated inside playmatch.
+	/// When the company was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 
-	/// When the company was created inside playmatch.
+	/// When the company was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 }
 
@@ -554,7 +554,7 @@ impl From<PlaymatchCompany> for PlaymatchCompanyV2 {
 	}
 }
 
-/// contains basic information about a Game.
+/// A game in the Playmatch catalogue, embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchGameV2 {
@@ -564,33 +564,33 @@ pub struct PlaymatchGameV2 {
 	/// The name of the game.
 	pub name: String,
 
-	/// Optional description of the game.
+	/// A description of the game, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 
-	/// Optional categories for the game.
+	/// Categories for the game, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub categories: Option<Vec<String>>,
 
-	/// Optional which game this game is a clone of (different editions/versions).
+	/// The id of the game this game is a clone of (a different edition or regional version), absent when the game is not a clone.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub clone_of: Option<Uuid>,
 
 	/// Whether this game is still present in the current version of its dat file.
 	pub current_in_latest_dat: bool,
 
-	/// Version string of the last dat file release this game was seen in.
+	/// The version of the last dat file release this game was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_version: Option<String>,
 
-	/// Id of the last dat file import this game was seen in.
+	/// The id of the last dat file import this game was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_file_import_id: Option<Uuid>,
 
-	/// When the game was created inside playmatch.
+	/// When the game was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the game was last updated inside playmatch.
+	/// When the game was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 
@@ -611,7 +611,7 @@ impl From<PlaymatchGame> for PlaymatchGameV2 {
 	}
 }
 
-/// contains basic information about a Game File.
+/// A single file (ROM entry) of a game, embedded in identify and game responses.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaymatchGameFileV2 {
@@ -624,49 +624,49 @@ pub struct PlaymatchGameFileV2 {
 	/// The name of the file, including extension.
 	pub file_name: String,
 
-	/// The size of the file in bytes, if available.
+	/// The size of the file in bytes, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub file_size_in_bytes: Option<i64>,
 
-	/// Optional crc32 checksum of the file.
+	/// The CRC32 checksum of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub crc: Option<String>,
 
-	/// Optional MD5 hash of the file.
+	/// The MD5 hash of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub md5: Option<String>,
 
-	/// Optional SHA1 hash of the file.
+	/// The SHA1 hash of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub sha1: Option<String>,
 
-	/// Optional SHA256 hash of the file.
+	/// The SHA256 hash of the file, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub sha256: Option<String>,
 
-	/// Optional status of the file, e.g. "verified", etc.
+	/// The dat-file status of the file, for example `verified`, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub status: Option<String>,
 
-	/// Optional serial number of the rom file, if applicable.
+	/// The serial number of the ROM, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub serial: Option<String>,
 
 	/// Whether this hash is still present in the current version of its dat file.
 	pub current_in_latest_dat: bool,
 
-	/// Version string of the last dat file release this hash was seen in.
+	/// The version of the last dat file release this hash was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_version: Option<String>,
 
-	/// Id of the last dat file import this hash was seen in.
+	/// The id of the last dat file import this hash was seen in, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub last_seen_dat_file_import_id: Option<Uuid>,
 
-	/// When the game file was created inside playmatch.
+	/// When the game file was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the game file was last updated inside playmatch.
+	/// When the game file was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 }
 

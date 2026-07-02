@@ -50,7 +50,8 @@ impl MigrationTrait for Migration {
 	async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
 		let conn = manager.get_connection();
 
-		// This does some workaround to replace the type with the older one as Postgres does not support dropping enum values
+		// Postgres cannot drop enum values, so the down path recreates the pre-migration enum under a temp
+		// name, deletes rows using the removed values, retypes the column, and renames the type back.
 		manager
 			.create_type(
 				Type::create()
@@ -82,7 +83,7 @@ impl MigrationTrait for Migration {
 			.drop_type(Type::drop().name(AutomaticMatchReasonEnum).to_owned())
 			.await?;
 
-		// somehow seaorm has some problem with quotes when using their own dsl so we run raw sql here
+		// SeaORM's DSL emits invalid quoting for this rename, so it runs as raw SQL.
 		let stmt = r#"
 			ALTER TYPE automatic_match_reason1_enum RENAME TO automatic_match_reason_enum;
 		"#;

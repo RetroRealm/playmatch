@@ -2,24 +2,24 @@ use crate::db::signature_metadata_mapping::SignatureMetadataMappingInputBuilderE
 
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
-	#[error("The game couldn't be found by the given hashes or file name")]
+	#[error("no game found for the given hashes or file name")]
 	GameNotFound,
 
-	#[error("The platform couldn't be found by the given name")]
+	#[error("no platform found with the given name")]
 	PlatformNotFound,
 
-	#[error("The company couldn't be found by the given name")]
+	#[error("no company found with the given name")]
 	CompanyNotFound,
 
-	#[error("The user couldn't be found by the given ID")]
+	#[error("no user found with the given id")]
 	UserNotFound,
 
 	#[error(
-		"A suggestion for this Game/Platform/Company with the same provider and provider ID already exists"
+		"a suggestion for this game, platform or company with the same provider and provider id already exists"
 	)]
 	SuggestionAlreadyExists,
 
-	#[error("The suggestion with the given ID couldn't be found")]
+	#[error("no suggestion found with the given id")]
 	SuggestionNotFound,
 
 	#[error(transparent)]

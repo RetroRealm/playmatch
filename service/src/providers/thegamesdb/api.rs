@@ -119,7 +119,7 @@ impl TheGamesDbClient {
 			},
 			Ok(None) => self.probe_remaining_allowance(api_key).await,
 			Err(e) => {
-				debug!("tgdb redis quota lookup failed, probing API: {e}");
+				debug!("TheGamesDB redis quota lookup failed, probing API: {e}");
 				self.probe_remaining_allowance(api_key).await
 			}
 		}
@@ -144,7 +144,7 @@ impl TheGamesDbClient {
 			)
 			.await
 		{
-			debug!("tgdb redis quota write failed: {e}");
+			debug!("TheGamesDB redis quota write failed: {e}");
 		}
 	}
 
@@ -177,7 +177,11 @@ impl TheGamesDbClient {
 			.headers(headers)
 			.build()?;
 
-		debug!("tgdb request: {} {}", req.method(), url_for_log.path());
+		debug!(
+			"TheGamesDB request: {} {}",
+			req.method(),
+			url_for_log.path()
+		);
 
 		let started = Instant::now();
 		let _inflight = crate::http::abstraction::InflightGuard::new("thegamesdb");

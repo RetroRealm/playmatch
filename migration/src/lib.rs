@@ -1,3 +1,12 @@
+//! SeaORM migrations for the playmatch Postgres schema.
+//!
+//! Enum-extension migrations are intentionally down-no-op: Postgres has no
+//! `DROP VALUE` for enum types without rewriting every referencing column;
+//! to roll back, drop the dependent rows and recreate the type.
+//!
+//! Index migrations use plain `CREATE INDEX`, not `CONCURRENTLY`, because
+//! migrations run inside a transaction; deploy them off-peak.
+
 pub use sea_orm_migration::prelude::*;
 
 mod m20240816_000001_initial_migration;

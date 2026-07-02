@@ -208,7 +208,7 @@ impl MigrationTrait for Migration {
 
 		// Game lookups during matching are platform-scoped + case-insensitive on
 		// name, so a single composite functional index covers both the direct
-		// and normalised name passes.
+		// and normalized name passes.
 		manager
 			.get_connection()
 			.execute_unprepared(

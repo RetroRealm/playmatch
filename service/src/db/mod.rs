@@ -1,3 +1,8 @@
+//! Raw SeaORM query layer, one module per table plus shared pagination and
+//! lifecycle helpers. Functions here return plain entity models; the sibling
+//! `entities` module composes them into the hydrated DTO projections served
+//! by the API.
+
 mod abstraction;
 pub mod company;
 pub mod constants;
@@ -24,7 +29,7 @@ pub mod user;
 /// so rows matched to a different provider still appear as unmatched for this one.
 ///
 /// `$fk_column` is the signature_metadata_mapping column pointing back to `$entity`
-/// (e.g. `signature_metadata_mapping::Column::CompanyId`).
+/// (for example `signature_metadata_mapping::Column::CompanyId`).
 ///
 /// Returns a `BoxFuture` and owns its `DbConn` so the fn is usable as a non-generic
 /// function pointer in the shared matcher pipeline driver.

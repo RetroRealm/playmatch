@@ -147,6 +147,8 @@ fn match_game_to_mobygames(
 			}
 
 			if let Some(alts) = c.alternate_titles.as_ref() {
+				// placed keeps a candidate that already matched alt_direct from
+				// also landing in alt_normalized.
 				let mut placed = false;
 				for alt in alts {
 					let alt_lower = alt.title.to_lowercase();
@@ -418,6 +420,8 @@ pub fn match_game_via_sibling_name_mobygames(
 				}
 
 				if let Some(alts) = c.alternate_titles.as_ref() {
+					// placed keeps a candidate that already matched alt_direct from
+					// also landing in alt_normalized.
 					let mut placed = false;
 					for alt in alts {
 						let alt_lower = alt.title.to_lowercase();

@@ -11,14 +11,14 @@ pub fn normalize_title(input: &str) -> String {
 	lazy_static! {
 		static ref RE_AMPERSAND: Regex = Regex::new(r"\s*&\s*").unwrap();
 		static ref RE_STRIP: Regex = Regex::new(r" - |: ").unwrap();
-		// Localised leading articles. Single-letter forms in the added locales
+		// Localized leading articles. Single-letter forms in the added locales
 		// (PT "o", IT "i") are deliberately omitted to avoid clobbering Roman
 		// numerals and short proper names; the original English "a"/"an" stay
 		// for backwards compatibility.
 		// Positional regex strips occurrences at the start of the title even
-		// when the word happens to be part of a proper name (e.g. "La Mulana"
-		// loses "La "); accepted false-positive in exchange for rescuing
-		// localised DAT releases that only differ from sibling providers'
+		// when the word happens to be part of a proper name (for example "La
+		// Mulana" loses "La "); accepted false-positive in exchange for rescuing
+		// localized DAT releases that only differ from sibling providers'
 		// titles by a leading article.
 		static ref RE_LEADING: Regex = Regex::new(
 			r"^(?i)(the |a |an |der |die |das |le |la |les |el |los |las |il |lo |gli |os |as )"

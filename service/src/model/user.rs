@@ -54,19 +54,25 @@ impl From<CreateOrGetUserRequestV2> for CreateOrGetUserRequest {
 	}
 }
 
-/// A User inside Playmatch.
+/// A user account in Playmatch.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
+	/// The unique id of the user.
 	pub id: Uuid,
+	/// The user's Discord account id, null when the account is not linked to Discord.
 	pub discord_id: Option<i64>,
+	/// The username of the user.
 	pub username: String,
+	/// The user's permission level.
 	pub permissions: UserPermissions,
+	/// When the user was created.
 	pub created_at: DateTime<Utc>,
+	/// When the user was last updated.
 	pub updated_at: DateTime<Utc>,
 }
 
-/// Permission Levels a user can have in Playmatch.
+/// The permission level of a Playmatch user. Levels are ordered `User` < `Trusted` < `Automation` < `Admin`; a route that requires one level accepts any higher level.
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub enum UserPermissions {
 	User,

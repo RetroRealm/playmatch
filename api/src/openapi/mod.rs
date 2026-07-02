@@ -8,6 +8,8 @@ use utoipa::OpenApi;
 use utoipa::openapi::ComponentsBuilder;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 
+const API_DESCRIPTION: &str = "Identifies ROM files by hash or file name and serves cached game metadata from multiple providers. Built for RetroRealm.";
+
 /// Single, non-bypassable constructor that finalizes any version's document by
 /// folding in the bearer security scheme. Both per-version builders route
 /// through this so the auth scheme can never be forgotten on one of them.
@@ -27,6 +29,7 @@ fn build_openapi(mut openapi: utoipa::openapi::OpenApi) -> utoipa::openapi::Open
 		.build();
 
 	openapi.components = Some(new_components);
+	openapi.info.description = Some(API_DESCRIPTION.to_string());
 	openapi
 }
 

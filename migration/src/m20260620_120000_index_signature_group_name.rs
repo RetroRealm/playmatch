@@ -1,14 +1,14 @@
 use sea_orm_migration::prelude::*;
 
-/// Backs the v2 `(name, id)` keyset over signature_group. The other v2 reference
-/// lists seek over columns that already carry a unique index (company.name,
-/// platform.name); signature_group.name has none, so add a plain btree.
 #[derive(Iden)]
 enum SignatureGroup {
 	Table,
 	Name,
 }
 
+/// Backs the v2 `(name, id)` keyset over signature_group. The other v2 reference
+/// lists seek over columns that already carry a unique index (company.name,
+/// platform.name); signature_group.name has none, so add a plain btree.
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 

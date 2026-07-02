@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub trait MatchRequest {
-	/// The type of manual match, if your permission level is not Automation this is ignored and set to your permission level instead.
+	/// Returns the requested manual match type. The match handlers overwrite it
+	/// with `Trusted` when the caller holds Trusted permissions; Automation and
+	/// Admin callers keep the value they sent.
 	fn get_manual_match_type(&self) -> ManualMatchMode;
 
 	fn set_manual_match_type(&mut self, match_mode: ManualMatchMode) -> &mut Self;
@@ -57,25 +59,25 @@ impl MatchRequest for GameMatchRequest {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CompanyOrPlatformMatchRequest {
-	/// Name of the Company or Platform to match.
+	/// The name of the company or platform to match.
 	pub name: String,
 
-	/// Optional comment about the match.
+	/// A comment about the match.
 	pub comment: Option<String>,
 
-	/// Metadata provider to match for.
+	/// The metadata provider to match for.
 	pub provider: MetadataProvider,
 
-	/// ID of the Company or Platform file in the metadata provider.
+	/// The id of the company or platform in the metadata provider.
 	pub provider_id: String,
 
-	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
+	/// The type of manual match. Ignored unless the caller holds Automation or Admin permissions; otherwise set from the caller's permission level.
 	pub manual_match_type: ManualMatchMode,
 
-	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	/// The id of the user making the suggestion. Ignored unless the caller holds Automation or Admin permissions; otherwise set to the caller's user id.
 	pub user_id: Option<Uuid>,
 
-	/// Optional canonical title from the provider for cross-provider name propagation.
+	/// The canonical title from the provider, used for cross-provider name propagation.
 	pub matched_name: Option<String>,
 }
 
@@ -96,34 +98,34 @@ impl CompanyOrPlatformMatchRequest {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameMatchRequest {
-	/// MD5 hash of the game file.
+	/// The MD5 hash of the game file, 32 hex characters.
 	pub md5: Option<String>,
 
-	/// SHA1 hash of the game file.
+	/// The SHA1 hash of the game file, 40 hex characters.
 	pub sha1: Option<String>,
 
-	/// SHA256 hash of the game file.
+	/// The SHA256 hash of the game file, 64 hex characters.
 	pub sha256: Option<String>,
 
-	/// Name of game or file.
+	/// The name of the game or file. At most 512 characters.
 	pub name: Option<String>,
 
-	/// Optional comment about the match.
+	/// A comment about the match.
 	pub comment: Option<String>,
 
-	/// Metadata provider to match for.
+	/// The metadata provider to match for.
 	pub provider: MetadataProvider,
 
-	/// ID of the game file in the metadata provider.
+	/// The id of the game in the metadata provider.
 	pub provider_id: String,
 
-	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
+	/// The type of manual match. Ignored unless the caller holds Automation or Admin permissions; otherwise set from the caller's permission level.
 	pub manual_match_type: ManualMatchMode,
 
-	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	/// The id of the user making the suggestion. Ignored unless the caller holds Automation or Admin permissions; otherwise set to the caller's user id.
 	pub user_id: Option<Uuid>,
 
-	/// Optional canonical title from the provider for cross-provider name propagation.
+	/// The canonical title from the provider, used for cross-provider name propagation.
 	pub matched_name: Option<String>,
 }
 
@@ -148,19 +150,19 @@ impl GameMatchRequest {
 
 #[derive(Debug)]
 pub struct GameMatchData {
-	/// Optional comment about the match.
+	/// A comment about the match.
 	pub comment: Option<String>,
 
-	/// Metadata provider to match for.
+	/// The metadata provider to match for.
 	pub provider: MetadataProvider,
 
-	/// ID of the game file in the metadata provider.
+	/// The id of the game in the metadata provider.
 	pub provider_id: String,
 
-	/// The type of manual match, if your permission level is not Automation or Admin this is ignored and set to your permission level instead.
+	/// The type of manual match. Ignored unless the caller holds Automation or Admin permissions; otherwise set from the caller's permission level.
 	pub manual_match_type: ManualMatchMode,
 
-	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	/// The id of the user making the suggestion. Ignored unless the caller holds Automation or Admin permissions; otherwise set to the caller's user id.
 	pub user_id: Option<Uuid>,
 
 	pub matched_name: Option<String>,

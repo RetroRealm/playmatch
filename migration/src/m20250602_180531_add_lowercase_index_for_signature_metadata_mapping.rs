@@ -69,7 +69,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Index auf LOWER("sha1") entfernen
 		manager
 			.get_connection()
 			.execute_unprepared(

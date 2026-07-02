@@ -80,7 +80,7 @@ impl HasheousClient {
 		headers.insert("Content-Type", "application/json".parse()?);
 
 		let serialised = serde_json::to_vec(body)
-			.with_context(|| format!("failed to serialise hasheous {endpoint_label} body"))?;
+			.with_context(|| format!("failed to serialize Hasheous {endpoint_label} body"))?;
 		let url_for_log = url.clone();
 		let req = self
 			.client
@@ -89,7 +89,7 @@ impl HasheousClient {
 			.body(serialised)
 			.build()?;
 
-		debug!("hasheous request: {} {}", req.method(), url_for_log.path());
+		debug!("Hasheous request: {} {}", req.method(), url_for_log.path());
 
 		let started = std::time::Instant::now();
 		let _inflight = crate::http::abstraction::InflightGuard::new("hasheous");

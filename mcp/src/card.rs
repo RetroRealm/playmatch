@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 const CARD_NAME: &str = "io.github.retrorealm/playmatch";
-const CARD_DESCRIPTION: &str = "Identifies game ROMs by hash and exposes the playmatch catalogue of games, platforms, companies and signature groups.";
+const CARD_DESCRIPTION: &str = "Identifies game ROMs by hash and exposes the Playmatch catalogue of games, platforms, companies and signature groups.";
 const CARD_TITLE: &str = "Playmatch";
 const CARD_WEBSITE: &str = "https://github.com/RetroRealm/playmatch";
 

@@ -28,19 +28,19 @@ static PEPPER: OnceLock<Vec<u8>> = OnceLock::new();
 /// [`MIN_PEPPER_BYTES`], or this function has already been called.
 pub fn init_pepper(pepper_hex: &str) -> Result<(), &'static str> {
 	let pepper =
-		hex::decode(pepper_hex.trim()).map_err(|_| "API_KEY_PEPPER must be hex-encoded")?;
+		hex::decode(pepper_hex.trim()).map_err(|_| "API_KEY_PEPPER must be hexadecimal")?;
 	if pepper.len() < MIN_PEPPER_BYTES {
 		return Err("API_KEY_PEPPER must decode to at least 16 bytes (32 hex chars)");
 	}
 	PEPPER
 		.set(pepper)
-		.map_err(|_| "API_KEY_PEPPER already initialised")
+		.map_err(|_| "API_KEY_PEPPER already initialized")
 }
 
 fn pepper() -> &'static [u8] {
 	PEPPER
 		.get()
-		.expect("API_KEY_PEPPER not initialised; call init_pepper() at startup")
+		.expect("API_KEY_PEPPER not initialized; call init_pepper() at startup")
 		.as_slice()
 }
 

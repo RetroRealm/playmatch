@@ -84,7 +84,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 1. Create `user` table
 		manager
 			.create_table(
 				Table::create()
@@ -121,7 +120,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create indexes for user table
 		manager
 			.create_index(
 				Index::create()
@@ -152,7 +150,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 2. Alter `signature_metadata_mapping` → add `created_by` UUID FK + index
 		manager
 			.alter_table(
 				Table::alter()
@@ -187,7 +184,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 3. Create `signature_metadata_mapping_suggestions`
 		manager
 			.create_table(
 				Table::create()
@@ -247,7 +243,6 @@ impl MigrationTrait for Migration {
 							.default(Expr::cust("CURRENT_TIMESTAMP")),
 					)
 					.primary_key(Index::create().col(SignatureMetadataMappingSuggestions::Id))
-					// FKs to game, company, platform
 					.foreign_key(
 						&mut ForeignKey::create()
 							.name("fk_smm_sugg_game_id")
@@ -293,7 +288,6 @@ impl MigrationTrait for Migration {
 							.on_update(ForeignKeyAction::Cascade)
 							.to_owned(),
 					)
-					// same “one of game_id, company_id, platform_id” constraint
 					.check(Expr::cust(
 						"num_nonnulls(game_id, company_id, platform_id) = 1",
 					))
@@ -301,7 +295,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 4. Indexes for suggestions FK columns
 		manager
 			.create_index(
 				Index::create()
@@ -360,7 +353,6 @@ impl MigrationTrait for Migration {
 
 		let db = manager.get_connection();
 
-		// 5. Insert initial admin and bot users
 		user::Entity::insert_many(vec![initial_admin_user, initial_bot_user])
 			.exec(db)
 			.await?;
@@ -382,7 +374,6 @@ impl MigrationTrait for Migration {
 	}
 
 	async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-		// 1. Drop indexes for users and suggestions
 		manager
 			.drop_index(
 				Index::drop()
@@ -447,7 +438,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 2. Drop suggestions table
 		manager
 			.drop_table(
 				Table::drop()
@@ -457,7 +447,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 3. Drop index on created_by
 		manager
 			.drop_index(
 				Index::drop()
@@ -468,7 +457,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 4. Remove FK & column from signature_metadata_mapping
 		manager
 			.alter_table(
 				Table::alter()
@@ -479,12 +467,10 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// 5. Drop user table
 		manager
 			.drop_table(Table::drop().if_exists().table(User::Table).to_owned())
 			.await?;
 
-		// 6. Drop user permissions enum
 		manager
 			.drop_type(Type::drop().name(UserPermissionsEnum).to_owned())
 			.await?;

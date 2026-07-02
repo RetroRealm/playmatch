@@ -8,19 +8,19 @@ use utoipa::ToSchema;
 #[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalGameMatchSuggestionPayload {
-	/// MD5 hash of the game file.
+	/// The MD5 hash of the game file.
 	pub md5: Option<String>,
 
-	/// SHA1 hash of the game file.
+	/// The SHA1 hash of the game file.
 	pub sha1: Option<String>,
 
-	/// SHA256 hash of the game file.
+	/// The SHA256 hash of the game file.
 	pub sha256: Option<String>,
 
-	/// File name of the ROM as the client knows it.
+	/// The file name of the ROM as the client knows it.
 	pub file_name: Option<String>,
 
-	/// File size in bytes.
+	/// The file size in bytes.
 	pub file_size: Option<i64>,
 
 	/// Every (provider, providerId) binding the client has resolved for this ROM.
@@ -30,11 +30,11 @@ pub struct ExternalGameMatchSuggestionPayload {
 #[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalProviderMapping {
-	/// Metadata provider tag. Unknown values are accepted and dropped by the
-	/// drain worker; only `IGDB` is recognised at the moment.
+	/// The metadata provider tag. Unknown values are accepted and dropped by the
+	/// drain worker; only `IGDB` is recognized at the moment.
 	pub provider: String,
 
-	/// Provider-side id the client matched the ROM to.
+	/// The provider-side id the client matched the ROM to.
 	pub provider_id: String,
 }
 

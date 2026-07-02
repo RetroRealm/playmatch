@@ -89,7 +89,7 @@ where
 			// A per-item infra failure (Redis/DB) is otherwise invisible beyond the
 			// aggregate error counter; log the cause so a batch-wide outage is
 			// diagnosable without exposing internals to the client.
-			log::warn!("bulk identify item failed: {err:?}");
+			log::warn!("Bulk identify item failed: {err:?}");
 			ItemOutcome::Error(BulkItemError {
 				code: "identify_failed".to_string(),
 				field: None,
@@ -161,7 +161,7 @@ fn assemble_response<T: Serialize + Matched>(
 		results.push(result);
 	}
 
-	// Bulk drops the single endpoint's per-response X-Cache in favour of an
+	// Bulk drops the single endpoint's per-response X-Cache in favor of an
 	// aggregate. Tokens stay UPPERCASE to match the single endpoint's vocabulary.
 	HttpResponse::Ok()
 		.append_header((

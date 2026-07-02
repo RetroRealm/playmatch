@@ -4,28 +4,33 @@ use utoipa::IntoParams;
 
 pub const MAX_SEARCH_LITERAL_LEN: usize = 200;
 
-/// Query an entity by its ID
+/// Query for one entity by id.
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct IdQuery {
+	/// The IGDB id of the entity.
 	pub id: i32,
 }
 
-/// Query an entity by its slug or ID
+/// Query for one entity by slug or id.
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct SlugIdQuery {
+	/// The IGDB slug of the entity.
 	pub slug: Option<String>,
+	/// The IGDB id of the entity.
 	pub id: Option<i32>,
 }
 
-/// Query multiple entities by their IDs
+/// Query for multiple entities by their ids.
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct IdsQuery {
+	/// The IGDB ids of the entities.
 	pub ids: Vec<i32>,
 }
 
-/// Query to search for entities by a string
+/// Query for a full-text entity search.
 #[derive(Debug, Serialize, Deserialize, IntoParams)]
 pub struct SearchQuery {
+	/// The search term.
 	pub query: String,
 }
 

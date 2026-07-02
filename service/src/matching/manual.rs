@@ -168,6 +168,9 @@ pub async fn apply_manual_game_match(
 	Ok(results)
 }
 
+/// Applies a manual match to a game and fans it out to related rows: the
+/// game's parent (if it is a clone), all of that parent's clones, and any
+/// other same-name, same-platform sibling games.
 pub async fn apply_manual_game_match_by_game(
 	game: game::Model,
 	r#match: GameMatchData,
@@ -176,7 +179,8 @@ pub async fn apply_manual_game_match_by_game(
 ) -> ServiceResult<Vec<UpdatedMatchResult>> {
 	let platform = find_platform_of_game(game.id, db_conn).await?;
 
-	// Find all games that match the name and have the same platform (this is useful for platforms having multiple dat sets for encrypted and decrypted versions)
+	// Same-name, same-platform siblings cover platforms that ship separate DAT
+	// sets for encrypted and decrypted variants.
 	let games = if let Some(platform) = platform {
 		find_games_by_name_and_platform_id(&game.name, platform.id, db_conn).await?
 	} else {
@@ -278,7 +282,7 @@ pub async fn apply_manual_game_match_by_game(
 		);
 		if let Err(e) = redis_conn.del(&cache_keys_to_bust).await {
 			warn!(
-				"batch identify-cache delete failed for {} keys: {e}",
+				"Batch identify-cache delete failed for {} keys: {e}",
 				cache_keys_to_bust.len()
 			);
 		}

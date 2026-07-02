@@ -23,7 +23,7 @@ fn ss_game_by_id_layout_is_stable() {
 
 #[test]
 fn ss_game_by_rom_layout_is_stable() {
-	// The trailing component is a sha256 of the normalised rom name; assert
+	// The trailing component is a sha256 of the normalized rom name; assert
 	// the surrounding shape only.
 	assert!(
 		provider_cache_key("screenscraper", "game:rom", "1:deadbeef")

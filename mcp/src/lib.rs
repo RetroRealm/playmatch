@@ -1,3 +1,7 @@
+//! MCP server crate: read-only tools over the service layer, packaged as a
+//! streamable HTTP service that the api crate mounts into its actix app at
+//! `/mcp`. Also builds the JSON for the `.well-known` discovery card.
+
 mod card;
 mod server;
 pub mod tools;

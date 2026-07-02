@@ -1,3 +1,10 @@
+//! ScreenScraper client. The API is operationally unusual: quotas are
+//! per-account and reset at Paris midnight, allowed concurrency is probed at
+//! runtime from the account's `maxthreads`, and overload or rejection comes
+//! back as French incident text on HTTP 200 rather than an error status. The
+//! constants at the top of this file encode those quirks; read their docs
+//! before changing request pacing or retry behavior.
+
 use crate::config::http::REQWEST_DEFAULT_USER_AGENT;
 use crate::http::abstraction::RetryPolicy;
 use crate::providers::screenscraper::model::{
@@ -49,7 +56,7 @@ const QUOTA_SOFT_LIMIT_NUMERATOR: u64 = 95;
 const QUOTA_SOFT_LIMIT_DENOMINATOR: u64 = 100;
 
 /// Retries for HTTP 429 thread-cap responses on the same credentials. 429
-/// does not charge a quota request; it just means too many in flight right
+/// does not charge a quota request; it means too many in flight right
 /// now. Backoff entries are milliseconds, jitter added per attempt.
 const MAX_429_RETRIES: usize = 3;
 const RETRY_BACKOFF_MS: &[u64] = &[250, 500, 1000];
@@ -77,6 +84,9 @@ const INCIDENT_PHRASES: &[&str] = &[
 /// `Ok(None)` so the matcher records a miss instead of bailing.
 const NOT_FOUND_PHRASES: &[&str] = &["non trouvée"];
 
+/// `redis_key` marks hard exhaustion (the Unix timestamp the account is
+/// blocked until), while `quota_redis_key` caches the last quota snapshot
+/// used to re-derive the account's allowed concurrency.
 struct Account {
 	id: String,
 	password: String,
@@ -205,7 +215,7 @@ impl ScreenScraperClient {
 
 	pub async fn search_games(&self, system_id: i32, term: &str) -> anyhow::Result<Vec<SsGame>> {
 		if !valid_system_id(system_id) {
-			debug!("screenscraper search_games skipped: invalid system_id ({system_id})");
+			debug!("ScreenScraper search_games skipped: invalid system_id ({system_id})");
 			return Ok(vec![]);
 		}
 		// ScreenScraper's jeuRecherche.php rejects searches with fewer than
@@ -213,7 +223,7 @@ impl ScreenScraperClient {
 		// obligatoires dans l'url"), so skip the round-trip entirely.
 		let trimmed = term.trim();
 		if trimmed.chars().filter(|c| c.is_alphanumeric()).count() < 3 {
-			debug!("screenscraper search_games skipped: term too short ({term:?})");
+			debug!("ScreenScraper search_games skipped: term too short ({term:?})");
 			return Ok(vec![]);
 		}
 		let url = self.url(
@@ -236,7 +246,7 @@ impl ScreenScraperClient {
 
 	pub async fn get_game_by_id(&self, game_id: i64) -> anyhow::Result<Option<SsGame>> {
 		if game_id <= 0 {
-			debug!("screenscraper get_game_by_id skipped: invalid game_id ({game_id})");
+			debug!("ScreenScraper get_game_by_id skipped: invalid game_id ({game_id})");
 			return Ok(None);
 		}
 		let url = self.url("jeuInfos.php", &[("gameid", game_id.to_string())])?;
@@ -249,12 +259,12 @@ impl ScreenScraperClient {
 		rom_name: &str,
 	) -> anyhow::Result<Option<SsGame>> {
 		if !valid_system_id(system_id) {
-			debug!("screenscraper get_game_by_rom_name skipped: invalid system_id ({system_id})");
+			debug!("ScreenScraper get_game_by_rom_name skipped: invalid system_id ({system_id})");
 			return Ok(None);
 		}
 		let trimmed = rom_name.trim();
 		if trimmed.is_empty() {
-			debug!("screenscraper get_game_by_rom_name skipped: empty rom_name");
+			debug!("ScreenScraper get_game_by_rom_name skipped: empty rom_name");
 			return Ok(None);
 		}
 		let url = self.url(
@@ -281,12 +291,12 @@ impl ScreenScraperClient {
 	) -> anyhow::Result<Option<SsGame>> {
 		const ENDPOINT_LABEL: &str = "game_by_hashes";
 		if !valid_system_id(system_id) {
-			debug!("screenscraper {ENDPOINT_LABEL} skipped: invalid system_id ({system_id})");
+			debug!("ScreenScraper {ENDPOINT_LABEL} skipped: invalid system_id ({system_id})");
 			return Ok(None);
 		}
 		let trimmed_name = rom_name.trim();
 		if trimmed_name.is_empty() {
-			debug!("screenscraper {ENDPOINT_LABEL} skipped: empty rom_name");
+			debug!("ScreenScraper {ENDPOINT_LABEL} skipped: empty rom_name");
 			return Ok(None);
 		}
 
@@ -294,7 +304,7 @@ impl ScreenScraperClient {
 		let sha1 = sha1.map(str::trim).filter(|s| !s.is_empty());
 		let crc = crc.map(str::trim).filter(|s| !s.is_empty());
 		if md5.is_none() && sha1.is_none() && crc.is_none() {
-			debug!("screenscraper {ENDPOINT_LABEL} skipped: no hashes available");
+			debug!("ScreenScraper {ENDPOINT_LABEL} skipped: no hashes available");
 			return Ok(None);
 		}
 
@@ -429,7 +439,7 @@ impl ScreenScraperClient {
 						.is_some_and(|h| h.success.eq_ignore_ascii_case("false"));
 					if header_signals_failure {
 						debug!(
-							"screenscraper header.success=false for {endpoint_label}: {:?}",
+							"ScreenScraper header.success=false for {endpoint_label}: {:?}",
 							env.header.and_then(|h| h.error)
 						);
 						return Ok(None);
@@ -512,7 +522,7 @@ impl ScreenScraperClient {
 				self.blacklisted.store(true, Ordering::Relaxed);
 				crate::metrics::record_screenscraper_quota_exhaustion("http_426");
 				error!(
-					"screenscraper client blacklisted (HTTP 426); the integration is non-compliant or obsolete and requires a code update"
+					"ScreenScraper client blacklisted (HTTP 426); the integration is non-compliant or obsolete and requires a code update"
 				);
 				Err(anyhow!(
 					"screenscraper client blacklisted (HTTP 426), requires update"
@@ -541,7 +551,7 @@ impl ScreenScraperClient {
 			.headers(headers)
 			.build()?;
 
-		debug!("screenscraper request: {} {url_for_log}", req.method());
+		debug!("ScreenScraper request: {} {url_for_log}", req.method());
 
 		let inflight = self.service.lock().await.ready().await?.call(req);
 		let res = inflight.await?;
@@ -629,7 +639,7 @@ impl ScreenScraperClient {
 						)
 					};
 					info!(
-						"screenscraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
+						"ScreenScraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
 						(reset - now).max(0)
 					);
 					let ttl = (reset - now).max(60) as u64;
@@ -655,7 +665,7 @@ impl ScreenScraperClient {
 			_ => "hard quota limit",
 		};
 		info!(
-			"screenscraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
+			"ScreenScraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
 			(reset - now).max(0)
 		);
 		let ttl = (reset - now).max(60) as u64;
@@ -712,7 +722,7 @@ impl ScreenScraperClient {
 			)
 		};
 		info!(
-			"screenscraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
+			"ScreenScraper account exhausted: {reason}; resuming at next paris midnight (~{}s)",
 			(reset - now).max(0)
 		);
 		let ttl = (reset - now).max(60) as u64;
@@ -749,7 +759,7 @@ fn apply_concurrency(account: &Account, target: usize) {
 		account.permits.add_permits(target - current);
 		account.concurrency.store(target, Ordering::Relaxed);
 		crate::metrics::set_provider_concurrency_configured("screenscraper", target as i64);
-		info!("screenscraper concurrency raised to {target} (was {current})");
+		info!("ScreenScraper concurrency raised to {target} (was {current})");
 	} else if target < current {
 		let asked = current - target;
 		let removed = account.permits.forget_permits(asked);
@@ -758,12 +768,12 @@ fn apply_concurrency(account: &Account, target: usize) {
 		if removed < asked {
 			drain_excess_permits(account.permits.clone(), asked - removed);
 			info!(
-				"screenscraper concurrency lowered to {target} (was {current}); forgot {removed} of {asked} immediately, draining remaining {} as in-flight requests finish",
+				"ScreenScraper concurrency lowered to {target} (was {current}); forgot {removed} of {asked} immediately, draining remaining {} as in-flight requests finish",
 				asked - removed
 			);
 		} else {
 			info!(
-				"screenscraper concurrency lowered to {target} (was {current}); forgot {asked} permits"
+				"ScreenScraper concurrency lowered to {target} (was {current}); forgot {asked} permits"
 			);
 		}
 	}
@@ -967,7 +977,7 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 
 	async fn match_db(self: Arc<Self>, db_conn: &sea_orm::DbConn) -> anyhow::Result<()> {
 		if self.is_quota_exhausted() {
-			warn!("screenscraper quota exhausted at cycle start, skipping");
+			warn!("ScreenScraper quota exhausted at cycle start, skipping");
 			return Ok(());
 		}
 		matching::match_db_to_screenscraper_entities(self, db_conn).await
@@ -978,7 +988,7 @@ impl crate::providers::MetadataProvider for ScreenScraperClient {
 		db_conn: &sea_orm::DbConn,
 	) -> anyhow::Result<()> {
 		if self.is_quota_exhausted() {
-			warn!("screenscraper quota exhausted at cross-pass start, skipping");
+			warn!("ScreenScraper quota exhausted at cross-pass start, skipping");
 			return Ok(());
 		}
 		crate::providers::drive_cross_match_pipeline(

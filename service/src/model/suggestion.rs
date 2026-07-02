@@ -9,47 +9,47 @@ use uuid::Uuid;
 #[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameSuggestionRequest {
-	/// MD5 hash of the game file.
+	/// The MD5 hash of the game file.
 	pub md5: Option<String>,
 
-	/// SHA1 hash of the game file.
+	/// The SHA1 hash of the game file.
 	pub sha1: Option<String>,
 
-	/// SHA256 hash of the game file.
+	/// The SHA256 hash of the game file.
 	pub sha256: Option<String>,
 
-	/// Name of game or file.
+	/// The name of the game or file.
 	pub name: Option<String>,
 
-	/// Optional comment about the match.
+	/// A comment about the match.
 	pub comment: Option<String>,
 
-	/// Metadata provider to match for.
+	/// The metadata provider to match for.
 	pub provider: MetadataProvider,
 
-	/// ID of the game file in the metadata provider.
+	/// The id of the game in the metadata provider.
 	pub provider_id: String,
 
-	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	/// The id of the user making the suggestion.
 	pub user_id: Option<Uuid>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CompanyOrPlatformSuggestionRequest {
-	/// Name of company or platform.
+	/// The name of the company or platform.
 	pub name: String,
 
-	/// Optional comment about the match.
+	/// A comment about the match.
 	pub comment: Option<String>,
 
-	/// Metadata provider to match for.
+	/// The metadata provider to match for.
 	pub provider: MetadataProvider,
 
-	/// ID of the company or platform in the metadata provider.
+	/// The id of the company or platform in the metadata provider.
 	pub provider_id: String,
 
-	/// The id of the user making the suggestion, if your permission level is not Automation or Admin, this is ignored and set to your user id instead.
+	/// The id of the user making the suggestion.
 	pub user_id: Option<Uuid>,
 }
 
@@ -59,15 +59,15 @@ pub struct Suggestion {
 	/// Unique identifier for the suggestion.
 	pub id: Uuid,
 
-	/// Id of the game this suggestion is for.
+	/// The id of the game this suggestion is for, absent when the suggestion is not for a game.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub game_id: Option<Uuid>,
 
-	/// Id of the company this suggestion is for.
+	/// The id of the company this suggestion is for, absent when the suggestion is not for a company.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_id: Option<Uuid>,
 
-	/// Id of the platform this suggestion is for.
+	/// The id of the platform this suggestion is for, absent when the suggestion is not for a platform.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform_id: Option<Uuid>,
 
@@ -77,14 +77,14 @@ pub struct Suggestion {
 	/// The ID of the game, company, or platform on the metadata provider.
 	pub provider_id: String,
 
-	/// Optional comment about the suggestion.
+	/// A comment about the suggestion.
 	pub comment: Option<String>,
 
-	/// User Id of the user who created the suggestion.
+	/// The id of the user who created the suggestion, absent for externally-submitted ones.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub created_by: Option<Uuid>,
 
-	/// Origin of an externally-submitted suggestion (e.g. truncated User-Agent), null for user-submitted ones.
+	/// Origin of an externally-submitted suggestion (for example a truncated User-Agent), absent for user-submitted ones.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub source: Option<String>,
 

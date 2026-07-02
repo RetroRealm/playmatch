@@ -1,3 +1,9 @@
+//! HTTP layer of Playmatch: the actix-web server bootstrap, route wiring for
+//! the `/api/v1`, `/api/v2` and bare `/api` alias scopes, the OpenAPI
+//! documents, and the shared middleware stack. Also owns the separate metrics
+//! listener, the cron jobs for DAT ingestion and provider matching, and the
+//! optional MCP mount. Business logic lives in the service crate.
+
 use crate::middleware::{http_request_metrics, v2_error_envelope, version_lifecycle_headers};
 #[doc(hidden)]
 pub use crate::openapi::{create_openapi, create_openapi_v1, create_openapi_v2};
@@ -217,9 +223,9 @@ async fn start() -> anyhow::Result<()> {
 	// Install the API key pepper before the server accepts requests. Missing or
 	// malformed pepper is a loud startup panic.
 	let pepper_raw = env::var("API_KEY_PEPPER").expect(
-		"API_KEY_PEPPER environment variable is required (e.g. output of `openssl rand -hex 32`)",
+		"API_KEY_PEPPER environment variable is required (for example the output of `openssl rand -hex 32`)",
 	);
-	service::db::user::init_pepper(&pepper_raw).unwrap_or_else(|e| panic!("API_KEY_PEPPER: {e}"));
+	service::db::user::init_pepper(&pepper_raw).unwrap_or_else(|e| panic!("{e}"));
 
 	let igdb_http_client = Client::builder().cookie_store(true).build()?;
 
@@ -310,7 +316,7 @@ async fn start() -> anyhow::Result<()> {
 		providers.push(c as Arc<dyn MetadataProvider>);
 	}
 	if providers.is_empty() {
-		warn!("No metadata providers configured. Background match cron will be a no-op.");
+		warn!("No metadata providers configured; the background match cron will be a no-op");
 	}
 	let providers_arc = Arc::new(providers);
 
@@ -525,7 +531,7 @@ async fn start() -> anyhow::Result<()> {
 				{
 					Ok(stats) if stats.processed_envelopes > 0 => {
 						debug!(
-							"external suggestion drain: processed {} envelopes (created: {}, already_matched: {}, duplicates: {}, unknown_roms: {}, invalid: {}, invalid_mappings: {}, unsupported_providers: {})",
+							"External suggestion drain: processed {} envelopes (created: {}, already_matched: {}, duplicates: {}, unknown_roms: {}, invalid: {}, invalid_mappings: {}, unsupported_providers: {})",
 							stats.processed_envelopes,
 							stats.created,
 							stats.already_matched,
@@ -537,7 +543,7 @@ async fn start() -> anyhow::Result<()> {
 						);
 					}
 					Ok(_) => {}
-					Err(e) => error!("external suggestion drain failed: {e}"),
+					Err(e) => error!("External suggestion drain failed: {e}"),
 				}
 			})
 		})?)
@@ -1112,8 +1118,8 @@ fn v2_json_config() -> JsonConfig {
 /// v2 public surface. Self-contained: it carries its own paginated reference
 /// lists plus singular reads that reuse the same service fns as v1, and it
 /// mounts the version-agnostic shared routes and provider proxies so the v2
-/// scope answers every resource v1 does without registering two services at the
-/// same literal path. `flags` gate the provider proxies exactly as in v1.
+/// scope answers every resource v1 does. `flags` gate the provider proxies
+/// exactly as in v1.
 fn configure_public_api_routes_v2(cfg: &mut ServiceConfig, flags: PublicRouteFlags) {
 	// Everything mounts inside ONE empty-prefix scope. An actix `scope("")` matches
 	// every path, so a sibling empty scope registered ahead of other services

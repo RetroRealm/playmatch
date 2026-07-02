@@ -17,7 +17,7 @@ use service::model::GameFileMatchSearch;
 /// The strongest supplied hash resolves the file: sha256, then sha1, then md5,
 /// then crc. When no hash matches, the filename and size are tried last.
 ///
-/// This is the v2 twin of the v1 `/identify/ids`: identical behaviour, except a
+/// This is the v2 twin of the v1 `/identify/ids`: identical behavior, except a
 /// malformed query answers the v2 `{code, message}` envelope instead of v1's
 /// plain-text body.
 #[utoipa::path(

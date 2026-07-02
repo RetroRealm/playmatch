@@ -320,7 +320,7 @@ impl SteamGridDbClient {
 			.build()?;
 
 		debug!(
-			"steamgriddb request: {} {}",
+			"SteamGridDB request: {} {}",
 			req.method(),
 			url_for_log.path()
 		);
@@ -332,7 +332,7 @@ impl SteamGridDbClient {
 
 		if log::log_enabled!(log::Level::Debug) {
 			let preview: String = body.chars().take(256).collect();
-			debug!("steamgriddb response (status={status}, first 256): {preview}");
+			debug!("SteamGridDB response (status={status}, first 256): {preview}");
 		}
 
 		if status == StatusCode::NOT_FOUND {

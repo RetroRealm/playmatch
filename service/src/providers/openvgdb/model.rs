@@ -72,7 +72,7 @@ impl From<openvgdb_release::Model> for OvgdbRelease {
 	}
 }
 
-/// A rom matched by hash together with every release attached to it.
+/// A ROM matched by hash together with every release attached to it.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OvgdbRomMatch {
 	pub rom: OvgdbRom,

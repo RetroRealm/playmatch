@@ -1,3 +1,8 @@
+# migration
+
+SeaORM migrations for the playmatch database. The migrator also runs
+automatically at service startup; use this CLI for manual control.
+
 # Running Migrator CLI
 
 - Generate a new migration file

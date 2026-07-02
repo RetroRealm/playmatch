@@ -1,8 +1,5 @@
 use sea_orm_migration::prelude::*;
 
-/// Backs the v2 `(name, id)` keyset browse over game. The existing trigram GIN
-/// index serves fuzzy search but cannot drive an ordered range scan, so add a
-/// plain btree on (name, id).
 #[derive(Iden)]
 enum Game {
 	Table,
@@ -10,6 +7,9 @@ enum Game {
 	Id,
 }
 
+/// Backs the v2 `(name, id)` keyset browse over game. The existing trigram GIN
+/// index serves fuzzy search but cannot drive an ordered range scan, so add a
+/// plain btree on (name, id).
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 

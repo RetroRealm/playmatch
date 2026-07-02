@@ -59,6 +59,9 @@ use service::providers::igdb::model::{
 };
 
 /// IGDB-prefilled thin wrapper around `$crate::__provider_entity_routes_impl`.
+/// `$singular_summary`/`$plural_summary` are full doc sentences (see that
+/// macro's doc comment for why they cannot be built from the entity name at
+/// macro-expansion time).
 macro_rules! igdb_entity_routes {
 	(
 		$singular_route:literal,
@@ -66,7 +69,9 @@ macro_rules! igdb_entity_routes {
 		$plural_route:literal,
 		$plural_fn:ident,
 		$cached_fn:ident,
-		$model:ty
+		$model:ty,
+		$singular_summary:literal,
+		$plural_summary:literal
 	) => {
 		$crate::__provider_entity_routes_impl!(
 			IgdbClient,
@@ -76,7 +81,9 @@ macro_rules! igdb_entity_routes {
 			$plural_route,
 			$plural_fn,
 			$cached_fn,
-			$model
+			$model,
+			$singular_summary,
+			$plural_summary
 		);
 	};
 }
@@ -110,7 +117,7 @@ pub async fn get_igdb_game_by_id(
 		}
 		get_game_by_slug_cached(igdb_client.as_ref(), &mut redis_conn, slug).await?
 	} else {
-		return Ok(HttpResponse::BadRequest().body("Either slug or id must be provided"));
+		return Ok(HttpResponse::BadRequest().body("either slug or id must be provided"));
 	};
 
 	if let Some(game) = response {
@@ -185,7 +192,9 @@ igdb_entity_routes!(
 	"/igdb/age-ratings",
 	get_igdb_age_ratings_by_ids,
 	get_age_rating_by_id_cached,
-	AgeRating
+	AgeRating,
+	"Returns one IGDB AgeRating by id.",
+	"Looks up many IGDB AgeRating records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -194,7 +203,9 @@ igdb_entity_routes!(
 	"/igdb/alternative-names",
 	get_igdb_alternative_names_by_ids,
 	get_alternative_name_by_id_cached,
-	AlternativeName
+	AlternativeName,
+	"Returns one IGDB AlternativeName by id.",
+	"Looks up many IGDB AlternativeName records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -203,7 +214,9 @@ igdb_entity_routes!(
 	"/igdb/artworks",
 	get_igdb_artworks_by_ids,
 	get_artwork_by_id_cached,
-	Artwork
+	Artwork,
+	"Returns one IGDB Artwork by id.",
+	"Looks up many IGDB Artwork records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -212,7 +225,9 @@ igdb_entity_routes!(
 	"/igdb/collections",
 	get_igdb_collections_by_ids,
 	get_collection_by_id_cached,
-	Collection
+	Collection,
+	"Returns one IGDB Collection by id.",
+	"Looks up many IGDB Collection records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -221,7 +236,9 @@ igdb_entity_routes!(
 	"/igdb/covers",
 	get_igdb_covers_by_ids,
 	get_cover_by_id_cached,
-	Cover
+	Cover,
+	"Returns one IGDB Cover by id.",
+	"Looks up many IGDB Cover records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -230,7 +247,9 @@ igdb_entity_routes!(
 	"/igdb/external-games",
 	get_igdb_external_games_by_ids,
 	get_external_game_by_id_cached,
-	ExternalGame
+	ExternalGame,
+	"Returns one IGDB ExternalGame by id.",
+	"Looks up many IGDB ExternalGame records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -239,7 +258,9 @@ igdb_entity_routes!(
 	"/igdb/franchises",
 	get_igdb_franchises_by_ids,
 	get_franchise_by_id_cached,
-	Franchise
+	Franchise,
+	"Returns one IGDB Franchise by id.",
+	"Looks up many IGDB Franchise records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -248,7 +269,9 @@ igdb_entity_routes!(
 	"/igdb/genres",
 	get_igdb_genres_by_ids,
 	get_genre_by_id_cached,
-	Genre
+	Genre,
+	"Returns one IGDB Genre by id.",
+	"Looks up many IGDB Genre records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -257,7 +280,9 @@ igdb_entity_routes!(
 	"/igdb/age-rating-categories",
 	get_igdb_age_rating_categories_by_ids,
 	get_age_rating_category_by_id_cached,
-	AgeRatingCategory
+	AgeRatingCategory,
+	"Returns one IGDB AgeRatingCategory by id.",
+	"Looks up many IGDB AgeRatingCategory records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -266,7 +291,9 @@ igdb_entity_routes!(
 	"/igdb/age-rating-content-descriptions-v2",
 	get_igdb_age_rating_content_descriptions_v2_by_ids,
 	get_age_rating_content_description_v2_by_id_cached,
-	AgeRatingContentDescriptionV2
+	AgeRatingContentDescriptionV2,
+	"Returns one IGDB AgeRatingContentDescriptionV2 by id.",
+	"Looks up many IGDB AgeRatingContentDescriptionV2 records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -275,7 +302,9 @@ igdb_entity_routes!(
 	"/igdb/age-rating-content-description-types",
 	get_igdb_age_rating_content_description_types_by_ids,
 	get_age_rating_content_description_type_by_id_cached,
-	AgeRatingContentDescriptionType
+	AgeRatingContentDescriptionType,
+	"Returns one IGDB AgeRatingContentDescriptionType by id.",
+	"Looks up many IGDB AgeRatingContentDescriptionType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -284,7 +313,9 @@ igdb_entity_routes!(
 	"/igdb/age-rating-organizations",
 	get_igdb_age_rating_organizations_by_ids,
 	get_age_rating_organization_by_id_cached,
-	AgeRatingOrganization
+	AgeRatingOrganization,
+	"Returns one IGDB AgeRatingOrganization by id.",
+	"Looks up many IGDB AgeRatingOrganization records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -293,7 +324,9 @@ igdb_entity_routes!(
 	"/igdb/company-statuses",
 	get_igdb_company_statuses_by_ids,
 	get_company_status_by_id_cached,
-	CompanyStatus
+	CompanyStatus,
+	"Returns one IGDB CompanyStatus by id.",
+	"Looks up many IGDB CompanyStatus records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -302,7 +335,9 @@ igdb_entity_routes!(
 	"/igdb/date-formats",
 	get_igdb_date_formats_by_ids,
 	get_date_format_by_id_cached,
-	DateFormat
+	DateFormat,
+	"Returns one IGDB DateFormat by id.",
+	"Looks up many IGDB DateFormat records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -311,7 +346,9 @@ igdb_entity_routes!(
 	"/igdb/external-game-sources",
 	get_igdb_external_game_sources_by_ids,
 	get_external_game_source_by_id_cached,
-	ExternalGameSource
+	ExternalGameSource,
+	"Returns one IGDB ExternalGameSource by id.",
+	"Looks up many IGDB ExternalGameSource records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -320,7 +357,9 @@ igdb_entity_routes!(
 	"/igdb/game-release-formats",
 	get_igdb_game_release_formats_by_ids,
 	get_game_release_format_by_id_cached,
-	GameReleaseFormat
+	GameReleaseFormat,
+	"Returns one IGDB GameReleaseFormat by id.",
+	"Looks up many IGDB GameReleaseFormat records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -329,7 +368,9 @@ igdb_entity_routes!(
 	"/igdb/game-statuses",
 	get_igdb_game_statuses_by_ids,
 	get_game_status_by_id_cached,
-	GameStatus
+	GameStatus,
+	"Returns one IGDB GameStatus by id.",
+	"Looks up many IGDB GameStatus records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -338,7 +379,9 @@ igdb_entity_routes!(
 	"/igdb/game-types",
 	get_igdb_game_types_by_ids,
 	get_game_type_by_id_cached,
-	GameType
+	GameType,
+	"Returns one IGDB GameType by id.",
+	"Looks up many IGDB GameType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -347,7 +390,9 @@ igdb_entity_routes!(
 	"/igdb/platform-types",
 	get_igdb_platform_types_by_ids,
 	get_platform_type_by_id_cached,
-	PlatformType
+	PlatformType,
+	"Returns one IGDB PlatformType by id.",
+	"Looks up many IGDB PlatformType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -356,7 +401,9 @@ igdb_entity_routes!(
 	"/igdb/release-date-regions",
 	get_igdb_release_date_regions_by_ids,
 	get_release_date_region_by_id_cached,
-	ReleaseDateRegion
+	ReleaseDateRegion,
+	"Returns one IGDB ReleaseDateRegion by id.",
+	"Looks up many IGDB ReleaseDateRegion records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -365,7 +412,9 @@ igdb_entity_routes!(
 	"/igdb/website-types",
 	get_igdb_website_types_by_ids,
 	get_website_type_by_id_cached,
-	WebsiteType
+	WebsiteType,
+	"Returns one IGDB WebsiteType by id.",
+	"Looks up many IGDB WebsiteType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -374,7 +423,9 @@ igdb_entity_routes!(
 	"/igdb/artwork-types",
 	get_igdb_artwork_types_by_ids,
 	get_artwork_type_by_id_cached,
-	ArtworkType
+	ArtworkType,
+	"Returns one IGDB ArtworkType by id.",
+	"Looks up many IGDB ArtworkType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -383,7 +434,9 @@ igdb_entity_routes!(
 	"/igdb/character-mug-shots",
 	get_igdb_character_mug_shots_by_ids,
 	get_character_mug_shot_by_id_cached,
-	CharacterMugShot
+	CharacterMugShot,
+	"Returns one IGDB CharacterMugShot by id.",
+	"Looks up many IGDB CharacterMugShot records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -392,7 +445,9 @@ igdb_entity_routes!(
 	"/igdb/company-sizes",
 	get_igdb_company_sizes_by_ids,
 	get_company_size_by_id_cached,
-	CompanySize
+	CompanySize,
+	"Returns one IGDB CompanySize by id.",
+	"Looks up many IGDB CompanySize records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -401,7 +456,9 @@ igdb_entity_routes!(
 	"/igdb/company-types",
 	get_igdb_company_types_by_ids,
 	get_company_type_by_id_cached,
-	CompanyType
+	CompanyType,
+	"Returns one IGDB CompanyType by id.",
+	"Looks up many IGDB CompanyType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -410,7 +467,9 @@ igdb_entity_routes!(
 	"/igdb/company-type-histories",
 	get_igdb_company_type_histories_by_ids,
 	get_company_type_history_by_id_cached,
-	CompanyTypeHistory
+	CompanyTypeHistory,
+	"Returns one IGDB CompanyTypeHistory by id.",
+	"Looks up many IGDB CompanyTypeHistory records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -419,7 +478,9 @@ igdb_entity_routes!(
 	"/igdb/entity-types",
 	get_igdb_entity_types_by_ids,
 	get_entity_type_by_id_cached,
-	EntityType
+	EntityType,
+	"Returns one IGDB EntityType by id.",
+	"Looks up many IGDB EntityType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -428,7 +489,9 @@ igdb_entity_routes!(
 	"/igdb/game-time-to-beats",
 	get_igdb_game_time_to_beats_by_ids,
 	get_game_time_to_beat_by_id_cached,
-	GameTimeToBeat
+	GameTimeToBeat,
+	"Returns one IGDB GameTimeToBeat by id.",
+	"Looks up many IGDB GameTimeToBeat records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -437,7 +500,9 @@ igdb_entity_routes!(
 	"/igdb/reports",
 	get_igdb_reports_by_ids,
 	get_report_by_id_cached,
-	Report
+	Report,
+	"Returns one IGDB Report by id.",
+	"Looks up many IGDB Report records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -446,7 +511,9 @@ igdb_entity_routes!(
 	"/igdb/report-types",
 	get_igdb_report_types_by_ids,
 	get_report_type_by_id_cached,
-	ReportType
+	ReportType,
+	"Returns one IGDB ReportType by id.",
+	"Looks up many IGDB ReportType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -455,7 +522,9 @@ igdb_entity_routes!(
 	"/igdb/characters",
 	get_igdb_characters_by_ids,
 	get_character_by_id_cached,
-	Character
+	Character,
+	"Returns one IGDB Character by id.",
+	"Looks up many IGDB Character records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -464,7 +533,9 @@ igdb_entity_routes!(
 	"/igdb/character-genders",
 	get_igdb_character_genders_by_ids,
 	get_character_gender_by_id_cached,
-	CharacterGender
+	CharacterGender,
+	"Returns one IGDB CharacterGender by id.",
+	"Looks up many IGDB CharacterGender records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -473,7 +544,9 @@ igdb_entity_routes!(
 	"/igdb/character-species-list",
 	get_igdb_character_species_by_ids,
 	get_character_species_by_id_cached,
-	CharacterSpecies
+	CharacterSpecies,
+	"Returns one IGDB CharacterSpecies by id.",
+	"Looks up many IGDB CharacterSpecies records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -482,7 +555,9 @@ igdb_entity_routes!(
 	"/igdb/collection-memberships",
 	get_igdb_collection_memberships_by_ids,
 	get_collection_membership_by_id_cached,
-	CollectionMembership
+	CollectionMembership,
+	"Returns one IGDB CollectionMembership by id.",
+	"Looks up many IGDB CollectionMembership records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -491,7 +566,9 @@ igdb_entity_routes!(
 	"/igdb/collection-membership-types",
 	get_igdb_collection_membership_types_by_ids,
 	get_collection_membership_type_by_id_cached,
-	CollectionMembershipType
+	CollectionMembershipType,
+	"Returns one IGDB CollectionMembershipType by id.",
+	"Looks up many IGDB CollectionMembershipType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -500,7 +577,9 @@ igdb_entity_routes!(
 	"/igdb/collection-relations",
 	get_igdb_collection_relations_by_ids,
 	get_collection_relation_by_id_cached,
-	CollectionRelation
+	CollectionRelation,
+	"Returns one IGDB CollectionRelation by id.",
+	"Looks up many IGDB CollectionRelation records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -509,7 +588,9 @@ igdb_entity_routes!(
 	"/igdb/collection-relation-types",
 	get_igdb_collection_relation_types_by_ids,
 	get_collection_relation_type_by_id_cached,
-	CollectionRelationType
+	CollectionRelationType,
+	"Returns one IGDB CollectionRelationType by id.",
+	"Looks up many IGDB CollectionRelationType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -518,7 +599,9 @@ igdb_entity_routes!(
 	"/igdb/collection-types",
 	get_igdb_collection_types_by_ids,
 	get_collection_type_by_id_cached,
-	CollectionType
+	CollectionType,
+	"Returns one IGDB CollectionType by id.",
+	"Looks up many IGDB CollectionType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -527,7 +610,9 @@ igdb_entity_routes!(
 	"/igdb/companies",
 	get_igdb_companies_by_ids,
 	get_company_by_id_cached,
-	Company
+	Company,
+	"Returns one IGDB Company by id.",
+	"Looks up many IGDB Company records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -536,7 +621,9 @@ igdb_entity_routes!(
 	"/igdb/company-logos",
 	get_igdb_company_logos_by_ids,
 	get_company_logo_by_id_cached,
-	CompanyLogo
+	CompanyLogo,
+	"Returns one IGDB CompanyLogo by id.",
+	"Looks up many IGDB CompanyLogo records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -545,7 +632,9 @@ igdb_entity_routes!(
 	"/igdb/company-websites",
 	get_igdb_company_websites_by_ids,
 	get_company_website_by_id_cached,
-	CompanyWebsite
+	CompanyWebsite,
+	"Returns one IGDB CompanyWebsite by id.",
+	"Looks up many IGDB CompanyWebsite records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -554,7 +643,9 @@ igdb_entity_routes!(
 	"/igdb/events",
 	get_igdb_events_by_ids,
 	get_event_by_id_cached,
-	Event
+	Event,
+	"Returns one IGDB Event by id.",
+	"Looks up many IGDB Event records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -563,7 +654,9 @@ igdb_entity_routes!(
 	"/igdb/event-logos",
 	get_igdb_event_logos_by_ids,
 	get_event_logo_by_id_cached,
-	EventLogo
+	EventLogo,
+	"Returns one IGDB EventLogo by id.",
+	"Looks up many IGDB EventLogo records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -572,7 +665,9 @@ igdb_entity_routes!(
 	"/igdb/event-networks",
 	get_igdb_event_networks_by_ids,
 	get_event_network_by_id_cached,
-	EventNetwork
+	EventNetwork,
+	"Returns one IGDB EventNetwork by id.",
+	"Looks up many IGDB EventNetwork records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -581,7 +676,9 @@ igdb_entity_routes!(
 	"/igdb/game-engines",
 	get_igdb_game_engines_by_ids,
 	get_game_engine_by_id_cached,
-	GameEngine
+	GameEngine,
+	"Returns one IGDB GameEngine by id.",
+	"Looks up many IGDB GameEngine records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -590,7 +687,9 @@ igdb_entity_routes!(
 	"/igdb/game-engine-logos",
 	get_igdb_game_engine_logos_by_ids,
 	get_game_engine_logo_by_id_cached,
-	GameEngineLogo
+	GameEngineLogo,
+	"Returns one IGDB GameEngineLogo by id.",
+	"Looks up many IGDB GameEngineLogo records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -599,7 +698,9 @@ igdb_entity_routes!(
 	"/igdb/game-localizations",
 	get_igdb_game_localizations_by_ids,
 	get_game_localization_by_id_cached,
-	GameLocalization
+	GameLocalization,
+	"Returns one IGDB GameLocalization by id.",
+	"Looks up many IGDB GameLocalization records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -608,7 +709,9 @@ igdb_entity_routes!(
 	"/igdb/game-modes",
 	get_igdb_game_modes_by_ids,
 	get_game_mode_by_id_cached,
-	GameMode
+	GameMode,
+	"Returns one IGDB GameMode by id.",
+	"Looks up many IGDB GameMode records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -617,7 +720,9 @@ igdb_entity_routes!(
 	"/igdb/game-versions",
 	get_igdb_game_versions_by_ids,
 	get_game_version_by_id_cached,
-	GameVersion
+	GameVersion,
+	"Returns one IGDB GameVersion by id.",
+	"Looks up many IGDB GameVersion records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -626,7 +731,9 @@ igdb_entity_routes!(
 	"/igdb/game-version-features",
 	get_igdb_game_version_features_by_ids,
 	get_game_version_feature_by_id_cached,
-	GameVersionFeature
+	GameVersionFeature,
+	"Returns one IGDB GameVersionFeature by id.",
+	"Looks up many IGDB GameVersionFeature records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -635,7 +742,9 @@ igdb_entity_routes!(
 	"/igdb/game-version-feature-values",
 	get_igdb_game_version_feature_values_by_ids,
 	get_game_version_feature_value_by_id_cached,
-	GameVersionFeatureValue
+	GameVersionFeatureValue,
+	"Returns one IGDB GameVersionFeatureValue by id.",
+	"Looks up many IGDB GameVersionFeatureValue records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -644,7 +753,9 @@ igdb_entity_routes!(
 	"/igdb/game-videos",
 	get_igdb_game_videos_by_ids,
 	get_game_video_by_id_cached,
-	GameVideo
+	GameVideo,
+	"Returns one IGDB GameVideo by id.",
+	"Looks up many IGDB GameVideo records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -653,7 +764,9 @@ igdb_entity_routes!(
 	"/igdb/involved-companies",
 	get_igdb_involved_companies_by_ids,
 	get_involved_company_by_id_cached,
-	InvolvedCompany
+	InvolvedCompany,
+	"Returns one IGDB InvolvedCompany by id.",
+	"Looks up many IGDB InvolvedCompany records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -662,7 +775,9 @@ igdb_entity_routes!(
 	"/igdb/keywords",
 	get_igdb_keywords_by_ids,
 	get_keyword_by_id_cached,
-	Keyword
+	Keyword,
+	"Returns one IGDB Keyword by id.",
+	"Looks up many IGDB Keyword records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -671,7 +786,9 @@ igdb_entity_routes!(
 	"/igdb/languages",
 	get_igdb_languages_by_ids,
 	get_language_by_id_cached,
-	Language
+	Language,
+	"Returns one IGDB Language by id.",
+	"Looks up many IGDB Language records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -680,7 +797,9 @@ igdb_entity_routes!(
 	"/igdb/language-supports",
 	get_igdb_language_supports_by_ids,
 	get_language_support_by_id_cached,
-	LanguageSupport
+	LanguageSupport,
+	"Returns one IGDB LanguageSupport by id.",
+	"Looks up many IGDB LanguageSupport records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -689,7 +808,9 @@ igdb_entity_routes!(
 	"/igdb/language-support-types",
 	get_igdb_language_support_types_by_ids,
 	get_language_support_type_by_id_cached,
-	LanguageSupportType
+	LanguageSupportType,
+	"Returns one IGDB LanguageSupportType by id.",
+	"Looks up many IGDB LanguageSupportType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -698,7 +819,9 @@ igdb_entity_routes!(
 	"/igdb/multiplayer-modes",
 	get_igdb_multiplayer_modes_by_ids,
 	get_multiplayer_mode_by_id_cached,
-	MultiplayerMode
+	MultiplayerMode,
+	"Returns one IGDB MultiplayerMode by id.",
+	"Looks up many IGDB MultiplayerMode records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -707,7 +830,9 @@ igdb_entity_routes!(
 	"/igdb/network-types",
 	get_igdb_network_types_by_ids,
 	get_network_type_by_id_cached,
-	NetworkType
+	NetworkType,
+	"Returns one IGDB NetworkType by id.",
+	"Looks up many IGDB NetworkType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -716,7 +841,9 @@ igdb_entity_routes!(
 	"/igdb/platforms",
 	get_igdb_platforms_by_ids,
 	get_platform_by_id_cached,
-	Platform
+	Platform,
+	"Returns one IGDB Platform by id.",
+	"Looks up many IGDB Platform records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -725,7 +852,9 @@ igdb_entity_routes!(
 	"/igdb/platform-families",
 	get_igdb_platform_families_by_ids,
 	get_platform_family_by_id_cached,
-	PlatformFamily
+	PlatformFamily,
+	"Returns one IGDB PlatformFamily by id.",
+	"Looks up many IGDB PlatformFamily records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -734,7 +863,9 @@ igdb_entity_routes!(
 	"/igdb/platform-logos",
 	get_igdb_platform_logos_by_ids,
 	get_platform_logo_by_id_cached,
-	PlatformLogo
+	PlatformLogo,
+	"Returns one IGDB PlatformLogo by id.",
+	"Looks up many IGDB PlatformLogo records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -743,7 +874,9 @@ igdb_entity_routes!(
 	"/igdb/platform-versions",
 	get_igdb_platform_versions_by_ids,
 	get_platform_version_by_id_cached,
-	PlatformVersion
+	PlatformVersion,
+	"Returns one IGDB PlatformVersion by id.",
+	"Looks up many IGDB PlatformVersion records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -752,7 +885,9 @@ igdb_entity_routes!(
 	"/igdb/platform-version-companies",
 	get_igdb_platform_version_companies_by_ids,
 	get_platform_version_company_by_id_cached,
-	PlatformVersionCompany
+	PlatformVersionCompany,
+	"Returns one IGDB PlatformVersionCompany by id.",
+	"Looks up many IGDB PlatformVersionCompany records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -761,7 +896,9 @@ igdb_entity_routes!(
 	"/igdb/platform-version-release-dates",
 	get_igdb_platform_version_release_dates_by_ids,
 	get_platform_version_release_date_by_id_cached,
-	PlatformVersionReleaseDate
+	PlatformVersionReleaseDate,
+	"Returns one IGDB PlatformVersionReleaseDate by id.",
+	"Looks up many IGDB PlatformVersionReleaseDate records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -770,7 +907,9 @@ igdb_entity_routes!(
 	"/igdb/platform-websites",
 	get_igdb_platform_websites_by_ids,
 	get_platform_website_by_id_cached,
-	PlatformWebsite
+	PlatformWebsite,
+	"Returns one IGDB PlatformWebsite by id.",
+	"Looks up many IGDB PlatformWebsite records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -779,7 +918,9 @@ igdb_entity_routes!(
 	"/igdb/player-perspectives",
 	get_igdb_player_perspectives_by_ids,
 	get_player_perspective_by_id_cached,
-	PlayerPerspective
+	PlayerPerspective,
+	"Returns one IGDB PlayerPerspective by id.",
+	"Looks up many IGDB PlayerPerspective records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -788,7 +929,9 @@ igdb_entity_routes!(
 	"/igdb/popularity-primitives",
 	get_igdb_popularity_primitives_by_ids,
 	get_popularity_primitive_by_id_cached,
-	PopularityPrimitive
+	PopularityPrimitive,
+	"Returns one IGDB PopularityPrimitive by id.",
+	"Looks up many IGDB PopularityPrimitive records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -797,7 +940,9 @@ igdb_entity_routes!(
 	"/igdb/popularity-types",
 	get_igdb_popularity_types_by_ids,
 	get_popularity_type_by_id_cached,
-	PopularityType
+	PopularityType,
+	"Returns one IGDB PopularityType by id.",
+	"Looks up many IGDB PopularityType records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -806,7 +951,9 @@ igdb_entity_routes!(
 	"/igdb/regions",
 	get_igdb_regions_by_ids,
 	get_region_by_id_cached,
-	Region
+	Region,
+	"Returns one IGDB Region by id.",
+	"Looks up many IGDB Region records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -815,7 +962,9 @@ igdb_entity_routes!(
 	"/igdb/release-dates",
 	get_igdb_release_dates_by_ids,
 	get_release_date_by_id_cached,
-	ReleaseDate
+	ReleaseDate,
+	"Returns one IGDB ReleaseDate by id.",
+	"Looks up many IGDB ReleaseDate records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -824,7 +973,9 @@ igdb_entity_routes!(
 	"/igdb/release-date-statuses",
 	get_igdb_release_date_statuses_by_ids,
 	get_release_date_status_by_id_cached,
-	ReleaseDateStatus
+	ReleaseDateStatus,
+	"Returns one IGDB ReleaseDateStatus by id.",
+	"Looks up many IGDB ReleaseDateStatus records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -833,7 +984,9 @@ igdb_entity_routes!(
 	"/igdb/screenshots",
 	get_igdb_screenshots_by_ids,
 	get_screenshot_by_id_cached,
-	Screenshot
+	Screenshot,
+	"Returns one IGDB Screenshot by id.",
+	"Looks up many IGDB Screenshot records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -842,7 +995,9 @@ igdb_entity_routes!(
 	"/igdb/themes",
 	get_igdb_themes_by_ids,
 	get_theme_by_id_cached,
-	Theme
+	Theme,
+	"Returns one IGDB Theme by id.",
+	"Looks up many IGDB Theme records by id in one request."
 );
 
 igdb_entity_routes!(
@@ -851,5 +1006,7 @@ igdb_entity_routes!(
 	"/igdb/websites",
 	get_igdb_websites_by_ids,
 	get_website_by_id_cached,
-	Website
+	Website,
+	"Returns one IGDB Website by id.",
+	"Looks up many IGDB Website records by id in one request."
 );

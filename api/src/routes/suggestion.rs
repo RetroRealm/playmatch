@@ -214,7 +214,7 @@ pub async fn submit_external_game_suggestion(
 				return Ok(HttpResponse::NoContent());
 			}
 			Err(e) => {
-				log::warn!("external suggestion rate limit check failed for {ip}: {e}");
+				log::warn!("External suggestion rate limit check failed for {ip}: {e}");
 			}
 		}
 	}
@@ -236,7 +236,7 @@ pub async fn submit_external_game_suggestion(
 			service::metrics::record_user_action("external_suggestion", "queue_full");
 		}
 		Err(e) => {
-			log::warn!("external suggestion enqueue failed: {e}");
+			log::warn!("External suggestion enqueue failed: {e}");
 			service::metrics::record_user_action("external_suggestion", "bad_payload");
 		}
 	}

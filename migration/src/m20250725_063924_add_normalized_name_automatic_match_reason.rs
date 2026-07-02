@@ -24,7 +24,7 @@ impl MigrationTrait for Migration {
 	}
 
 	async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
-		// This migration does not support down migration as it adds a new enum value and postgresql doesn't allow to delete enum values.
+		// Down is a no-op: enum-extension migrations cannot be reverted, see the crate doc in lib.rs.
 
 		Ok(())
 	}

@@ -32,12 +32,12 @@ where
 	Fut: std::future::Future<Output = anyhow::Result<Option<T>>>,
 {
 	if let Ok(Some(cached_val)) = redis_conn.get_ex(&cache_key, Expiry::EX(ttl)).await {
-		debug!("openvgdb cache hit for {label}: {cache_key}");
+		debug!("OpenVGDB cache hit for {label}: {cache_key}");
 		crate::metrics::record_cache_hit(PROVIDER_LABEL, label);
 		let deserialized = deserialize_option_redis_value(cached_val)?;
 		return Ok(deserialized);
 	}
-	debug!("openvgdb cache miss for {label}: {cache_key}");
+	debug!("OpenVGDB cache miss for {label}: {cache_key}");
 	crate::metrics::record_cache_miss(PROVIDER_LABEL, label);
 
 	let value = fetch().await?;
@@ -59,12 +59,12 @@ where
 	Fut: std::future::Future<Output = anyhow::Result<Vec<T>>>,
 {
 	if let Ok(Some(cached_val)) = redis_conn.get_ex(&cache_key, Expiry::EX(ttl)).await {
-		debug!("openvgdb cache hit for {label}: {cache_key}");
+		debug!("OpenVGDB cache hit for {label}: {cache_key}");
 		crate::metrics::record_cache_hit(PROVIDER_LABEL, label);
 		let deserialized: Vec<T> = serde_json::from_str(&cached_val)?;
 		return Ok(deserialized);
 	}
-	debug!("openvgdb cache miss for {label}: {cache_key}");
+	debug!("OpenVGDB cache miss for {label}: {cache_key}");
 	crate::metrics::record_cache_miss(PROVIDER_LABEL, label);
 
 	let values = fetch().await?;

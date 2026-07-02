@@ -144,8 +144,9 @@ pub async fn find_signature_metadata_mapping_by_platform_game_company_and_provid
 }
 
 /// `matched_name` and `matched_year` use COALESCE on conflict so a follow-up
-/// call that doesn't carry those fields (e.g. a hash-only retry) preserves
-/// values written by an earlier hit. Every other column is overwritten.
+/// call that doesn't carry those fields (for example a hash-only retry)
+/// preserves values written by an earlier hit. Every other column is
+/// overwritten.
 pub async fn create_or_update_signature_metadata_mapping(
 	input: SignatureMetadataMappingInput,
 	db_conn: &DbConn,

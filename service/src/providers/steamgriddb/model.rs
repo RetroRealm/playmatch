@@ -156,10 +156,10 @@ pub struct SgdbAuthor {
 	pub avatar: String,
 }
 
-/// Normalised asset record used for grids, heroes, logos, and icons. The four
+/// Normalized asset record used for grids, heroes, logos, and icons. The four
 /// SGDB asset endpoints return the same shape with slightly different valid
-/// styles/dimensions/mimes; we keep them as one struct and let the response
-/// stream them through unchanged.
+/// styles, dimensions, and mime types, so one struct covers all of them and
+/// responses stream it through unchanged.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SgdbAsset {
 	pub id: i64,
@@ -182,7 +182,7 @@ pub struct SgdbAsset {
 }
 
 /// Filter knobs passed straight through to SGDB's asset endpoints. All fields
-/// optional; serialised values are stable so the cache helper can hash them.
+/// are optional; serialized values are stable so the cache helper can hash them.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct AssetFilters {
 	#[serde(default)]

@@ -118,7 +118,7 @@ impl EmuReadyClient {
 			.headers(headers)
 			.build()?;
 
-		debug!("emuready request: {} {}", req.method(), url_for_log.path());
+		debug!("EmuReady request: {} {}", req.method(), url_for_log.path());
 
 		let started = std::time::Instant::now();
 		let _inflight = crate::http::abstraction::InflightGuard::new("emuready");
@@ -173,6 +173,7 @@ fn build_url(procedure: &str, input: Option<&str>) -> anyhow::Result<Url> {
 	Ok(url)
 }
 
+// tRPC GET procedures take their input as a JSON-encoded query param wrapped in {"json": ...}.
 fn build_trpc_input<T: Serialize>(payload: &T) -> anyhow::Result<String> {
 	Ok(serde_json::to_string(
 		&serde_json::json!({ "json": payload }),

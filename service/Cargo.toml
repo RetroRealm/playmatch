@@ -45,7 +45,7 @@ sea-orm = { workspace = true, features = ["debug-print", "runtime-tokio-rustls",
 
 [dev-dependencies]
 # Do not enable sea-orm's `mock` feature: it drops the `Clone` impl from
-# `DatabaseConnection`, which this crate relies on. DB behaviour is tested
+# `DatabaseConnection`, which this crate relies on. DB behavior is tested
 # against the Postgres integration test instead.
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 migration = { path = "../migration" }

@@ -55,7 +55,7 @@ pub async fn manually_match_game(
 		&& match_request.sha256.is_none()
 	{
 		return Err(error::Error::BadRequest(
-			"At least one of file_name, md5, sha1 or sha256 must be provided.".to_string(),
+			"at least one of file_name, md5, sha1 or sha256 is required".to_string(),
 		));
 	}
 

@@ -176,7 +176,7 @@ pub async fn parse_and_import_dat_file(
 							}
 						}
 
-						// When we insert too many sqlx-postgres panics, so we chunk the inserts
+						// sqlx-postgres panics past its bound-parameter limit, so inserts are chunked.
 						for chunk in to_insert.chunks(*PARALLELISM) {
 							insert_game_file_bulk(
 								chunk.to_vec(),
@@ -197,7 +197,7 @@ pub async fn parse_and_import_dat_file(
 
 					let game_release = insert_game(import.id, game.clone(), &conn).await?;
 
-					// When we insert too many sqlx-postgres panics, so we chunk the inserts
+					// sqlx-postgres panics past its bound-parameter limit, so inserts are chunked.
 					for chunk in game.rom.chunks(*PARALLELISM) {
 						insert_game_file_bulk(chunk.to_vec(), game_release.id, import.id, &conn)
 							.await?;
@@ -242,7 +242,7 @@ pub async fn parse_and_import_dat_file(
 	new_game_ids.dedup();
 	for game_id in &new_game_ids {
 		if let Err(e) = assign_and_seed_new_game(*game_id, conn, redis_conn).await {
-			warn!("failed to assign content anchor for new game {game_id}: {e:#}");
+			warn!("Failed to assign content anchor for new game {game_id}: {e:#}");
 		}
 	}
 
@@ -250,7 +250,7 @@ pub async fn parse_and_import_dat_file(
 	// not fail the import.
 	for game_id in retired_game_ids {
 		if let Err(e) = bust_identify_cache_for_game(redis_conn, conn, game_id).await {
-			warn!("failed to bust identify cache for retired game {game_id}: {e}");
+			warn!("Failed to bust identify cache for retired game {game_id}: {e}");
 		}
 	}
 
@@ -264,7 +264,7 @@ pub async fn parse_and_import_dat_file(
 		added_files.extend(get_game_files_from_game_id(game_id, conn).await?);
 	}
 	if let Err(e) = bust_identify_cache_for_hashes(redis_conn, conn, &added_files).await {
-		warn!("failed to bust identify cache for added hashes: {e}");
+		warn!("Failed to bust identify cache for added hashes: {e}");
 	}
 
 	Ok(())
@@ -325,12 +325,14 @@ async fn update_game_properties(
 	Ok(())
 }
 
+// DAT header names are not structured data. This heuristically splits a
+// header into company, platform and tags, tuned against the DAT filenames
+// pinned by the unit tests below.
 fn parse_company_and_platform(
 	dat: &Datafile,
 ) -> anyhow::Result<(Option<String>, String, Vec<String>)> {
 	let mut dat_header = dat.header.name.clone();
 
-	// Remove Arcade - from the name because it is not a company or system
 	dat_header = dat_header.replace("Arcade - ", "");
 
 	if let Some(subset) = &dat.header.subset {
@@ -388,7 +390,8 @@ fn parse_company_and_platform(
 		}
 	}
 
-	// Remove company name from platform if it appears there for GameCube
+	// Some GameCube DAT headers repeat the company inside the platform segment
+	// ("Nintendo - NintendoGameCube"); strip it, with and without a space.
 	if let Some(ref company_name) = company {
 		if platform.starts_with(company_name) && platform.to_lowercase().contains("gamecube") {
 			let after_company = platform.strip_prefix(company_name).unwrap_or(&platform);
@@ -399,7 +402,6 @@ fn parse_company_and_platform(
 				.to_string();
 		}
 
-		// Also check for "CompanyPlatform" (no space) patterns
 		let company_no_spaces = company_name.replace(' ', "");
 		if platform.starts_with(&company_no_spaces) && platform.len() > company_no_spaces.len() {
 			let potential_platform = &platform[company_no_spaces.len()..];
@@ -420,7 +422,7 @@ fn parse_company_and_platform(
 	for capture in DAT_TAG_REGEX.captures_iter(&platform) {
 		if let Some(tag_match) = capture.get(1) {
 			let tag = tag_match.as_str();
-			// Don't treat version-like strings as tags
+			// Skip version-like tokens such as "2023-01-01" so they are not treated as tags.
 			if !tag.contains('-') || !tag.chars().all(|c| c.is_numeric() || c == '-' || c == ' ') {
 				tags.push(tag.to_owned());
 				clean_platform = clean_platform.replace(&format!(" ({tag})"), "");
@@ -464,9 +466,10 @@ pub fn sanitize_dat_string(mut file_name: String, file_extension: &str, version:
 	file_name
 }
 
-/// True for build stamps and release counts (digits and separators only, e.g.
-/// "(20260605-234217)" or "(100)"); they change per build and would otherwise
-/// fork a new dat file row each time. Letter-bearing tags like (Decrypted) stay.
+/// True for build stamps and release counts (digits and separators only, such
+/// as "(20260605-234217)" or "(100)"); they change per build and would
+/// otherwise fork a new dat file row each time. Letter-bearing tags like
+/// (Decrypted) stay.
 fn is_build_stamp(inner: &str) -> bool {
 	inner.chars().any(|c| c.is_ascii_digit())
 		&& inner
@@ -483,7 +486,7 @@ pub async fn parse_dat_file(path: &Path) -> anyhow::Result<Datafile> {
 	let meta = tokio::fs::metadata(path).await?;
 	if meta.len() > MAX_DAT_BYTES {
 		anyhow::bail!(
-			"dat file {} is {} bytes, exceeds MAX_DAT_BYTES ({})",
+			"DAT file {} is {} bytes, exceeds MAX_DAT_BYTES ({})",
 			path.display(),
 			meta.len(),
 			MAX_DAT_BYTES,

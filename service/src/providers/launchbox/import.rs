@@ -173,6 +173,10 @@ enum Batch {
 	Images(Vec<launchbox_game_image::ActiveModel>),
 }
 
+// LaunchBox's Metadata.xml runs to hundreds of MB, so the parser thread and
+// the DB inserter run concurrently over a bounded channel instead of parsing
+// then inserting, bounding memory to at most LB_CHANNEL_DEPTH batches of
+// LB_BATCH_SIZE rows in flight.
 async fn stream_parse_and_insert(xml_path: &Path, db_conn: &DbConn) -> anyhow::Result<Counts> {
 	let (tx, mut rx) = mpsc::channel::<Batch>(LB_CHANNEL_DEPTH);
 	let xml_path_owned = xml_path.to_owned();

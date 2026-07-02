@@ -1,3 +1,6 @@
+//! Mirrors IGDB's API schema one-to-one. Field-level reference lives in
+//! IGDB's own API documentation.
+
 use bigdecimal::BigDecimal;
 use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Utc};

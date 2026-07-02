@@ -81,7 +81,7 @@ pub async fn ensure_imported(
 
 	let elapsed_ms = started.elapsed().as_millis();
 	info!(
-		"OpenVGDB import done in {} ms: {} roms, {} releases (md5={})",
+		"OpenVGDB import done in {} ms: {} ROMs, {} releases (md5={})",
 		elapsed_ms, counts.roms, counts.releases, md5,
 	);
 
@@ -182,7 +182,7 @@ async fn read_sqlite_and_insert(sqlite_path: &Path, db_conn: &DbConn) -> anyhow:
 			counts.roms += n;
 			crate::metrics::record_openvgdb_import_records("rom", "imported", n as u64);
 			if counts.roms.is_multiple_of(50_000) {
-				info!("OpenVGDB: imported {} roms", counts.roms);
+				info!("OpenVGDB: imported {} ROMs", counts.roms);
 			}
 		}
 	}

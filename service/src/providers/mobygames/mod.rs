@@ -245,7 +245,7 @@ impl MobyGamesClient {
 			.headers(headers)
 			.build()?;
 
-		debug!("mobygames request: {} {url_for_log}", req.method());
+		debug!("MobyGames request: {} {url_for_log}", req.method());
 
 		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
 		let res = rate_limited_future.await?;
@@ -254,7 +254,7 @@ impl MobyGamesClient {
 
 		if log::log_enabled!(log::Level::Debug) {
 			let preview: String = body.chars().take(256).collect();
-			debug!("mobygames response (status={status}, first 256): {preview}");
+			debug!("MobyGames response (status={status}, first 256): {preview}");
 		}
 
 		if status == StatusCode::NOT_FOUND {

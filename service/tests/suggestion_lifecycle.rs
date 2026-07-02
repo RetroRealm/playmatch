@@ -167,7 +167,7 @@ async fn accept_game_suggestion_creates_mapping_and_clears_suggestion() {
 	);
 
 	// The lifecycle marks an accepted suggestion terminal by deleting the row;
-	// there is no status column, so the row is simply gone.
+	// there is no status column, so the row is gone.
 	assert_eq!(
 		count_suggestions(&db).await,
 		0,

@@ -1,3 +1,8 @@
+//! The DAT file pipeline: downloads DAT sets through the `sources` module,
+//! unpacks and parses them, and imports files into Postgres, skipping any
+//! whose hash is already in the import history. After importing it populates
+//! clone-of relationships and backfills content anchors.
+
 use crate::config::PARALLELISM;
 use crate::db::dat_file_import::is_dat_already_in_history;
 use crate::db::signature_group::find_signature_group_by_name;
@@ -36,18 +41,18 @@ pub async fn download_and_parse_dats(
 	let tmp_dir = current_dir.join(DATS_PATH).join(TMP_PATH);
 	tokio::fs::create_dir_all(&tmp_dir).await?;
 
-	info!("Starting to download No-Intro DATs.");
+	info!("Starting to download No-Intro DATs");
 	download_no_intro_dats(client).await?;
 	info!("Successfully downloaded No-Intro DATs");
 
-	info!("Starting to download Public Redump DATs.");
+	info!("Starting to download Public Redump DATs");
 	download_redump_dats(client, RedumpType::Public).await?;
 	info!("Successfully downloaded Public Redump DATs");
-	info!("Starting to download Private Redump DATs.");
+	info!("Starting to download Private Redump DATs");
 	download_redump_dats(client, RedumpType::Private).await?;
 	info!("Successfully downloaded Private Redump DATs");
 
-	info!("Starting to download dats.site Legacy DATs.");
+	info!("Starting to download dats.site Legacy DATs");
 	download_dats_site_legacy_dats(client).await?;
 	info!("Successfully downloaded dats.site Legacy DATs");
 
@@ -121,7 +126,7 @@ pub async fn download_and_parse_dats(
 		let already_imported = is_dat_already_in_history(&hash, conn).await?;
 
 		if already_imported && !force_import {
-			debug!("Dat file already imported: {file:?}");
+			debug!("DAT file already imported: {file:?}");
 			crate::metrics::record_dat_ingestion_file(source_label, "skipped_duplicate");
 			continue;
 		}
@@ -130,9 +135,9 @@ pub async fn download_and_parse_dats(
 			Some(signature_group_name) => find_signature_group_by_name(signature_group_name, conn)
 				.await?
 				.ok_or_else(|| {
-					anyhow!("Signature Group not found in database (are all migrations applied?)")
+					anyhow!("signature group not found in database (are all migrations applied?)")
 				})?,
-			None => return Err(anyhow!("Signature Group not found")),
+			None => return Err(anyhow!("signature group not found")),
 		};
 
 		debug!("Importing DAT file: {file:?}");
@@ -144,7 +149,7 @@ pub async fn download_and_parse_dats(
 				crate::metrics::record_dat_ingestion_file(source_label, "imported");
 			}
 			Err(e) => {
-				error!("Failed to parse and import dat file: {file:?}, {e}");
+				error!("Failed to parse and import DAT file: {file:?}, {e}");
 				crate::metrics::record_dat_ingestion_file(source_label, "parse_error");
 			}
 		}

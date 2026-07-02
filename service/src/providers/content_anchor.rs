@@ -186,7 +186,7 @@ async fn reconcile_anchor(
 			.await
 			{
 				error!(
-					"content-anchor reconcile failed for game {game_id} provider {provider:?}: {e:#}"
+					"Content-anchor reconcile failed for game {game_id} provider {provider:?}: {e:#}"
 				);
 			}
 		}
@@ -218,14 +218,14 @@ pub async fn run_content_anchor_reconcile_wave(
 			let mut redis_conn = redis_conn.clone();
 			futures.push(tokio::spawn(async move {
 				if let Err(e) = reconcile_anchor(anchor_id, &db_conn, &mut redis_conn).await {
-					error!("content-anchor reconcile failed for anchor {anchor_id}: {e:#}");
+					error!("Content-anchor reconcile failed for anchor {anchor_id}: {e:#}");
 				}
 			}));
 		}
 
 		for future in futures {
 			if let Err(e) = future.await {
-				error!("content-anchor reconcile task panicked: {e:?}");
+				error!("Content-anchor reconcile task panicked: {e:?}");
 			}
 		}
 	}
@@ -299,7 +299,7 @@ pub async fn seed_mappings_from_sibling(
 		.await
 		{
 			error!(
-				"content-anchor seed failed for game {} provider {provider:?}: {e:#}",
+				"Content-anchor seed failed for game {} provider {provider:?}: {e:#}",
 				game.id
 			);
 		}

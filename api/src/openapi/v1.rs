@@ -191,7 +191,6 @@ use utoipa::OpenApi;
 #[openapi(
 	info(
 		title = "playmatch",
-		description = "A blazingly fast microservice for matching ROM file hashes and caching game metadata. Originally designed for RetroRealm.",
 		license(
 			name = "MIT",
 			url = "https://github.com/RetroRealm/playmatch/blob/develop/LICENSE.md"

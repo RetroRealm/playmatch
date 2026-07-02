@@ -8,7 +8,6 @@ impl MigrationTrait for Migration {
 	async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
 		let conn = manager.get_connection();
 
-		// Create the update timestamp function
 		let create_function_sql = r#"
         CREATE OR REPLACE FUNCTION update_modified_column()
         RETURNS TRIGGER AS $$
@@ -30,7 +29,6 @@ impl MigrationTrait for Migration {
 		conn.execute_unprepared(create_signature_group_trigger_sql)
 			.await?;
 
-		// Create the trigger for the posts table
 		let create_dat_file_trigger_sql = r#"
         CREATE TRIGGER update_dat_file_modified_time
         BEFORE UPDATE ON dat_file
@@ -39,7 +37,6 @@ impl MigrationTrait for Migration {
         "#;
 		conn.execute_unprepared(create_dat_file_trigger_sql).await?;
 
-		// Create the trigger for the posts table
 		let create_dat_file_import_trigger_sql = r#"
         CREATE TRIGGER update_dat_file_import_modified_time
         BEFORE UPDATE ON dat_file_import
@@ -49,7 +46,6 @@ impl MigrationTrait for Migration {
 		conn.execute_unprepared(create_dat_file_import_trigger_sql)
 			.await?;
 
-		// Create the trigger for the posts table
 		let create_company_trigger_sql = r#"
         CREATE TRIGGER update_company_modified_time
         BEFORE UPDATE ON company
@@ -58,7 +54,6 @@ impl MigrationTrait for Migration {
         "#;
 		conn.execute_unprepared(create_company_trigger_sql).await?;
 
-		// Create the trigger for the posts table
 		let create_platform_trigger_sql = r#"
         CREATE TRIGGER update_platform_modified_time
         BEFORE UPDATE ON platform
@@ -67,7 +62,6 @@ impl MigrationTrait for Migration {
         "#;
 		conn.execute_unprepared(create_platform_trigger_sql).await?;
 
-		// Create the trigger for the posts table
 		let create_game_trigger_sql = r#"
         CREATE TRIGGER update_game_modified_time
         BEFORE UPDATE ON game
@@ -76,7 +70,6 @@ impl MigrationTrait for Migration {
         "#;
 		conn.execute_unprepared(create_game_trigger_sql).await?;
 
-		// Create the trigger for the posts table
 		let create_game_file_trigger_sql = r#"
         CREATE TRIGGER update_game_file_modified_time
         BEFORE UPDATE ON game_file
@@ -86,7 +79,6 @@ impl MigrationTrait for Migration {
 		conn.execute_unprepared(create_game_file_trigger_sql)
 			.await?;
 
-		// Create the trigger for the posts table
 		let create_signature_metadata_mapping_trigger_sql = r#"
         CREATE TRIGGER update_signature_metadata_mapping_modified_time
         BEFORE UPDATE ON signature_metadata_mapping
@@ -102,7 +94,6 @@ impl MigrationTrait for Migration {
 	async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
 		let conn = manager.get_connection();
 
-		// Drop triggers
 		conn.execute_unprepared(
 			"DROP TRIGGER IF EXISTS update_signature_group_modified_time ON signature_group;",
 		)
@@ -130,7 +121,6 @@ impl MigrationTrait for Migration {
 		conn.execute_unprepared("DROP TRIGGER IF EXISTS update_signature_metadata_mapping_modified_time ON signature_metadata_mapping;")
 			.await?;
 
-		// Drop the function
 		conn.execute_unprepared("DROP FUNCTION IF EXISTS update_modified_column;")
 			.await?;
 

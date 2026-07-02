@@ -35,7 +35,7 @@ pub struct IdentifyRomArgs {
 pub struct SearchGamesArgs {
 	/// The human game title to search for, for example "pokemon diamond".
 	pub query: String,
-	/// Optional playmatch platform id as a UUID string to narrow the search.
+	/// Optional Playmatch platform id as a UUID string to narrow the search.
 	pub platform_id: Option<String>,
 	/// Optional maximum number of candidates to return.
 	pub limit: Option<u32>,
@@ -43,31 +43,31 @@ pub struct SearchGamesArgs {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GameIdArgs {
-	/// The playmatch game id as a UUID string.
+	/// The Playmatch game id as a UUID string.
 	pub game_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GameFileIdArgs {
-	/// The playmatch game file id as a UUID string.
+	/// The Playmatch game file id as a UUID string.
 	pub game_file_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct CompanyIdArgs {
-	/// The playmatch company id as a UUID string.
+	/// The Playmatch company id as a UUID string.
 	pub company_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct PlatformIdArgs {
-	/// The playmatch platform id as a UUID string.
+	/// The Playmatch platform id as a UUID string.
 	pub platform_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct SignatureGroupIdArgs {
-	/// The playmatch signature group id as a UUID string.
+	/// The Playmatch signature group id as a UUID string.
 	pub signature_group_id: String,
 }
 
@@ -87,13 +87,13 @@ pub struct ListDatFilesArgs {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct DatFileIdArgs {
-	/// The playmatch dat file id as a UUID string.
+	/// The Playmatch dat file id as a UUID string.
 	pub dat_file_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ListDatFileGamesArgs {
-	/// The playmatch dat file id as a UUID string.
+	/// The Playmatch dat file id as a UUID string.
 	pub dat_file_id: String,
 	/// Only include games present in the dat file's current release. Defaults to true.
 	pub current_only: Option<bool>,
@@ -107,7 +107,7 @@ pub struct ListDatFileGamesArgs {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GameFilesArgs {
-	/// The playmatch game id as a UUID string.
+	/// The Playmatch game id as a UUID string.
 	pub game_id: String,
 	/// Only include files present in the current release. Defaults to true.
 	pub current_only: Option<bool>,
@@ -174,7 +174,7 @@ fn not_found(kind: &str, id: &str) -> CallToolResult {
 }
 
 fn internal_error(context: &str, err: anyhow::Error) -> ErrorData {
-	log::error!("mcp internal error in {context}: {err:?}");
+	log::error!("MCP internal error in {context}: {err:?}");
 	ErrorData::internal_error("internal error".to_string(), None)
 }
 
@@ -265,7 +265,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Find a playmatch game by human title when you do not have a hash. Fuzzy substring search over the catalogue, ordered by relevance, returning candidate ids, names and platforms. Pass a returned id to playmatch_get_game for the full record. Optional platform_id narrows to a platform; optional limit caps the candidates."
+		description = "Find a Playmatch game by human title when you do not have a hash. Fuzzy substring search over the catalogue, ordered by relevance, returning candidate ids, names and platforms. Pass a returned id to playmatch_get_game for the full record. Optional platform_id narrows to a platform; optional limit caps the candidates."
 	)]
 	async fn playmatch_search_games_by_name(
 		&self,
@@ -296,7 +296,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Fetch a single game and its external metadata by its playmatch game id. DAT-currency fields such as current_in_latest_dat are populated only by playmatch_get_game_with_relations."
+		description = "Fetch a single game and its external metadata by its Playmatch game id. DAT-currency fields such as current_in_latest_dat are populated only by playmatch_get_game_with_relations."
 	)]
 	async fn playmatch_get_game(
 		&self,
@@ -315,7 +315,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Fetch a game with its full relations (platform, company, signature group, dat file and files) by its playmatch game id."
+		description = "Fetch a game with its full relations (platform, company, signature group, dat file and files) by its Playmatch game id."
 	)]
 	async fn playmatch_get_game_with_relations(
 		&self,
@@ -334,7 +334,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Return the dat file imports a game file was seen in, newest first, by its playmatch game file id."
+		description = "Return the dat file imports a game file was seen in, newest first, by its Playmatch game file id."
 	)]
 	async fn playmatch_get_game_file_history(
 		&self,
@@ -358,7 +358,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Fetch a single company and its external metadata by its playmatch company id."
+		description = "Fetch a single company and its external metadata by its Playmatch company id."
 	)]
 	async fn playmatch_get_company(
 		&self,
@@ -387,7 +387,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Fetch a single platform with its related company and external metadata by its playmatch platform id."
+		description = "Fetch a single platform with its related company and external metadata by its Playmatch platform id."
 	)]
 	async fn playmatch_get_platform(
 		&self,
@@ -405,7 +405,7 @@ impl PlaymatchMcp {
 		}
 	}
 
-	#[tool(description = "List every signature group (dat publisher) known to playmatch.")]
+	#[tool(description = "List every signature group (dat publisher) known to Playmatch.")]
 	async fn playmatch_list_signature_groups(&self) -> Result<CallToolResult, ErrorData> {
 		let json = tools::list_signature_groups_json(&self.db)
 			.await
@@ -413,7 +413,7 @@ impl PlaymatchMcp {
 		Ok(ok_text(json))
 	}
 
-	#[tool(description = "Fetch a single signature group by its playmatch signature group id.")]
+	#[tool(description = "Fetch a single signature group by its Playmatch signature group id.")]
 	async fn playmatch_get_signature_group(
 		&self,
 		Parameters(args): Parameters<SignatureGroupIdArgs>,
@@ -464,7 +464,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "Fetch a single dat file with its related entities and aggregate game counts by its playmatch dat file id."
+		description = "Fetch a single dat file with its related entities and aggregate game counts by its Playmatch dat file id."
 	)]
 	async fn playmatch_get_dat_file(
 		&self,
@@ -483,7 +483,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "List the games in a dat file by its playmatch dat file id. Defaults to current games only; set current_only false for every game ever seen. Opt into per-game files with include_files and external metadata mappings with include_mappings; cap with limit."
+		description = "List the games in a dat file by its Playmatch dat file id. Defaults to current games only; set current_only false for every game ever seen. Opt into per-game files with include_files and external metadata mappings with include_mappings; cap with limit."
 	)]
 	async fn playmatch_list_dat_file_games(
 		&self,
@@ -509,7 +509,7 @@ impl PlaymatchMcp {
 	}
 
 	#[tool(
-		description = "List the catalogued files (rom dumps with their hashes) of a game by its playmatch game id. Defaults to current files only; set current_only false for every file ever seen. Cap with limit."
+		description = "List the catalogued files (ROM dumps with their hashes) of a game by its Playmatch game id. Defaults to current files only; set current_only false for every file ever seen. Cap with limit."
 	)]
 	async fn playmatch_get_game_files(
 		&self,
@@ -584,8 +584,7 @@ impl PlaymatchMcp {
 		}
 		if args.items.len() > MAX_BULK_ITEMS {
 			return Ok(bad_input(format!(
-				"batch too large: {} items exceeds the limit of {MAX_BULK_ITEMS}",
-				args.items.len()
+				"batch exceeds the {MAX_BULK_ITEMS}-item cap"
 			)));
 		}
 
@@ -634,7 +633,7 @@ impl ServerHandler for PlaymatchMcp {
 	fn get_info(&self) -> ServerInfo {
 		let mut info = ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
 			.with_instructions(
-				"playmatch identifies game ROMs by hash and exposes the playmatch catalogue. \
+				"Playmatch identifies game ROMs by hash and exposes the Playmatch catalogue. \
 				 Use the identify tools to resolve a ROM file to a game; they accept SHA256, \
 				 SHA1, MD5 and CRC hashes plus file name and size, and try them from most to \
 				 least accurate. When you have no ROM and no hash, only a human title, use \

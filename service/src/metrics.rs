@@ -49,14 +49,14 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	let cache_events = IntCounterVec::new(
 		Opts::new(
 			"api_cache_events_total",
-			"Cache hits and misses, labelled by subsystem and lookup kind",
+			"Cache hits and misses, labeled by subsystem and lookup kind",
 		),
 		&["cache", "lookup", "result"],
 	)?;
 	registry.register(Box::new(cache_events.clone()))?;
 	CACHE_EVENTS
 		.set(cache_events)
-		.map_err(|_| anyhow::anyhow!("cache metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("cache metrics already initialized"))?;
 
 	let cache_l1_size = IntGaugeVec::new(
 		Opts::new(
@@ -68,7 +68,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(cache_l1_size.clone()))?;
 	CACHE_L1_SIZE
 		.set(cache_l1_size)
-		.map_err(|_| anyhow::anyhow!("cache l1 size metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("cache l1 size metrics already initialized"))?;
 
 	let identify_attempts = IntCounterVec::new(
 		Opts::new(
@@ -80,19 +80,19 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(identify_attempts.clone()))?;
 	IDENTIFY_ATTEMPTS
 		.set(identify_attempts)
-		.map_err(|_| anyhow::anyhow!("identify metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("identify metrics already initialized"))?;
 
 	let service_errors = IntCounterVec::new(
 		Opts::new(
 			"api_service_errors_total",
-			"Errors returned to clients, labelled by collapsed variant",
+			"Errors returned to clients, labeled by collapsed variant",
 		),
 		&["variant"],
 	)?;
 	registry.register(Box::new(service_errors.clone()))?;
 	SERVICE_ERRORS
 		.set(service_errors)
-		.map_err(|_| anyhow::anyhow!("service error metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("service error metrics already initialized"))?;
 
 	let metadata_auto_matches = IntCounterVec::new(
 		Opts::new(
@@ -104,7 +104,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(metadata_auto_matches.clone()))?;
 	METADATA_AUTO_MATCHES
 		.set(metadata_auto_matches)
-		.map_err(|_| anyhow::anyhow!("metadata auto match metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("metadata auto match metrics already initialized"))?;
 
 	let match_rung_outcomes = IntCounterVec::new(
 		Opts::new(
@@ -116,7 +116,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(match_rung_outcomes.clone()))?;
 	MATCH_RUNG_OUTCOMES
 		.set(match_rung_outcomes)
-		.map_err(|_| anyhow::anyhow!("match rung outcome metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("match rung outcome metrics already initialized"))?;
 
 	let metadata_token_refreshes = IntCounterVec::new(
 		Opts::new(
@@ -128,7 +128,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(metadata_token_refreshes.clone()))?;
 	METADATA_TOKEN_REFRESHES
 		.set(metadata_token_refreshes)
-		.map_err(|_| anyhow::anyhow!("metadata token refresh metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("metadata token refresh metrics already initialized"))?;
 
 	let background_job_runs = IntCounterVec::new(
 		Opts::new(
@@ -140,7 +140,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(background_job_runs.clone()))?;
 	BACKGROUND_JOB_RUNS
 		.set(background_job_runs)
-		.map_err(|_| anyhow::anyhow!("background job run metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("background job run metrics already initialized"))?;
 
 	let background_job_duration = HistogramVec::new(
 		HistogramOpts::new(
@@ -155,7 +155,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(background_job_duration.clone()))?;
 	BACKGROUND_JOB_DURATION
 		.set(background_job_duration)
-		.map_err(|_| anyhow::anyhow!("background job duration metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("background job duration metrics already initialized"))?;
 
 	let background_job_last_success = IntGaugeVec::new(
 		Opts::new(
@@ -167,7 +167,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(background_job_last_success.clone()))?;
 	BACKGROUND_JOB_LAST_SUCCESS
 		.set(background_job_last_success)
-		.map_err(|_| anyhow::anyhow!("background job last success metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("background job last success metrics already initialized"))?;
 
 	let metadata_requests = IntCounterVec::new(
 		Opts::new(
@@ -179,7 +179,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(metadata_requests.clone()))?;
 	METADATA_REQUESTS
 		.set(metadata_requests)
-		.map_err(|_| anyhow::anyhow!("metadata request metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("metadata request metrics already initialized"))?;
 
 	let metadata_request_duration = HistogramVec::new(
 		HistogramOpts::new(
@@ -194,7 +194,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(metadata_request_duration.clone()))?;
 	METADATA_REQUEST_DURATION
 		.set(metadata_request_duration)
-		.map_err(|_| anyhow::anyhow!("metadata request duration metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("metadata request duration metrics already initialized"))?;
 
 	let dat_ingestion_files = IntCounterVec::new(
 		Opts::new(
@@ -206,7 +206,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(dat_ingestion_files.clone()))?;
 	DAT_INGESTION_FILES
 		.set(dat_ingestion_files)
-		.map_err(|_| anyhow::anyhow!("dat ingestion metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("dat ingestion metrics already initialized"))?;
 
 	let clone_of_resolutions = IntCounterVec::new(
 		Opts::new(
@@ -218,7 +218,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(clone_of_resolutions.clone()))?;
 	CLONE_OF_RESOLUTIONS
 		.set(clone_of_resolutions)
-		.map_err(|_| anyhow::anyhow!("clone-of metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("clone-of metrics already initialized"))?;
 
 	let user_actions = IntCounterVec::new(
 		Opts::new(
@@ -230,7 +230,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(user_actions.clone()))?;
 	USER_ACTIONS
 		.set(user_actions)
-		.map_err(|_| anyhow::anyhow!("user action metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("user action metrics already initialized"))?;
 
 	let user_agents = IntCounterVec::new(
 		Opts::new(
@@ -242,7 +242,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(user_agents.clone()))?;
 	USER_AGENTS
 		.set(user_agents)
-		.map_err(|_| anyhow::anyhow!("user agent metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("user agent metrics already initialized"))?;
 
 	let launchbox_import_records = IntCounterVec::new(
 		Opts::new(
@@ -254,7 +254,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(launchbox_import_records.clone()))?;
 	LAUNCHBOX_IMPORT_RECORDS
 		.set(launchbox_import_records)
-		.map_err(|_| anyhow::anyhow!("launchbox import metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("launchbox import metrics already initialized"))?;
 
 	let openvgdb_import_records = IntCounterVec::new(
 		Opts::new(
@@ -266,7 +266,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(openvgdb_import_records.clone()))?;
 	OPENVGDB_IMPORT_RECORDS
 		.set(openvgdb_import_records)
-		.map_err(|_| anyhow::anyhow!("openvgdb import metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("openvgdb import metrics already initialized"))?;
 
 	let retroachievements_import_records = IntCounterVec::new(
 		Opts::new(
@@ -278,7 +278,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(retroachievements_import_records.clone()))?;
 	RETROACHIEVEMENTS_IMPORT_RECORDS
 		.set(retroachievements_import_records)
-		.map_err(|_| anyhow::anyhow!("retroachievements import metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("retroachievements import metrics already initialized"))?;
 
 	let screenscraper_quota_exhaustion = IntCounterVec::new(
 		Opts::new(
@@ -290,7 +290,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(screenscraper_quota_exhaustion.clone()))?;
 	SCREENSCRAPER_QUOTA_EXHAUSTION
 		.set(screenscraper_quota_exhaustion)
-		.map_err(|_| anyhow::anyhow!("screenscraper quota metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("screenscraper quota metrics already initialized"))?;
 
 	let metadata_request_inflight = IntGaugeVec::new(
 		Opts::new(
@@ -302,7 +302,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(metadata_request_inflight.clone()))?;
 	METADATA_REQUEST_INFLIGHT
 		.set(metadata_request_inflight)
-		.map_err(|_| anyhow::anyhow!("metadata request inflight metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("metadata request inflight metrics already initialized"))?;
 
 	let metadata_request_attempts = IntCounterVec::new(
 		Opts::new(
@@ -314,7 +314,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(metadata_request_attempts.clone()))?;
 	METADATA_REQUEST_ATTEMPTS
 		.set(metadata_request_attempts)
-		.map_err(|_| anyhow::anyhow!("metadata request attempts metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("metadata request attempts metrics already initialized"))?;
 
 	let provider_concurrency_configured = IntGaugeVec::new(
 		Opts::new(
@@ -326,7 +326,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(provider_concurrency_configured.clone()))?;
 	PROVIDER_CONCURRENCY_CONFIGURED
 		.set(provider_concurrency_configured)
-		.map_err(|_| anyhow::anyhow!("provider concurrency metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("provider concurrency metrics already initialized"))?;
 
 	let cross_match_attempts = IntCounterVec::new(
 		Opts::new(
@@ -338,7 +338,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(cross_match_attempts.clone()))?;
 	CROSS_MATCH_ATTEMPTS
 		.set(cross_match_attempts)
-		.map_err(|_| anyhow::anyhow!("cross match metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("cross match metrics already initialized"))?;
 
 	let thegamesdb_api_calls = IntCounterVec::new(
 		Opts::new(
@@ -350,7 +350,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(thegamesdb_api_calls.clone()))?;
 	THEGAMESDB_API_CALLS
 		.set(thegamesdb_api_calls)
-		.map_err(|_| anyhow::anyhow!("thegamesdb api metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("thegamesdb api metrics already initialized"))?;
 
 	let thegamesdb_cycle_calls = IntGauge::new(
 		"api_thegamesdb_cycle_calls_current",
@@ -359,7 +359,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(thegamesdb_cycle_calls.clone()))?;
 	THEGAMESDB_CYCLE_CALLS
 		.set(thegamesdb_cycle_calls)
-		.map_err(|_| anyhow::anyhow!("thegamesdb cycle calls metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("thegamesdb cycle calls metrics already initialized"))?;
 
 	let thegamesdb_remaining_allowance = IntGauge::new(
 		"api_thegamesdb_remaining_allowance",
@@ -369,7 +369,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	THEGAMESDB_REMAINING_ALLOWANCE
 		.set(thegamesdb_remaining_allowance)
 		.map_err(|_| {
-			anyhow::anyhow!("thegamesdb remaining allowance metrics already initialised")
+			anyhow::anyhow!("thegamesdb remaining allowance metrics already initialized")
 		})?;
 
 	let external_suggestion_queue_depth = IntGauge::new(
@@ -379,31 +379,31 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(external_suggestion_queue_depth.clone()))?;
 	EXTERNAL_SUGGESTION_QUEUE_DEPTH
 		.set(external_suggestion_queue_depth)
-		.map_err(|_| anyhow::anyhow!("external suggestion queue metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("external suggestion queue metrics already initialized"))?;
 
 	let http_rate_limit_rejected = IntCounterVec::new(
 		Opts::new(
 			"api_http_rate_limit_rejected_total",
-			"Incoming HTTP requests rejected by the rate limiter, labelled by client classification",
+			"Incoming HTTP requests rejected by the rate limiter, labeled by client classification",
 		),
 		&["client_classification"],
 	)?;
 	registry.register(Box::new(http_rate_limit_rejected.clone()))?;
 	HTTP_RATE_LIMIT_REJECTED
 		.set(http_rate_limit_rejected)
-		.map_err(|_| anyhow::anyhow!("http rate limit rejected metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("http rate limit rejected metrics already initialized"))?;
 
 	let http_requests_inflight = IntGaugeVec::new(
 		Opts::new(
 			"api_http_requests_inflight",
-			"Current in-flight inbound HTTP requests, labelled by matched route template and method",
+			"Current in-flight inbound HTTP requests, labeled by matched route template and method",
 		),
 		&["route", "method"],
 	)?;
 	registry.register(Box::new(http_requests_inflight.clone()))?;
 	HTTP_REQUESTS_INFLIGHT
 		.set(http_requests_inflight)
-		.map_err(|_| anyhow::anyhow!("http requests inflight metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("http requests inflight metrics already initialized"))?;
 
 	let db_pool_connections = IntGaugeVec::new(
 		Opts::new(
@@ -415,7 +415,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(db_pool_connections.clone()))?;
 	DB_POOL_CONNECTIONS
 		.set(db_pool_connections)
-		.map_err(|_| anyhow::anyhow!("db pool metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("db pool metrics already initialized"))?;
 
 	let identify_latency = HistogramVec::new(
 		HistogramOpts::new(
@@ -430,36 +430,36 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(identify_latency.clone()))?;
 	IDENTIFY_LATENCY
 		.set(identify_latency)
-		.map_err(|_| anyhow::anyhow!("identify latency metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("identify latency metrics already initialized"))?;
 
 	let identify_hit_position = IntCounterVec::new(
 		Opts::new(
 			"api_identify_hit_position_total",
-			"Identify hits labelled by the hash type that produced the hit",
+			"Identify hits labeled by the hash type that produced the hit",
 		),
 		&["hash_type"],
 	)?;
 	registry.register(Box::new(identify_hit_position.clone()))?;
 	IDENTIFY_HIT_POSITION
 		.set(identify_hit_position)
-		.map_err(|_| anyhow::anyhow!("identify hit position metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("identify hit position metrics already initialized"))?;
 
 	let auth_attempts = IntCounterVec::new(
 		Opts::new(
 			"api_auth_attempts_total",
-			"Authentication outcomes labelled by reason (success, missing_header, unknown_token, permission_denied)",
+			"Authentication outcomes labeled by reason (success, missing_header, unknown_token, permission_denied)",
 		),
 		&["outcome"],
 	)?;
 	registry.register(Box::new(auth_attempts.clone()))?;
 	AUTH_ATTEMPTS
 		.set(auth_attempts)
-		.map_err(|_| anyhow::anyhow!("auth attempts metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("auth attempts metrics already initialized"))?;
 
 	let auth_latency = HistogramVec::new(
 		HistogramOpts::new(
 			"api_auth_latency_seconds",
-			"Authentication call latency labelled by outcome",
+			"Authentication call latency labeled by outcome",
 		)
 		.buckets(vec![
 			0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5,
@@ -469,7 +469,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(auth_latency.clone()))?;
 	AUTH_LATENCY
 		.set(auth_latency)
-		.map_err(|_| anyhow::anyhow!("auth latency metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("auth latency metrics already initialized"))?;
 
 	let upstream_unavailable = IntCounterVec::new(
 		Opts::new(
@@ -481,31 +481,31 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(upstream_unavailable.clone()))?;
 	UPSTREAM_UNAVAILABLE
 		.set(upstream_unavailable)
-		.map_err(|_| anyhow::anyhow!("upstream unavailable metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("upstream unavailable metrics already initialized"))?;
 
 	let builder_errors = IntCounterVec::new(
 		Opts::new(
 			"api_builder_errors_total",
-			"Builder validation errors labelled by builder and failing field",
+			"Builder validation errors labeled by builder and failing field",
 		),
 		&["builder", "field"],
 	)?;
 	registry.register(Box::new(builder_errors.clone()))?;
 	BUILDER_ERRORS
 		.set(builder_errors)
-		.map_err(|_| anyhow::anyhow!("builder errors metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("builder errors metrics already initialized"))?;
 
 	let bulk_identify_items = IntCounterVec::new(
 		Opts::new(
 			"api_bulk_identify_items_total",
-			"Bulk identify items processed, labelled by per-item outcome (ok, invalid, error)",
+			"Bulk identify items processed, labeled by per-item outcome (ok, invalid, error)",
 		),
 		&["outcome"],
 	)?;
 	registry.register(Box::new(bulk_identify_items.clone()))?;
 	BULK_IDENTIFY_ITEMS
 		.set(bulk_identify_items)
-		.map_err(|_| anyhow::anyhow!("bulk identify items metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("bulk identify items metrics already initialized"))?;
 
 	let bulk_identify_batch_size = HistogramVec::new(
 		HistogramOpts::new(
@@ -518,19 +518,19 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(bulk_identify_batch_size.clone()))?;
 	BULK_IDENTIFY_BATCH_SIZE
 		.set(bulk_identify_batch_size)
-		.map_err(|_| anyhow::anyhow!("bulk identify batch size metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("bulk identify batch size metrics already initialized"))?;
 
 	let bulk_by_id_items = IntCounterVec::new(
 		Opts::new(
 			"api_bulk_by_id_items_total",
-			"Bulk get-by-id items resolved, labelled by resource and per-item outcome (ok, not_found)",
+			"Bulk get-by-id items resolved, labeled by resource and per-item outcome (ok, not_found)",
 		),
 		&["resource", "outcome"],
 	)?;
 	registry.register(Box::new(bulk_by_id_items.clone()))?;
 	BULK_BY_ID_ITEMS
 		.set(bulk_by_id_items)
-		.map_err(|_| anyhow::anyhow!("bulk by id items metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("bulk by id items metrics already initialized"))?;
 
 	let bulk_by_id_batch_size = HistogramVec::new(
 		HistogramOpts::new(
@@ -543,7 +543,7 @@ pub fn init(registry: &Registry) -> anyhow::Result<()> {
 	registry.register(Box::new(bulk_by_id_batch_size.clone()))?;
 	BULK_BY_ID_BATCH_SIZE
 		.set(bulk_by_id_batch_size)
-		.map_err(|_| anyhow::anyhow!("bulk by id batch size metrics already initialised"))?;
+		.map_err(|_| anyhow::anyhow!("bulk by id batch size metrics already initialized"))?;
 
 	Ok(())
 }

@@ -364,7 +364,7 @@ async fn run_api_rung(
 			.await
 			{
 				debug!(
-					"tgdb upsert from api hit failed for id {}: {e}",
+					"TheGamesDB upsert from api hit failed for id {}: {e}",
 					api_game.id
 				);
 			} else if let Some(alts) = &api_game.alternates {
@@ -386,7 +386,7 @@ async fn run_api_rung(
 						insert_tgdb_aliases(api_game.id, &alias_rows, client.db_conn()).await
 				{
 					debug!(
-						"tgdb alias insert from api hit failed for id {}: {e}",
+						"TheGamesDB alias insert from api hit failed for id {}: {e}",
 						api_game.id
 					);
 				}

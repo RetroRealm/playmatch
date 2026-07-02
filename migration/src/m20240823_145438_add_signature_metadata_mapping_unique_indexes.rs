@@ -21,7 +21,7 @@ impl MigrationTrait for Migration {
 
 		let ids_to_delete = signature_metadata_mapping::Entity::find()
 			.from_raw_sql(Statement::from_sql_and_values(
-				DbBackend::Postgres, // Use the appropriate DbBackend (e.g., Postgres, MySql, etc.)
+				DbBackend::Postgres,
 				r#"
                 SELECT a.id FROM signature_metadata_mapping a
                 INNER JOIN signature_metadata_mapping b

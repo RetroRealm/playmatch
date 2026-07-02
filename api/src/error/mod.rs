@@ -10,13 +10,13 @@ pub enum Error {
 	#[error("a database error occurred: {0}")]
 	DbError(anyhow::Error),
 
-	#[error("Authentication failed: {0}")]
+	#[error("authentication failed: {0}")]
 	InvalidAuth(String),
 
-	#[error("You do not have permission to perform this action")]
+	#[error("insufficient permissions for this action")]
 	InvalidAuthPermission,
 
-	#[error("User was not found")]
+	#[error("user not found")]
 	UserNotFound,
 
 	#[error("{0}")]

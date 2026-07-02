@@ -56,15 +56,15 @@ pub(crate) fn spawn_cache_write(
 ) {
 	tokio::spawn(async move {
 		if let Err(e) = redis_conn.set_ex(&cache_key, payload, ttl_secs).await {
-			warn!("cache write failed for {cache_key}: {e}");
+			warn!("Cache write failed for {cache_key}: {e}");
 		}
 	});
 }
 
-/// Normalise free-text input before using it as a cache key suffix. Lowercase,
+/// Normalize free-text input before using it as a cache key suffix. Lowercase,
 /// trim, and collapse internal whitespace so `"Pokemon"`, `" pokemon "`, and
 /// `"POKEMON"` all hit the same entry. The return value is a sha256 hex digest
-/// of the normalised form, keeping the key short and free of `:` separators
+/// of the normalized form, keeping the key short and free of `:` separators
 /// that could collide with the namespace layout.
 pub fn normalised_key_hash(input: &str) -> String {
 	let mut normalised = String::with_capacity(input.len());

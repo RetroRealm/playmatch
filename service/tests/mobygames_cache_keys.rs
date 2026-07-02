@@ -31,7 +31,7 @@ fn mg_game_by_id_layout_is_stable() {
 
 #[test]
 fn mg_game_search_layout_is_stable() {
-	// The trailing component is a sha256 of the normalised query; assert the
+	// The trailing component is a sha256 of the normalized query; assert the
 	// surrounding shape only.
 	assert!(
 		provider_cache_key("mobygames", "game:search", "deadbeef")

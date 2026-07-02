@@ -188,7 +188,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create signature_group table
 		manager
 			.create_table(
 				Table::create()
@@ -249,7 +248,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create unique index on company name
 		manager
 			.create_index(
 				Index::create()
@@ -261,7 +259,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create platform table
 		manager
 			.create_table(
 				Table::create()
@@ -299,7 +296,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create unique index on platform name
 		manager
 			.create_index(
 				Index::create()
@@ -321,7 +317,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create dat_file table
 		manager
 			.create_table(
 				Table::create()
@@ -378,7 +373,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create indexes for dat_file table
 		manager
 			.create_index(
 				Index::create()
@@ -416,7 +410,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create dat_file_import table
 		manager
 			.create_table(
 				Table::create()
@@ -462,7 +455,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create indexes for dat_file_import table
 		manager
 			.create_index(
 				Index::create()
@@ -502,7 +494,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create game table
 		manager
 			.create_table(
 				Table::create()
@@ -555,7 +546,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create indexes for game table
 		manager
 			.create_index(
 				Index::create()
@@ -584,7 +574,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create game_file table
 		manager
 			.create_table(
 				Table::create()
@@ -629,7 +618,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create indexes for game_file table
 		manager
 			.create_index(
 				Index::create()
@@ -676,7 +664,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create signature_metadata_mapping table
 		manager
 			.create_table(
 				Table::create()
@@ -776,7 +763,6 @@ impl MigrationTrait for Migration {
 			)
 			.await?;
 
-		// Create indexes for signature_metadata_mapping table
 		manager
 			.create_index(
 				Index::create()
@@ -831,7 +817,7 @@ impl MigrationTrait for Migration {
 	}
 
 	async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-		// Drop tables in reverse order to handle foreign key dependencies correctly
+		// Drop in reverse creation order so foreign keys resolve.
 		manager
 			.drop_table(
 				Table::drop()

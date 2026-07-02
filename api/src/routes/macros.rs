@@ -1,6 +1,8 @@
 //! Provider-agnostic route wrappers. Each provider defines a thin prefilled
 //! wrapper macro in its own `routes/<provider>.rs` so per-entity invocations
-//! stay terse.
+//! stay terse. Only the IGDB routes invoke these macros today, so the
+//! generated doc text names IGDB directly; a future second consumer needs to
+//! parametrize the provider name.
 //!
 //! The macros assume the following are in scope at the invocation site:
 //! `actix_web::web::Data`, `actix_web::{HttpResponse, Responder, get}`,
@@ -17,9 +19,10 @@ macro_rules! __provider_id_route_impl {
 		$route:literal,
 		$fn_name:ident,
 		$cached_fn:ident,
-		$model:ty
+		$model:ty,
+		$summary:literal
 	) => {
-		/// Returns one entity by id.
+		#[doc = $summary]
 		#[utoipa::path(get, tag = $tag, params(IdQuery), responses((status = 200, description = "The matched entity", body = $model), (status = 404, description = "Entity not found")))]
 		#[get($route)]
 		pub async fn $fn_name(
@@ -53,9 +56,10 @@ macro_rules! __provider_ids_route_impl {
 		$route:literal,
 		$fn_name:ident,
 		$cached_fn:ident,
-		$model:ty
+		$model:ty,
+		$summary:literal
 	) => {
-		/// Looks up many entities by id in one request.
+		#[doc = $summary]
 		#[utoipa::path(get, tag = $tag, params(IdsQuery), responses((status = 200, description = "The matched entities", body = Vec<$model>)))]
 		#[get($route)]
 		pub async fn $fn_name(
@@ -81,8 +85,14 @@ macro_rules! __provider_ids_route_impl {
 
 /// Pastes the singular-id and bulk-ids route impls together. Kept as two impls
 /// because utoipa cannot toggle `body = $model` vs `body = Vec<$model>` inside
-/// a single derive input. Pluralisation is irregular, so both fn names and
+/// a single derive input. Pluralization is irregular, so both fn names and
 /// both routes are passed explicitly.
+///
+/// `$singular_summary`/`$plural_summary` are full doc strings, not just the
+/// entity name: `#[utoipa::path]` reads doc comments from the unexpanded
+/// attribute list, so a `concat!`-built literal never resolves to the
+/// `Expr::Lit` it requires. Declarative macros cannot synthesize a new string
+/// literal from parts, so callers pass the finished sentence.
 #[macro_export]
 macro_rules! __provider_entity_routes_impl {
 	(
@@ -93,7 +103,9 @@ macro_rules! __provider_entity_routes_impl {
 		$plural_route:literal,
 		$plural_fn:ident,
 		$cached_fn:ident,
-		$model:ty
+		$model:ty,
+		$singular_summary:literal,
+		$plural_summary:literal
 	) => {
 		$crate::__provider_id_route_impl!(
 			$client_ty,
@@ -101,7 +113,8 @@ macro_rules! __provider_entity_routes_impl {
 			$singular_route,
 			$singular_fn,
 			$cached_fn,
-			$model
+			$model,
+			$singular_summary
 		);
 		$crate::__provider_ids_route_impl!(
 			$client_ty,
@@ -109,7 +122,8 @@ macro_rules! __provider_entity_routes_impl {
 			$plural_route,
 			$plural_fn,
 			$cached_fn,
-			$model
+			$model,
+			$plural_summary
 		);
 	};
 }

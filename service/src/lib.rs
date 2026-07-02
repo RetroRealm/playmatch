@@ -1,3 +1,8 @@
+//! Core domain crate of Playmatch: DAT file ingestion, the identify cascade,
+//! the provider matching pipeline, the database query layer, and Redis
+//! caching. The api crate exposes this over HTTP and the mcp crate exposes it
+//! to MCP clients.
+
 pub mod bulk;
 pub mod cache;
 pub mod config;

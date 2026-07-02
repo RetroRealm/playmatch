@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 build = "build.rs"
 authors = ["DevYukine <devyukine@gmx.de>"]
-description = "A simple matchmaking service"
+description = "ROM identification and game metadata service"
 
 [workspace]
 members = [".", "api", "service", "entity", "migration", "mcp"]

@@ -33,11 +33,11 @@ pub struct PlatformMetadataResponse {
 	/// The name of the platform.
 	pub name: String,
 
-	/// Optional name of the company that made the platform.
+	/// The name of the company that made the platform, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_name: Option<String>,
 
-	/// Optional ID of the company that made the platform.
+	/// The id of the company that made the platform, absent when unknown.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company_id: Option<Uuid>,
 
@@ -56,22 +56,22 @@ pub struct GameMetadataResponse {
 	/// The name of the game.
 	pub name: String,
 
-	/// Optional description of the game.
+	/// A description of the game, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
 
-	/// Optional categories for the game.
+	/// Categories for the game, absent when the dat provides none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub categories: Option<Vec<String>>,
 
-	/// Optional which game this game is a clone of (different editions/versions).
+	/// The id of the game this game is a clone of (a different edition or regional version), absent when the game is not a clone.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub clone_of: Option<Uuid>,
 
-	/// When the game was created inside playmatch.
+	/// When the game was created inside Playmatch.
 	pub created_at: DateTime<Utc>,
 
-	/// When the game was last updated inside playmatch.
+	/// When the game was last updated inside Playmatch.
 	pub updated_at: DateTime<Utc>,
 
 	/// External metadata mappings for the game (one row per matched provider).
@@ -83,29 +83,29 @@ pub struct GameMetadataResponse {
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalMetadata {
-	/// The Name of the metadata provider.
+	/// The name of the metadata provider.
 	pub provider_name: MetadataProvider,
 
-	/// The ID of the game for this provider.
+	/// The id of the game, company, or platform on the metadata provider, absent when there is no match.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider_id: Option<String>,
 
-	/// Type of how this game was matched to this Provider
+	/// How this game was matched to this provider.
 	pub match_type: MetadataMatchType,
 
-	/// Optional Comment about the match.
+	/// A comment about the match, absent when there is none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub comment: Option<String>,
 
-	/// Optional Type of manual match
+	/// The type of manual match, absent when the match is not manual.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub manual_match_type: Option<ManualMatchMode>,
 
-	/// Optional Reason why the match failed
+	/// Why the automatic match failed, absent when the match did not fail.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub failed_match_reason: Option<FailedMatchReason>,
 
-	/// Optional Reason for automatic match
+	/// The reason for an automatic match, absent when the match was not automatic or when the reason has no v1 representation.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub automatic_match_reason: Option<AutomaticMatchReason>,
 }
@@ -135,16 +135,16 @@ pub enum MetadataProvider {
 	Hasheous,
 }
 
-/// Match types for a game
+/// How a game, platform or company was matched to a metadata provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum MetadataMatchType {
-	/// The game was automatically matched.
+	/// The game was matched automatically, without human input.
 	Automatic,
 
 	/// Automatic game matching failed and no manual match was done.
 	Failed,
 
-	/// The game was manually matched
+	/// The game was matched by hand; `manualMatchType` records the trust level of the match.
 	Manual,
 
 	/// No match was done.
@@ -154,13 +154,13 @@ pub enum MetadataMatchType {
 /// How a game was manually matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum ManualMatchMode {
-	/// Game was manually matched by an Admin, which is the most trusted match.
+	/// Matched by an Admin user; the most trusted manual match.
 	Admin,
 
-	/// Game was manually matched by the community (via Discord as example).
+	/// Matched by the community, for example through an approved suggestion.
 	Community,
 
-	/// Game was manually matched by a trusted user
+	/// Matched by a user with Trusted permissions.
 	Trusted,
 }
 
@@ -184,16 +184,16 @@ pub enum FailedMatchReason {
 /// Reason why a game was automatically matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum AutomaticMatchReason {
-	/// Matched by an alternative name which was exactly matching the title.
+	/// Matched by an alternative name exactly matching the title.
 	AlternativeName,
 
-	/// Matched by the direct name which was exactly matching the title.
+	/// Matched by the game's direct name exactly matching the title.
 	DirectName,
 
-	/// A Game which is a clone of this game (a different version) was matched.
+	/// A game which is a clone of this game (a different version) was matched.
 	ViaChild,
 
-	/// A Game which this game is a clone of (a different version) was matched.
+	/// A game which this game is a clone of (a different version) was matched.
 	ViaParent,
 
 	/// Matched by the normalized name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
@@ -214,7 +214,7 @@ pub enum AutomaticMatchReason {
 	/// Matched by another provider's canonical title via cross-provider name propagation, exact lower-case compare.
 	CrossProviderDirectName,
 
-	/// Matched by another provider's canonical title via cross-provider name propagation, after normalisation.
+	/// Matched by another provider's canonical title via cross-provider name propagation, after normalization.
 	CrossProviderNormalizedName,
 }
 
@@ -222,29 +222,29 @@ pub enum AutomaticMatchReason {
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalMetadataV2 {
-	/// The Name of the metadata provider.
+	/// The name of the metadata provider.
 	pub provider_name: MetadataProvider,
 
-	/// The ID of the game for this provider.
+	/// The id of the game, company, or platform on the metadata provider, absent when there is no match.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub provider_id: Option<String>,
 
-	/// Type of how this game was matched to this Provider
+	/// How this game was matched to this provider.
 	pub match_type: MetadataMatchType,
 
-	/// Optional Comment about the match.
+	/// A comment about the match, absent when there is none.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub comment: Option<String>,
 
-	/// Optional Type of manual match
+	/// The type of manual match, absent when the match is not manual.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub manual_match_type: Option<ManualMatchMode>,
 
-	/// Optional Reason why the match failed
+	/// Why the automatic match failed, absent when the match did not fail.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub failed_match_reason: Option<FailedMatchReason>,
 
-	/// Optional Reason for automatic match
+	/// The reason for an automatic match, absent when the match was not automatic.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub automatic_match_reason: Option<AutomaticMatchReasonV2>,
 }
@@ -252,16 +252,16 @@ pub struct ExternalMetadataV2 {
 /// Reason why a game was automatically matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum AutomaticMatchReasonV2 {
-	/// Matched by an alternative name which was exactly matching the title.
+	/// Matched by an alternative name exactly matching the title.
 	AlternativeName,
 
-	/// Matched by the direct name which was exactly matching the title.
+	/// Matched by the game's direct name exactly matching the title.
 	DirectName,
 
-	/// A Game which is a clone of this game (a different version) was matched.
+	/// A game which is a clone of this game (a different version) was matched.
 	ViaChild,
 
-	/// A Game which this game is a clone of (a different version) was matched.
+	/// A game which this game is a clone of (a different version) was matched.
 	ViaParent,
 
 	/// Matched by the normalized name (colons and dashes removed, Leading and trailing `The ` and `, The` removed, Leading and trailing `A ` and `An ` removed) matching the normalized title.
@@ -282,7 +282,7 @@ pub enum AutomaticMatchReasonV2 {
 	/// Matched by another provider's canonical title via cross-provider name propagation, exact lower-case compare.
 	CrossProviderDirectName,
 
-	/// Matched by another provider's canonical title via cross-provider name propagation, after normalisation.
+	/// Matched by another provider's canonical title via cross-provider name propagation, after normalization.
 	CrossProviderNormalizedName,
 
 	/// Propagated from a content-sibling game that shares the same file hash set.

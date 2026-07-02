@@ -106,6 +106,9 @@ fn match_game_to_igdb(
 			.search_game_by_name_and_platform(&clean_name, platform_igdb_id)
 			.await?;
 
+		// Candidates split into three buckets: direct and normalized name matches
+		// are resolved from the search response alone, but alternative names are
+		// not included in it, so needs_alt candidates require a second API call.
 		let mut direct: Vec<ScoredCand<'_>> = vec![];
 		let mut normalized: Vec<ScoredCand<'_>> = vec![];
 		let mut needs_alt: Vec<(&IgdbGame, CandidateScore, Option<i16>)> = vec![];
@@ -386,6 +389,8 @@ async fn get_game_platform_igdb_id(game: &Model, db_conn: &DbConn) -> anyhow::Re
 	})
 }
 
+// Deliberately mirrors match_game_to_igdb's direct/normalized/alternative-name
+// rung cascade, one sibling name at a time.
 pub fn match_game_via_sibling_name_igdb(
 	game: Model,
 	sibling_names: Vec<String>,

@@ -1,7 +1,8 @@
-//! Postgres-backed tests for the chunk F9 v2 endpoints: service-wide stats,
-//! per-platform stats, the game-file presence changelog and the signature-group
-//! games listing. They drive the real actix v2 scope end to end so routing
-//! precedence, the count aggregation and the 404 paths are all exercised.
+//! Postgres-backed tests for the v2 stats, presence and signature-group-games
+//! endpoints: service-wide stats, per-platform stats, the game-file presence
+//! changelog and the signature-group games listing. They drive the real
+//! actix v2 scope end to end so routing precedence, the count aggregation
+//! and the 404 paths are all exercised.
 //! Require Docker.
 
 use actix_web::web::Data;

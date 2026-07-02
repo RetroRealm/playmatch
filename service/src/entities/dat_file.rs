@@ -162,14 +162,14 @@ async fn build_summary(model: dat_file::Model, conn: &DbConn) -> anyhow::Result<
 
 	let signature_group = signature_group.ok_or_else(|| {
 		anyhow::anyhow!(
-			"signature group {} missing for dat file {}",
+			"signature group {} missing for DAT file {}",
 			model.signature_group_id,
 			model.id
 		)
 	})?;
 	let platform = platform.ok_or_else(|| {
 		anyhow::anyhow!(
-			"platform {} missing for dat file {}",
+			"platform {} missing for DAT file {}",
 			model.platform_id,
 			model.id
 		)
@@ -261,14 +261,14 @@ fn summary_from_maps(
 		.get(&model.signature_group_id)
 		.ok_or_else(|| {
 			anyhow::anyhow!(
-				"signature group {} missing for dat file {}",
+				"signature group {} missing for DAT file {}",
 				model.signature_group_id,
 				model.id
 			)
 		})?;
 	let platform = platforms.get(&model.platform_id).ok_or_else(|| {
 		anyhow::anyhow!(
-			"platform {} missing for dat file {}",
+			"platform {} missing for DAT file {}",
 			model.platform_id,
 			model.id
 		)

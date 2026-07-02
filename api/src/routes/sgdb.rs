@@ -104,8 +104,8 @@ pub async fn search_sgdb_games(
 
 #[rustfmt::skip]
 macro_rules! sgdb_assets_by_game_route {
-	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
-		#[doc = $tag_summary]
+	($route:literal, $fn_name:ident, $cached_fn:ident, $summary:literal, $tag_summary:literal) => {
+		#[doc = $summary]
 		#[utoipa::path(
 							get,
 							tag = "SteamGridDB",
@@ -136,8 +136,8 @@ macro_rules! sgdb_assets_by_game_route {
 
 #[rustfmt::skip]
 macro_rules! sgdb_assets_by_platform_route {
-	($route:literal, $fn_name:ident, $cached_fn:ident, $tag_summary:literal) => {
-		#[doc = $tag_summary]
+	($route:literal, $fn_name:ident, $cached_fn:ident, $summary:literal, $tag_summary:literal) => {
+		#[doc = $summary]
 		#[utoipa::path(
 							get,
 							tag = "SteamGridDB",
@@ -171,12 +171,14 @@ sgdb_assets_by_game_route!(
 	"/sgdb/grids",
 	get_sgdb_grids_by_game,
 	get_sgdb_grids_by_game_cached,
+	"Returns the grid assets for a SteamGridDB game.",
 	"The grid assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/grids/by-platform",
 	get_sgdb_grids_by_platform,
 	get_sgdb_grids_by_platform_cached,
+	"Returns the grid assets for an external platform id.",
 	"The grid assets for the external platform id"
 );
 
@@ -184,12 +186,14 @@ sgdb_assets_by_game_route!(
 	"/sgdb/heroes",
 	get_sgdb_heroes_by_game,
 	get_sgdb_heroes_by_game_cached,
+	"Returns the hero assets for a SteamGridDB game.",
 	"The hero assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/heroes/by-platform",
 	get_sgdb_heroes_by_platform,
 	get_sgdb_heroes_by_platform_cached,
+	"Returns the hero assets for an external platform id.",
 	"The hero assets for the external platform id"
 );
 
@@ -197,12 +201,14 @@ sgdb_assets_by_game_route!(
 	"/sgdb/logos",
 	get_sgdb_logos_by_game,
 	get_sgdb_logos_by_game_cached,
+	"Returns the logo assets for a SteamGridDB game.",
 	"The logo assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/logos/by-platform",
 	get_sgdb_logos_by_platform,
 	get_sgdb_logos_by_platform_cached,
+	"Returns the logo assets for an external platform id.",
 	"The logo assets for the external platform id"
 );
 
@@ -210,11 +216,13 @@ sgdb_assets_by_game_route!(
 	"/sgdb/icons",
 	get_sgdb_icons_by_game,
 	get_sgdb_icons_by_game_cached,
+	"Returns the icon assets for a SteamGridDB game.",
 	"The icon assets for the SteamGridDB game"
 );
 sgdb_assets_by_platform_route!(
 	"/sgdb/icons/by-platform",
 	get_sgdb_icons_by_platform,
 	get_sgdb_icons_by_platform_cached,
+	"Returns the icon assets for an external platform id.",
 	"The icon assets for the external platform id"
 );

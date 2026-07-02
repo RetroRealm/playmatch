@@ -15,22 +15,22 @@ use utoipa::{IntoParams, ToSchema};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, IntoParams, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameFileMatchSearch {
-	/// The file name of the game file.
+	/// The file name of the game file. At most 512 characters.
 	pub file_name: String,
 
-	/// The size of the game file in bytes.
+	/// The size of the game file in bytes. Must be non-negative.
 	pub file_size: i64,
 
-	/// Optional MD5 hash of the game file.
+	/// The MD5 hash of the game file, 32 hex characters.
 	pub md5: Option<String>,
 
-	/// Optional SHA1 hash of the game file.
+	/// The SHA1 hash of the game file, 40 hex characters.
 	pub sha1: Option<String>,
 
-	/// Optional SHA256 hash of the game file.
+	/// The SHA256 hash of the game file, 64 hex characters.
 	pub sha256: Option<String>,
 
-	/// Optional CRC32 checksum of the game file.
+	/// The CRC32 checksum of the game file, 8 hex characters.
 	pub crc: Option<String>,
 }
 
@@ -50,7 +50,7 @@ impl GameFileMatchSearch {
 	}
 }
 
-/// Type of match for this game.
+/// How a game was matched: by which hash, by file name and size, or not at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, ToSchema)]
 pub enum GameMatchType {
 	/// Matched by SHA256 hash.
@@ -104,14 +104,14 @@ impl GameMatchType {
 	}
 }
 
-/// Result of a manual match.
+/// The outcome of a manual match for one entity, returned by the manual match endpoints.
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatedMatchResult {
-	/// ID of the entity matched (game, platform or company).
+	/// The id of the matched entity (game, platform or company).
 	pub id: Uuid,
 
-	/// The updated ExternalMetadata for the entity.
+	/// The updated external metadata mapping for the entity.
 	pub external_metadata: ExternalMetadata,
 }
 
@@ -137,7 +137,7 @@ pub struct GameAndRelationMatchResult {
 	/// The type of match that was found.
 	pub game_match_type: GameMatchType,
 
-	/// If a match was found, the game found.
+	/// If a match was found, the matched game.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub game: Option<PlaymatchGame>,
 
@@ -153,19 +153,19 @@ pub struct GameAndRelationMatchResult {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform: Option<PlaymatchPlatform>,
 
-	/// if a match was found, the signature group who published the dat file this game belongs to.
+	/// If a match was found, the signature group that published the dat file this game belongs to.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub signature_group: Option<PlaymatchSignatureGroup>,
 
-	/// if a match was found, the dat file this game belongs to.
+	/// If a match was found, the dat file this game belongs to.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dat_file: Option<PlaymatchDatFile>,
 
-	/// if a match was found, the dat file import this game belongs to.
+	/// If a match was found, the dat file import this game belongs to.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dat_file_import: Option<PlaymatchDatFileImport>,
 
-	/// If a match was found, External metadata for the game.
+	/// If a match was found, external metadata for the game.
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub external_metadata: Vec<ExternalMetadata>,
 }
@@ -174,27 +174,27 @@ pub struct GameAndRelationMatchResult {
 #[derive(Debug, Serialize, Deserialize, Clone, Builder, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameAndRelationsResult {
-	/// the game found.
+	/// The game found.
 	pub game: PlaymatchGame,
 
-	/// If a match was found, the game files for this game.
+	/// The game files for this game.
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub game_files: Vec<PlaymatchGameFile>,
 
-	/// If a match was found and a company for this platform exists, the company.
+	/// The company for this platform, when one exists.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub company: Option<PlaymatchCompany>,
 
-	/// If a match was found, the platform for this game.
+	/// The platform for this game.
 	pub platform: PlaymatchPlatform,
 
-	/// if a match was found, the signature group who published the dat file this game belongs to.
+	/// The signature group that published the dat file this game belongs to.
 	pub signature_group: PlaymatchSignatureGroup,
 
-	/// if a match was found, the dat file this game belongs to.
+	/// The dat file this game belongs to.
 	pub dat_file: PlaymatchDatFile,
 
-	/// if a match was found, the dat file import this game belongs to.
+	/// The dat file import this game belongs to.
 	pub dat_file_import: PlaymatchDatFileImport,
 
 	/// External metadata mappings for the game (one row per matched provider).
@@ -210,7 +210,7 @@ pub struct GameAndRelationMatchResultV2 {
 	/// The type of match that was found.
 	pub game_match_type: GameMatchType,
 
-	/// If a match was found, the game found.
+	/// If a match was found, the matched game.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub game: Option<PlaymatchGameV2>,
 
@@ -226,7 +226,7 @@ pub struct GameAndRelationMatchResultV2 {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub platform: Option<PlaymatchPlatformV2>,
 
-	/// If a match was found, the signature group who published the dat file this game belongs to.
+	/// If a match was found, the signature group that published the dat file this game belongs to.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub signature_group: Option<PlaymatchSignatureGroupV2>,
 
@@ -238,7 +238,7 @@ pub struct GameAndRelationMatchResultV2 {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub dat_file_import: Option<PlaymatchDatFileImportV2>,
 
-	/// If a match was found, External metadata for the game.
+	/// If a match was found, external metadata for the game.
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub external_metadata: Vec<ExternalMetadataV2>,
 
@@ -290,7 +290,7 @@ pub struct GameAndRelationsResultV2 {
 	/// The platform for this game.
 	pub platform: PlaymatchPlatformV2,
 
-	/// The signature group who published the dat file this game belongs to.
+	/// The signature group that published the dat file this game belongs to.
 	pub signature_group: PlaymatchSignatureGroupV2,
 
 	/// The dat file this game belongs to.

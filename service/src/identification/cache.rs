@@ -130,7 +130,7 @@ pub async fn bust_identify_cache_for_game(
 	}
 	if let Err(e) = redis_conn.del(&keys).await {
 		warn!(
-			"identify cache bust failed for game {game_id} ({} keys): {e}",
+			"Identify cache bust failed for game {game_id} ({} keys): {e}",
 			keys.len()
 		);
 	}
@@ -182,7 +182,7 @@ pub async fn bust_identify_cache_for_hashes(
 	}
 	if let Err(e) = redis_conn.del(&keys).await {
 		warn!(
-			"hash-aware identify cache bust failed ({} keys): {e}",
+			"Hash-aware identify cache bust failed ({} keys): {e}",
 			keys.len()
 		);
 	}

@@ -19,9 +19,7 @@ impl MigrationTrait for Migration {
 		Ok(())
 	}
 
-	// Postgres has no DROP VALUE for enum types without rewriting every column
-	// that references it; reverting an enum-extension migration is intentionally
-	// a no-op. To roll back, drop the dependent rows and recreate the type.
+	// Down is a no-op: enum-extension migrations cannot be reverted, see the crate doc in lib.rs.
 	async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
 		Ok(())
 	}

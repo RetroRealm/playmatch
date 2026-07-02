@@ -1,3 +1,9 @@
+//! IGDB client: typed lookups for the full IGDB API surface plus the name
+//! matcher wiring in `matching`. Authentication is Twitch OAuth2 with
+//! client-credentials tokens refreshed proactively 60 seconds before expiry,
+//! and every request goes through a tower stack that enforces IGDB's rate
+//! limit of 4 requests per second and retries transient failures.
+
 use crate::config::http::REQWEST_DEFAULT_USER_AGENT;
 use crate::http::abstraction::RetryPolicy;
 use crate::providers::igdb::constants::{
@@ -1165,7 +1171,7 @@ impl IgdbClient {
 			.await?;
 
 		debug!(
-			"igdb oauth refresh ok: token_type={:?} expires_in={:?}",
+			"IGDB oauth refresh ok: token_type={:?} expires_in={:?}",
 			token_result.token_type(),
 			token_result.expires_in(),
 		);
@@ -1192,6 +1198,7 @@ impl IgdbClient {
 			let now = Utc::now();
 			let diff = now - last_request;
 
+			// Refresh 60s before expiry so a token cannot lapse mid-request.
 			if diff.num_seconds() + 60 > token.expires_in().unwrap_or_default().as_secs() as i64 {
 				drop(oauth2);
 				return self.refresh_token_instrumented("expired").await;
@@ -1289,11 +1296,11 @@ impl IgdbClient {
 			))
 			.build()?;
 
-		debug!("igdb request: {} {}", req.method(), req.url().path());
+		debug!("IGDB request: {} {}", req.method(), req.url().path());
 		if let Some(body) = req.body()
 			&& let Some(bytes) = body.as_bytes()
 		{
-			debug!("igdb request body: {:?}", std::str::from_utf8(bytes)?);
+			debug!("IGDB request body: {:?}", std::str::from_utf8(bytes)?);
 		}
 
 		let rate_limited_future = self.service.lock().await.ready().await?.call(req);
@@ -1304,7 +1311,7 @@ impl IgdbClient {
 		let body = res.text().await?;
 		if log::log_enabled!(log::Level::Debug) {
 			let preview: String = body.chars().take(256).collect();
-			debug!("igdb response (first 256 chars): {preview}");
+			debug!("IGDB response (first 256 chars): {preview}");
 		}
 
 		Ok(serde_json::from_str(&body)?)

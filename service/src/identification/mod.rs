@@ -1,3 +1,8 @@
+//! The identify cascade: this module tries each match type in order and
+//! assembles the response DTOs. `cache` owns the Redis-backed lookups and
+//! cache busting; `protocol` carries the cache-coherence bookkeeping and
+//! documents why it lives in its own file.
+
 pub mod cache;
 mod protocol;
 

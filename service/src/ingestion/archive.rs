@@ -15,7 +15,7 @@ pub async fn extract_if_archived(path: &PathBuf) -> anyhow::Result<()> {
 	if let Some(file_extension) = path.extension() {
 		let file_extension = file_extension.to_str().unwrap_or_default();
 		if file_extension == "zip" {
-			debug!("Found zip file, extracting...");
+			debug!("Found zip file, extracting");
 			extract_zip_in_same_path(path).await?;
 			debug!("Removing zip file: {path:?}");
 			tokio::fs::remove_file(path).await?;

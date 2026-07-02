@@ -38,7 +38,7 @@ pub async fn wrap_download_and_parse_dats(
 			"success"
 		}
 		Err(e) => {
-			error!("Failed to download and imported DATs: {e}");
+			error!("Failed to download and import DATs: {e}");
 			"failure"
 		}
 	};
