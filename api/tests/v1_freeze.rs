@@ -26,6 +26,8 @@ fn assert_or_update_golden(name: &str, actual: &str) {
 			"missing golden {name}; regenerate with UPDATE_GOLDEN=1 cargo test -p api --test v1_freeze"
 		)
 	});
+	// The golden is committed with LF; autocrlf checkouts read it back as CRLF.
+	let expected = expected.replace("\r\n", "\n");
 	assert_eq!(
 		expected.trim_end(),
 		actual.trim_end(),
