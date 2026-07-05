@@ -66,6 +66,7 @@ mod m20260620_150000_index_dat_file_import_timeline;
 mod m20260620_160000_add_signature_group_display_priority;
 mod m20260620_170000_create_content_anchor;
 mod m20260620_180000_add_content_hash_automatic_match_reason_enum_values;
+mod m20260705_120000_merge_redump_private_dat_files;
 
 pub struct Migrator;
 
@@ -132,6 +133,7 @@ impl MigratorTrait for Migrator {
 			Box::new(
 				m20260620_180000_add_content_hash_automatic_match_reason_enum_values::Migration,
 			),
+			Box::new(m20260705_120000_merge_redump_private_dat_files::Migration),
 		]
 	}
 }

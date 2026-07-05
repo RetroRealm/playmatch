@@ -11,7 +11,7 @@ use tokio::fs;
 
 pub use self::dats_site::download_dats_site_legacy_dats;
 pub use self::no_intro::download_no_intro_dats;
-pub use self::redump::{RedumpType, download_redump_dats};
+pub use self::redump::download_redump_dats;
 
 pub(super) async fn download_and_extract_dats(
 	client: &Client,

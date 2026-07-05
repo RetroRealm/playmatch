@@ -10,7 +10,7 @@ use crate::fs;
 use crate::fs::calculate_md5;
 use crate::ingestion::parser::import::parse_and_import_dat_file;
 use crate::ingestion::sources::{
-	RedumpType, download_dats_site_legacy_dats, download_no_intro_dats, download_redump_dats,
+	download_dats_site_legacy_dats, download_no_intro_dats, download_redump_dats,
 };
 use crate::matching::clone::populate_all_clone_of_ids;
 use crate::matching::content_anchor::assign_all_content_anchors;
@@ -41,16 +41,18 @@ pub async fn download_and_parse_dats(
 	let tmp_dir = current_dir.join(DATS_PATH).join(TMP_PATH);
 	tokio::fs::create_dir_all(&tmp_dir).await?;
 
+	// The redump-private source is gone; its dats now ship in the public daily
+	// pack. Drop any leftover download dir so a force import cannot resurrect
+	// the merged rows. Failure just means the leftovers linger, hence ignored.
+	let _ = tokio::fs::remove_dir_all(current_dir.join(DATS_PATH).join("redump-private")).await;
+
 	info!("Starting to download No-Intro DATs");
 	download_no_intro_dats(client).await?;
 	info!("Successfully downloaded No-Intro DATs");
 
-	info!("Starting to download Public Redump DATs");
-	download_redump_dats(client, RedumpType::Public).await?;
-	info!("Successfully downloaded Public Redump DATs");
-	info!("Starting to download Private Redump DATs");
-	download_redump_dats(client, RedumpType::Private).await?;
-	info!("Successfully downloaded Private Redump DATs");
+	info!("Starting to download Redump DATs");
+	download_redump_dats(client).await?;
+	info!("Successfully downloaded Redump DATs");
 
 	info!("Starting to download dats.site Legacy DATs");
 	download_dats_site_legacy_dats(client).await?;

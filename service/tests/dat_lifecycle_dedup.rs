@@ -264,3 +264,216 @@ async fn current_flag(db: &DbConn, table: &str, id: &str) -> bool {
 		.unwrap();
 	row.try_get::<bool>("", "is_current").unwrap()
 }
+
+const M_PLAT: &str = "aa000000-0000-0000-0000-000000000001";
+const M_PLAT2: &str = "aa000000-0000-0000-0000-000000000002";
+const M_PLAT3: &str = "aa000000-0000-0000-0000-000000000003";
+const PUB_DF: &str = "ab000000-0000-0000-0000-000000000001";
+const PRIV_DF: &str = "ab000000-0000-0000-0000-000000000002";
+const ORPH_DF: &str = "ab000000-0000-0000-0000-000000000003";
+const MERGED_DF: &str = "ab000000-0000-0000-0000-000000000004";
+const I_PUB: &str = "ac000000-0000-0000-0000-000000000001";
+const I_PRIV: &str = "ac000000-0000-0000-0000-000000000002";
+const I_ORPH: &str = "ac000000-0000-0000-0000-000000000003";
+const I_MERGED: &str = "ac000000-0000-0000-0000-000000000004";
+const PUB_GAME: &str = "ad000000-0000-0000-0000-000000000001";
+const PRIV_GAME: &str = "ad000000-0000-0000-0000-000000000002";
+const ORPH_GAME: &str = "ad000000-0000-0000-0000-000000000003";
+const MERGED_GAME: &str = "ad000000-0000-0000-0000-000000000004";
+const PUB_GF: &str = "ae000000-0000-0000-0000-000000000001";
+const PRIV_GF: &str = "ae000000-0000-0000-0000-000000000002";
+const ORPH_GF: &str = "ae000000-0000-0000-0000-000000000003";
+const MERGED_GF: &str = "ae000000-0000-0000-0000-000000000004";
+
+// A live private-era "Nintendo - Wii U (2025-07-19 10-00-00)" folds into its
+// clean public sibling, the counterpart-less underscore/date-stamped Xbox 360
+// dat is renamed in place, and an already-deduplicated lone "Sony -
+// PlayStation 3" passes through untouched. Re-running must be a no-op.
+#[tokio::test]
+async fn merge_migration_folds_private_dat_into_public_and_renames_orphans() {
+	let (_pg, db) = start_pg().await;
+	let sg = redump_sg_id(&db).await;
+	seed_private_merge_scenario(&db, &sg).await;
+
+	run_merge_migration(&db).await;
+	assert_merged_state(&db).await;
+
+	// Re-run over already-merged data to prove idempotency.
+	run_merge_migration(&db).await;
+	assert_merged_state(&db).await;
+}
+
+async fn run_merge_migration(db: &DbConn) {
+	let steps = rollback_steps_through("m20260705_120000_merge_redump_private_dat_files");
+	Migrator::down(db, Some(steps)).await.unwrap();
+	Migrator::up(db, None).await.unwrap();
+}
+
+async fn assert_merged_state(db: &DbConn) {
+	assert_eq!(
+		count_named(db, "Nintendo - Wii U").await,
+		1,
+		"the private Wii U duplicate must be merged into the public row"
+	);
+	assert_eq!(
+		scalar_uuid(
+			db,
+			"SELECT id AS v FROM dat_file WHERE name = 'Nintendo - Wii U'"
+		)
+		.await,
+		Some(Uuid::parse_str(PUB_DF).unwrap()),
+		"the surviving Wii U row must be the public canonical"
+	);
+	assert!(
+		dat_file_name(db, PRIV_DF).await.is_none(),
+		"the emptied private duplicate must be deleted"
+	);
+	assert_eq!(
+		scalar_uuid(
+			db,
+			&format!("SELECT dat_file_id AS v FROM dat_file_import WHERE id = '{I_PRIV}'"),
+		)
+		.await,
+		Some(Uuid::parse_str(PUB_DF).unwrap()),
+		"the private import must be repointed to the public row"
+	);
+	assert_eq!(
+		scalar_uuid(
+			db,
+			&format!("SELECT latest_dat_file_import_id AS v FROM dat_file WHERE id = '{PUB_DF}'"),
+		)
+		.await,
+		Some(Uuid::parse_str(I_PUB).unwrap()),
+		"the canonical must point at the newest import"
+	);
+
+	assert!(!is_current_game(db, PRIV_GAME).await);
+	assert!(!is_current_file(db, PRIV_GF).await);
+	assert!(is_current_game(db, PUB_GAME).await);
+	assert!(is_current_file(db, PUB_GF).await);
+
+	assert_eq!(
+		dat_file_name(db, ORPH_DF).await.as_deref(),
+		Some("Microsoft - Xbox 360"),
+		"the counterpart-less orphan must be renamed, not deleted"
+	);
+	assert!(is_current_game(db, ORPH_GAME).await);
+	assert!(is_current_file(db, ORPH_GF).await);
+	assert_eq!(
+		scalar_uuid(
+			db,
+			&format!("SELECT dat_file_id AS v FROM dat_file_import WHERE id = '{I_ORPH}'"),
+		)
+		.await,
+		Some(Uuid::parse_str(ORPH_DF).unwrap()),
+		"the orphan's import must stay put"
+	);
+
+	assert_eq!(
+		dat_file_name(db, MERGED_DF).await.as_deref(),
+		Some("Sony - PlayStation 3"),
+		"an already-deduplicated single dat must keep its name"
+	);
+	assert_eq!(
+		scalar_uuid(
+			db,
+			&format!(
+				"SELECT latest_dat_file_import_id AS v FROM dat_file WHERE id = '{MERGED_DF}'"
+			),
+		)
+		.await,
+		Some(Uuid::parse_str(I_MERGED).unwrap()),
+		"an already-deduplicated single dat must keep its latest pointer"
+	);
+	assert!(is_current_game(db, MERGED_GAME).await);
+	assert!(is_current_file(db, MERGED_GF).await);
+}
+
+async fn redump_sg_id(db: &DbConn) -> String {
+	scalar_uuid(
+		db,
+		"SELECT id AS v FROM signature_group WHERE name = 'Redump'",
+	)
+	.await
+	.expect("the Redump signature group is inserted by an earlier migration")
+	.to_string()
+}
+
+async fn seed_private_merge_scenario(db: &DbConn, sg: &str) {
+	let sql = format!(
+		r#"
+		INSERT INTO platform (id, name) VALUES ('{M_PLAT}', 'Wii U');
+		INSERT INTO platform (id, name) VALUES ('{M_PLAT2}', 'Xbox 360');
+		INSERT INTO platform (id, name) VALUES ('{M_PLAT3}', 'PlayStation 3');
+
+		INSERT INTO dat_file (id, name, platform_id, current_version, signature_group_id, latest_dat_file_import_id)
+		VALUES ('{PUB_DF}', 'Nintendo - Wii U', '{M_PLAT}', '2026-07-01', '{sg}', '{I_PUB}');
+		INSERT INTO dat_file (id, name, platform_id, current_version, signature_group_id, latest_dat_file_import_id)
+		VALUES ('{PRIV_DF}', 'Nintendo - Wii U (2025-07-19 10-00-00)', '{M_PLAT}', '2025-07-19', '{sg}', '{I_PRIV}');
+		INSERT INTO dat_file (id, name, platform_id, current_version, signature_group_id, latest_dat_file_import_id)
+		VALUES ('{ORPH_DF}', 'Microsoft_-_Xbox_360_-_2025_07_19', '{M_PLAT2}', '2025-07-19', '{sg}', '{I_ORPH}');
+		INSERT INTO dat_file (id, name, platform_id, current_version, signature_group_id, latest_dat_file_import_id)
+		VALUES ('{MERGED_DF}', 'Sony - PlayStation 3', '{M_PLAT3}', '2026-07-01', '{sg}', '{I_MERGED}');
+
+		INSERT INTO dat_file_import (id, dat_file_id, name, version, md5, imported_at)
+		VALUES ('{I_PUB}', '{PUB_DF}', 'Nintendo - Wii U.dat', '2026-07-01', 'pubpubpub', '2026-07-01 12:00:00+00');
+		INSERT INTO dat_file_import (id, dat_file_id, name, version, md5, imported_at)
+		VALUES ('{I_PRIV}', '{PRIV_DF}', 'Nintendo - Wii U (2025-07-19 10-00-00).dat', '2025-07-19', 'privpriv', '2025-07-19 12:00:00+00');
+		INSERT INTO dat_file_import (id, dat_file_id, name, version, md5, imported_at)
+		VALUES ('{I_ORPH}', '{ORPH_DF}', 'Microsoft_-_Xbox_360_-_2025_07_19.dat', '2025-07-19', 'orphorph', '2025-07-19 12:00:00+00');
+		INSERT INTO dat_file_import (id, dat_file_id, name, version, md5, imported_at)
+		VALUES ('{I_MERGED}', '{MERGED_DF}', 'Sony - PlayStation 3.dat', '2026-07-01', 'mrgmrgmr', '2026-07-01 12:00:00+00');
+
+		INSERT INTO game (id, dat_file_import_id, name, is_current, last_seen_dat_file_import_id)
+		VALUES ('{PUB_GAME}', '{I_PUB}', 'Some Wii U Game (USA)', true, '{I_PUB}');
+		INSERT INTO game (id, dat_file_import_id, name, is_current, last_seen_dat_file_import_id)
+		VALUES ('{PRIV_GAME}', '{I_PRIV}', 'Some Wii U Game (USA)', true, '{I_PRIV}');
+		INSERT INTO game (id, dat_file_import_id, name, is_current, last_seen_dat_file_import_id)
+		VALUES ('{ORPH_GAME}', '{I_ORPH}', 'Some Xbox Game (USA)', true, '{I_ORPH}');
+		INSERT INTO game (id, dat_file_import_id, name, is_current, last_seen_dat_file_import_id)
+		VALUES ('{MERGED_GAME}', '{I_MERGED}', 'Some PS3 Game (USA)', true, '{I_MERGED}');
+
+		INSERT INTO game_file (id, game_id, file_name, sha1, is_current, last_seen_dat_file_import_id)
+		VALUES ('{PUB_GF}', '{PUB_GAME}', 'Some Wii U Game (USA).iso', 'wiiupub1', true, '{I_PUB}');
+		INSERT INTO game_file (id, game_id, file_name, sha1, is_current, last_seen_dat_file_import_id)
+		VALUES ('{PRIV_GF}', '{PRIV_GAME}', 'Some Wii U Game (USA).iso', 'wiiupriv', true, '{I_PRIV}');
+		INSERT INTO game_file (id, game_id, file_name, sha1, is_current, last_seen_dat_file_import_id)
+		VALUES ('{ORPH_GF}', '{ORPH_GAME}', 'Some Xbox Game (USA).iso', 'xbox0001', true, '{I_ORPH}');
+		INSERT INTO game_file (id, game_id, file_name, sha1, is_current, last_seen_dat_file_import_id)
+		VALUES ('{MERGED_GF}', '{MERGED_GAME}', 'Some PS3 Game (USA).iso', 'ps3mrg01', true, '{I_MERGED}');
+		"#
+	);
+	db.execute_unprepared(&sql).await.unwrap();
+}
+
+async fn count_named(db: &DbConn, name: &str) -> i64 {
+	let row = db
+		.query_one(Statement::from_string(
+			db.get_database_backend(),
+			format!("SELECT count(*) AS cnt FROM dat_file WHERE name = '{name}'"),
+		))
+		.await
+		.unwrap()
+		.unwrap();
+	row.try_get::<i64>("", "cnt").unwrap()
+}
+
+async fn dat_file_name(db: &DbConn, id: &str) -> Option<String> {
+	db.query_one(Statement::from_string(
+		db.get_database_backend(),
+		format!("SELECT name FROM dat_file WHERE id = '{id}'"),
+	))
+	.await
+	.unwrap()
+	.map(|row| row.try_get::<String>("", "name").unwrap())
+}
+
+async fn scalar_uuid(db: &DbConn, sql: &str) -> Option<Uuid> {
+	db.query_one(Statement::from_string(
+		db.get_database_backend(),
+		sql.to_owned(),
+	))
+	.await
+	.unwrap()
+	.and_then(|row| row.try_get::<Option<Uuid>>("", "v").unwrap())
+}
