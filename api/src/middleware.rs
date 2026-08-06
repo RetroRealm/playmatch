@@ -291,22 +291,33 @@ impl Drop for InflightGuard {
 	}
 }
 
+/// Known API clients identified by their `User-Agent` prefix. Checked before
+/// the generic bot heuristic so e.g. RetroBot does not fall into the `bot`
+/// bucket.
+const KNOWN_CLIENTS: [(&str, &str); 3] = [
+	("RomM/", "romm"),
+	("rom-converto/", "rom-converto"),
+	("RetroBot/", "retrobot"),
+];
+
 fn classify_user_agent(ua: &str) -> (&'static str, String) {
 	if ua.is_empty() {
 		return ("none", String::new());
 	}
 
-	if let Some(rest) = ua.strip_prefix("RomM/") {
-		let raw = rest
-			.split(|c: char| c.is_whitespace() || c == ';' || c == ',')
-			.next()
-			.unwrap_or("");
-		let version = if is_safe_version(raw) {
-			raw.to_string()
-		} else {
-			"unknown".to_string()
-		};
-		return ("romm", version);
+	for (prefix, product) in KNOWN_CLIENTS {
+		if let Some(rest) = ua.strip_prefix(prefix) {
+			let raw = rest
+				.split(|c: char| c.is_whitespace() || c == ';' || c == ',')
+				.next()
+				.unwrap_or("");
+			let version = if is_safe_version(raw) {
+				raw.to_string()
+			} else {
+				"unknown".to_string()
+			};
+			return (product, version);
+		}
 	}
 
 	let ua_lower = ua.to_ascii_lowercase();
@@ -387,6 +398,22 @@ mod tests {
 		assert_eq!(
 			classify_user_agent("RomM/<script>"),
 			("romm", "unknown".to_string())
+		);
+	}
+
+	#[test]
+	fn rom_converto_version_is_extracted() {
+		assert_eq!(
+			classify_user_agent("rom-converto/0.4.1"),
+			("rom-converto", "0.4.1".to_string())
+		);
+	}
+
+	#[test]
+	fn retrobot_is_not_bucketed_as_bot() {
+		assert_eq!(
+			classify_user_agent("RetroBot/1.2.0 (https://github.com/RetroRealm/RetroBot)"),
+			("retrobot", "1.2.0".to_string())
 		);
 	}
 
